@@ -41,6 +41,21 @@
       "target": "api::category.category",
       "inversedBy": "articles"
     },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Multi-tenant: scope articles per site"
+    },
+    "views": {
+      "type": "integer",
+      "default": 0
+    },
+    "isFeatured": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show in Featured News section"
+    },
     "blocks": {
       "type": "dynamiczone",
       "components": ["shared.media", "shared.quote", "shared.rich-text", "shared.slider"]

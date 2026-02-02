@@ -1,0 +1,47 @@
+{
+  "kind": "singleType",
+  "collectionName": "homepages",
+  "info": {
+    "singularName": "homepage",
+    "pluralName": "homepages",
+    "displayName": "Homepage Layout",
+    "description": "Homepage hero, most-read section and banners"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "heroBanner": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "mostReadSectionTitle": {
+      "type": "string"
+    },
+    "mostReadSectionBanner": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "mostReadMaxItems": {
+      "type": "integer",
+      "default": 5
+    },
+    "flashNewsMessage": {
+      "type": "text",
+      "description": "Urgent scrolling message in red bar (FLASH NEWS)"
+    },
+    "flashNewsActive": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show/hide flash news bar"
+    }
+  }
+}

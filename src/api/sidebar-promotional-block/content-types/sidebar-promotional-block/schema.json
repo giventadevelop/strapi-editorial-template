@@ -1,0 +1,39 @@
+{
+  "kind": "singleType",
+  "collectionName": "sidebar_promotional_blocks",
+  "info": {
+    "singularName": "sidebar-promotional-block",
+    "pluralName": "sidebar-promotional-blocks",
+    "displayName": "Sidebar Promotional Block",
+    "description": "Video, social or banner block for sidebar"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "blockType": {
+      "type": "enumeration",
+      "enum": ["video", "social", "banner"]
+    },
+    "thumbnail": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "videoUrl": {
+      "type": "string"
+    },
+    "embedCode": {
+      "type": "text"
+    },
+    "moreVideosLink": {
+      "type": "string"
+    },
+    "rotateWithOthers": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

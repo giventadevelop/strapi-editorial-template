@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "tenants",
+  "info": {
+    "singularName": "tenant",
+    "pluralName": "tenants",
+    "displayName": "Tenant",
+    "description": "Multi-tenant sites (e.g. MOSC, Catholicate News)"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "tenantId": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "description": "Programmatic ID from frontend (e.g. tenant_demo_002). Use this for API filtering."
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "domain": {
+      "type": "string"
+    }
+  }
+}

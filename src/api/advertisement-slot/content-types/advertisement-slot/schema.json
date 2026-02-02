@@ -1,0 +1,44 @@
+{
+  "kind": "collectionType",
+  "collectionName": "advertisement_slots",
+  "info": {
+    "singularName": "advertisement-slot",
+    "pluralName": "advertisement-slots",
+    "displayName": "Advertisement Slot",
+    "description": "Ad placements with position, media and date range"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "position": {
+      "type": "enumeration",
+      "enum": ["top", "between_sections", "sidebar"]
+    },
+    "media": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images", "files", "videos"]
+    },
+    "embedHtml": {
+      "type": "text"
+    },
+    "startDate": {
+      "type": "datetime"
+    },
+    "endDate": {
+      "type": "datetime"
+    },
+    "priority": {
+      "type": "integer"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Optional: scope ad slot per tenant"
+    }
+  }
+}
