@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CMS Setup & Next Steps — Catholicate News (Strapi)</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 72rem; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.75rem; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+        h2 { font-size: 1.35rem; margin-top: 2rem; }
+        h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+        h4 { font-size: 1.05rem; margin-top: 1rem; }
+        p { margin: 0.75rem 0; }
+        ul, ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+        li { margin: 0.35rem 0; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; }
+        th { background: #f5f5f5; }
+        pre, code { background: #f5f5f5; font-family: ui-monospace, monospace; font-size: 0.9em; }
+        pre { padding: 1rem; overflow-x: auto; border-radius: 4px; white-space: pre-wrap; }
+        code { padding: 0.2em 0.4em; border-radius: 3px; }
+        pre code { padding: 0; background: none; }
+        section { margin-bottom: 2rem; }
+        .note { background: #f8f9fa; padding: 1rem; border-left: 4px solid #6c757d; margin: 1rem 0; }
+        .decision { background: #e7f3ff; padding: 1rem; border-left: 4px solid #0d6efd; margin: 1rem 0; }
+        .step { background: #f0f9f0; padding: 0.5rem 1rem; margin: 0.5rem 0; border-left: 4px solid #198754; }
+        .warning { background: #fff3cd; padding: 1rem; border-left: 4px solid #ffc107; margin: 1rem 0; }
+        .toc { background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 4px; margin: 1rem 0; }
+        .toc ul { list-style: none; padding-left: 0; }
+        .toc li { margin: 0.25rem 0; }
+        .toc a { color: #0d6efd; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <h1>CMS Setup & Next Steps — Catholicate News</h1>
+            <p>Based on <a href="init_requirements_spec.html">init_requirements_spec.html</a>. Step-by-step guide to set up Strapi CMS with all project requirements.</p>
+        </header>
+
+        <nav class="toc" aria-label="Table of contents">
+            <h2>Contents</h2>
+            <ul>
+                <li><a href="#decisions">1. Decisions (Local vs Cloud, Template vs Scratch)</a></li>
+                <li><a href="#clone-template">1.3 Clone Strapi Cloud Template from Git (Recommended)</a></li>
+                <li><a href="#prerequisites">2. Prerequisites</a></li>
+                <li><a href="#phase1">3. Phase 1 — Create Strapi Project</a></li>
+                <li><a href="#phase1-alt">3 (Alt). Phase 1 — Clone Strapi Cloud Template (Easier)</a></li>
+                <li><a href="#phase2">4. Phase 2 — Bootstrap with Editorial Template (or Equivalent)</a></li>
+                <li><a href="#phase3">5. Phase 3 — Add Project-Specific Content Types &amp; Features</a></li>
+                <li><a href="#phase4">6. Phase 4 — Multi-Tenant, i18n, Permissions</a></li>
+                <li><a href="#phase5">7. Phase 5 — Connect Next.js (mosc-temp)</a></li>
+                <li><a href="#checklist">8. Requirements Checklist</a></li>
+            </ul>
+        </nav>
+
+        <section id="decisions">
+            <h2>1. Decisions (Based on Documentation)</h2>
+
+            <div class="decision">
+                <h3>1.1 Local vs Strapi Cloud</h3>
+                <p><strong>Decision: Set up Strapi locally for development.</strong></p>
+                <ul>
+                    <li><strong>Why local:</strong> Easier to connect to the existing Next.js project (mosc-temp at <code>E:\project_workspace\mosc-temp</code>), full control over schema and lifecycle hooks, no vendor dependency during build, and fits the “budget-friendly / self-hosted” recommendation in the spec.</li>
+                    <li><strong>Strapi Cloud later:</strong> You can deploy the same codebase to Strapi Cloud for production if you want managed hosting, or self-host (VPS/Docker) for lowest cost.</li>
+                </ul>
+            </div>
+
+            <div class="decision">
+                <h3>1.2 Use Editorial Template or Start from Scratch?</h3>
+                <p><strong>Decision: Prefer cloning the official Strapi Cloud template repo locally (easiest); otherwise create from scratch with <code>create-strapi-app</code> and add content types manually.</strong></p>
+                <ul>
+                    <li>The spec states the editorial template “saves initial setup time (hours to days)” and “gives a common editorial baseline.”</li>
+                    <li>On Strapi Cloud, when you click “Use template” you get a <strong>Blog</strong> (editorial-style) template. The same project is available as a <strong>public Git repo</strong> — you can clone it and run it locally without using Strapi Cloud.</li>
+                    <li><strong>Recommended path:</strong> Clone <code>strapi/strapi-cloud-template-blog</code> into <code>cms/</code> in this repo, then extend it with Tenant, Sidebar Block, Ad Slot, and i18n. See <a href="#clone-template">§1.3</a> and <a href="#phase1-alt">Phase 1 (Alternative)</a> below.</li>
+                </ul>
+            </div>
+
+            <div class="decision" id="clone-template">
+                <h3>1.3 Replicate Strapi Cloud Editorial/Blog Template from Git — Is It a Good Approach?</h3>
+                <p><strong>Yes. Cloning the Strapi Cloud template from GitHub is a good approach and the easier way to get a solid, industry-standard start.</strong></p>
+                <ul>
+                    <li><strong>What you get:</strong> The same pre-configured Strapi project that Strapi Cloud offers when you “Use template” (Blog/editorial). It includes predefined content types (e.g. Article, Category), config, database migrations, sample data scripts, and a modern Strapi version (e.g. Strapi 5.x) with the latest rich-text editor and admin.</li>
+                    <li><strong>Rich text &amp; features:</strong> Strapi 5 ships with an improved rich-text editor and built-in features. The template gives you a working schema and seed data so you don’t build Article/Category from scratch. Internationalization (i18n) is built into Strapi — you enable it in Admin (Settings → Internationalization) and add locales; the template may or may not enable i18n by default, but turning it on is straightforward.</li>
+                    <li><strong>Easier way:</strong> Instead of running <code>create-strapi-app</code> and then manually creating every content type, clone the repo once, install dependencies, and run. Then add only what’s missing for your spec: Tenant, Sidebar Promotional Block, Advertisement Slot, and enable i18n if not already on.</li>
+                </ul>
+                <p><strong>Official repo:</strong> <code>https://github.com/strapi/strapi-cloud-template-blog</code>. It is public and maintained by Strapi. You can clone it into your repo (e.g. as <code>cms/</code>) and develop locally; later you can deploy the same codebase to Strapi Cloud or self-host.</p>
+                <div class="note">
+                    <strong>Easier way in one sentence:</strong> Clone <code>strapi/strapi-cloud-template-blog</code> into <code>cms/</code>, run <code>npm install</code> and <code>npm run develop</code>, then add Tenant, Sidebar Block, Ad Slot, and i18n — instead of creating Article/Category and the rest from scratch.
+                </div>
+            </div>
+
+            <section id="prerequisites">
+                <h2>2. Prerequisites</h2>
+                <ul>
+                    <li><strong>Node.js</strong> 18.x or 20.x (LTS). Check: <code>node -v</code></li>
+                    <li><strong>npm</strong> 8+ or <strong>yarn</strong>. Check: <code>npm -v</code> or <code>yarn -v</code></li>
+                    <li><strong>Database:</strong> SQLite (default, good for local dev) or PostgreSQL / MySQL if you prefer. Strapi will prompt during <code>create-strapi-app</code>.</li>
+                    <li><strong>Git:</strong> This project is in <code>catholicatenews-in-temp</code>; the Next.js front end is in <code>E:\project_workspace\mosc-temp</code>.</li>
+                </ul>
+            </section>
+
+        <section id="phase1">
+            <h2>3. Phase 1 — Create Strapi Project</h2>
+
+            <h3>Step 1.1 — Choose project location</h3>
+            <p>Create the CMS inside this repo so backend and docs stay together. From the repo root:</p>
+            <pre><code>cd E:\project_workspace\catholicatenews-in-temp
+mkdir cms
+cd cms</code></pre>
+
+            <h3>Step 1.2 — Create Strapi app</h3>
+            <div class="step">Run the official quickstart (interactive prompts for DB and project name):</div>
+            <pre><code>npx create-strapi-app@latest . --quickstart</code></pre>
+            <p>Or with a specific database (e.g. PostgreSQL) later you can run without <code>--quickstart</code> and choose options. For the fastest start, <code>--quickstart</code> uses SQLite and opens the admin registration in the browser.</p>
+
+            <h3>Step 1.3 — First run</h3>
+            <ul>
+                <li>When the process finishes, Strapi will start. Create the first admin user in the browser (e.g. <code>http://localhost:1337/admin</code>).</li>
+                <li>Stop the server (Ctrl+C) when done. We will add content types next.</li>
+            </ul>
+        </section>
+
+        <section id="phase1-alt">
+            <h2>3 (Alt). Phase 1 — Clone Strapi Cloud Template (Easier Start)</h2>
+            <p>Use this path if you want the official <a href="https://github.com/strapi/strapi-cloud-template-blog">Strapi Cloud Blog template</a> locally with minimal setup.</p>
+
+            <h3>Recommended: Clone into a <strong>different folder</strong> (avoid Git conflicts)</h3>
+            <p>If this project is already a Git repo (e.g. <code>catholicatenews-in-temp</code>), cloning the template into a <strong>separate folder</strong> and copying your documentation there is both possible and wise:</p>
+            <ul>
+                <li><strong>No Git conflict:</strong> The template has its own <code>.git</code> and history. Cloning it inside your repo would create a nested repo; cloning it <em>outside</em> keeps two clean repos.</li>
+                <li><strong>Steps:</strong> Clone <code>strapi-cloud-template-blog</code> into a new folder (e.g. <code>E:\project_workspace\catholicatenews-cms</code>), then copy your <code>documentation/</code> folder (and any other files you want) from <code>catholicatenews-in-temp</code> into that new project. The CMS project then contains the template + your specs and next-steps docs.</li>
+                <li><strong>Result:</strong> One repo = CMS (template + your docs + your future Strapi customizations). Your original repo can stay as-is or be archived. The Next.js front end (mosc-temp) points at this CMS repo when running locally or at its deployed URL.</li>
+            </ul>
+            <p>See <a href="#clone-separate-folder">§ “Clone in a separate folder (two-repo setup)”</a> below for exact commands.</p>
+
+            <h3>Step A.1 — Clone the template</h3>
+            <p><strong>Option 1 — Clone into a different folder (recommended when current project is already a Git repo):</strong></p>
+            <pre><code># From anywhere, e.g. project_workspace:
+cd E:\project_workspace
+git clone https://github.com/strapi/strapi-cloud-template-blog.git catholicatenews-cms
+cd catholicatenews-cms</code></pre>
+            <p>Then copy your documentation from the existing project:</p>
+            <pre><code># Create documentation folder and copy your docs (run from catholicatenews-cms):
+mkdir documentation
+copy E:\project_workspace\catholicatenews-in-temp\documentation\*.html documentation\
+copy E:\project_workspace\catholicatenews-in-temp\documentation\*.png documentation\</code></pre>
+            <p><strong>Option 2 — Clone into <code>cms/</code> inside this repo</strong> (only if you want CMS and docs in one repo and are okay with a nested Git clone or will remove <code>cms/.git</code> and commit the template files into the parent repo):</p>
+            <pre><code># From repo root (catholicatenews-in-temp):
+git clone https://github.com/strapi/strapi-cloud-template-blog.git cms
+cd cms</code></pre>
+            <p>If you use Option 2 and want a single repo (no nested clone), after cloning run <code>Remove-Item -Recurse -Force cms\.git</code> (PowerShell) so <code>cms/</code> is just files; then <code>git add cms</code> and commit. You lose easy <code>git pull</code> from the Strapi template.</p>
+
+            <h3>Step A.2 — Install dependencies</h3>
+            <pre><code>npm install
+# or: yarn install</code></pre>
+
+            <h3>Step A.3 — Optional: remove Strapi Cloud plugin for local-only use</h3>
+            <p>The template includes <code>@strapi/plugin-cloud</code> for Strapi Cloud deployment. For local development you can leave it (it won’t affect local run) or remove it to avoid Cloud prompts:</p>
+            <pre><code>npm uninstall @strapi/plugin-cloud</code></pre>
+            <p>If you remove it, delete or comment out its registration in <code>src/admin/app.js</code> (or the config file where plugins are loaded) if present.</p>
+
+            <h3>Step A.4 — First run</h3>
+            <pre><code>npm run develop
+# or: yarn develop</code></pre>
+            <p>Strapi will start (typically <code>http://localhost:1337</code>). Create the first admin user in the browser. The template usually includes seed scripts (e.g. <code>npm run seed:example</code>) — run them if you want sample articles/categories.</p>
+
+            <h3>Step A.5 — What you have out of the box</h3>
+            <ul>
+                <li>Predefined content types (e.g. Article, Category) and schema</li>
+                <li>Strapi 5 with the current rich-text editor and admin</li>
+                <li>Config, database migrations, and optional seed data</li>
+            </ul>
+            <p>Then follow <a href="#phase2">Phase 2</a> to add <strong>only what’s missing</strong>: Homepage Layout (single type), Sidebar Promotional Block, Advertisement Slot, Tenant, and enable i18n in Settings → Internationalization. You do not need to recreate Article/Category from scratch.</p>
+
+            <h3 id="clone-separate-folder">Clone in a separate folder (two-repo setup)</h3>
+            <p>When your current project is already a Git repo, cloning the template into a <strong>different folder</strong> avoids conflicts:</p>
+            <ol>
+                <li>Clone the template: <code>git clone https://github.com/strapi/strapi-cloud-template-blog.git catholicatenews-cms</code> (from <code>E:\project_workspace</code> or any parent folder).</li>
+                <li>Copy your documentation: create <code>documentation/</code> in <code>catholicatenews-cms</code> and copy <code>init_requirements_spec.html</code>, <code>cms_setup_next_steps.html</code>, and any images (e.g. <code>catholicatenews_in_full_screen_shot.png</code>) from <code>catholicatenews-in-temp\documentation\</code>.</li>
+                <li>Commit the docs in the new repo: <code>cd catholicatenews-cms</code> then <code>git add documentation</code>, <code>git commit -m "Add project documentation"</code>. The CMS project is now self-contained with template + your specs.</li>
+            </ol>
+            <p>Your original repo (<code>catholicatenews-in-temp</code>) can stay as-is or be archived. The Next.js front end (mosc-temp) will use this CMS project’s URL (local or deployed).</p>
+        </section>
+
+        <section id="phase2">
+            <h2>4. Phase 2 — Bootstrap with Editorial Template (or Equivalent)</h2>
+            <p>If you used <a href="#phase1-alt">Phase 1 (Alternative)</a> and cloned the Strapi Cloud template, you already have Article and Category. Add only: Homepage Layout, Sidebar Block, and (in Phase 3) Ad Slot and Tenant. If you started from <code>create-strapi-app</code> (Phase 1), create all content types below.</p>
+
+            <h3>Step 2.1 — Content-Type Builder (Admin UI)</h3>
+            <p>Start Strapi: from <code>cms/</code> run <code>npm run develop</code>. In Admin → Content-Type Builder:</p>
+            <ul>
+                <li><strong>If you cloned the Strapi Cloud template:</strong> Article and Category already exist. Create only: Homepage Layout (single type), Sidebar Promotional Block (single type), and in Phase 3 add Advertisement Slot and Tenant.</li>
+                <li><strong>If you started from <code>create-strapi-app</code>:</strong> Create all of the following.</li>
+            </ul>
+
+            <h4>Collection: Category</h4>
+            <p class="note">Skip if you cloned the Strapi Cloud template — Category already exists.</p>
+            <ul>
+                <li><code>name</code> (Text, short)</li>
+                <li><code>slug</code> (UID, attached to <code>name</code>)</li>
+                <li><code>description</code> (Text, long) — optional</li>
+            </ul>
+
+            <h4>Collection: Article</h4>
+            <p class="note">Skip if you cloned the Strapi Cloud template — Article already exists. If needed, add a <code>views</code> (Integer) field for “most read” and enable i18n in Settings → Internationalization.</p>
+            <ul>
+                <li><code>title</code> (Text)</li>
+                <li><code>slug</code> (UID, attached to <code>title</code>)</li>
+                <li><code>content</code> (Rich text)</li>
+                <li><code>excerpt</code> (Text, long) — optional</li>
+                <li><code>coverImage</code> (Media, single image)</li>
+                <li><code>category</code> (Relation: many Articles → one Category)</li>
+                <li><code>publishedAt</code> (Date) — use Strapi’s built-in draft/publish</li>
+                <li><code>views</code> (Integer, default 0) — for “most read” ordering (add this to the cloned template’s Article if missing)</li>
+            </ul>
+            <p class="note">Enable i18n on Article (and Category if you want per-locale categories) in Settings → Internationalization.</p>
+
+            <h4>Single Type: Homepage Layout (or “Homepage”)</h4>
+            <ul>
+                <li><code>title</code> (Text) — e.g. “Home”</li>
+                <li><code>heroBanner</code> (Media, single image)</li>
+                <li><code>mostReadSectionTitle</code> (Text)</li>
+                <li><code>mostReadSectionBanner</code> (Media, single image)</li>
+                <li><code>mostReadMaxItems</code> (Integer, default 5)</li>
+            </ul>
+
+            <h4>Single Type: Sidebar Promotional Block</h4>
+            <ul>
+                <li><code>blockType</code> (Enumeration: <code>video</code>, <code>social</code>, <code>banner</code>)</li>
+                <li><code>thumbnail</code> (Media, single image)</li>
+                <li><code>videoUrl</code> (Text) — or embed URL</li>
+                <li><code>embedCode</code> (Text, long) — for iframe/embed HTML</li>
+                <li><code>moreVideosLink</code> (Text) — URL</li>
+                <li><code>rotateWithOthers</code> (Boolean) — optional, for rotation</li>
+            </ul>
+            <p>Restart Strapi after creating types so API routes are generated.</p>
+        </section>
+
+        <section id="phase3">
+            <h2>5. Phase 3 — Add Project-Specific Content Types &amp; Features</h2>
+
+            <h3>Step 3.1 — Advertisement Slot (repeatable / collection or component)</h3>
+            <p>Create a collection <strong>Advertisement Slot</strong> (or a reusable component used in a “Layout” single type) with:</p>
+            <ul>
+                <li><code>position</code> (Enumeration: <code>top</code>, <code>between_sections</code>, <code>sidebar</code>)</li>
+                <li><code>media</code> (Media) or <code>embedHtml</code> (Text, long)</li>
+                <li><code>startDate</code> / <code>endDate</code> (DateTime) — active range</li>
+                <li><code>priority</code> (Integer) — for ordering/rotation</li>
+            </ul>
+
+            <h3>Step 3.2 — Most-read logic</h3>
+            <ul>
+                <li>Articles already have <code>views</code>. Expose a public or internal API from Next.js (or Strapi custom controller) to increment view count when a user opens an article.</li>
+                <li>In Next.js, fetch “most read” with: <code>GET /api/articles?sort=views:desc&amp;pagination[limit]=5</code> (and tenant/locale filters — see Phase 4).</li>
+            </ul>
+
+            <h3>Step 3.3 — Lifecycle hooks (optional but recommended)</h3>
+            <p>Use Strapi lifecycle hooks to auto-set <code>publishedAt</code>, validate relations, or (later) auto-assign tenant. Example location: <code>src/api/article/content-types/article/lifecycles.js</code>.</p>
+        </section>
+
+        <section id="phase4">
+            <h2>6. Phase 4 — Multi-Tenant, i18n, Permissions</h2>
+
+            <h3>Step 4.1 — Tenant (multi-tenant)</h3>
+            <p>Per the spec, use <strong>Pattern 1: Single Strapi + Tenant field</strong>.</p>
+            <ul>
+                <li>Create collection <strong>Tenant</strong>: <code>name</code>, <code>slug</code> (UID), <code>domain</code> (Text, optional).</li>
+                <li>Add relation <strong>tenant</strong> (many Articles → one Tenant) to Article. Also add <code>tenant</code> to Sidebar Promotional Block, Homepage, and Advertisement Slot if they are per-tenant.</li>
+                <li>In Strapi Admin, create a tenant (e.g. slug <code>mosc</code>). Assign it to content entries.</li>
+                <li>Use lifecycle hooks to auto-assign tenant from the current user’s context if you have per-tenant roles.</li>
+            </ul>
+
+            <h3>Step 4.2 — API filtering by tenant</h3>
+            <p>Next.js (or API consumers) must always filter by tenant, e.g.:</p>
+            <pre><code>GET /api/articles?filters[tenant][slug]=mosc
+GET /api/sidebar-promotional-block (single type — ensure it’s tenant-scoped in your design or use a collection per tenant)</code></pre>
+            <p>For Single Types, you may need a custom controller or a “Homepage” per tenant (convert to collection “Homepage” with relation to Tenant) so that each tenant has its own homepage and sidebar block.</p>
+
+            <h3>Step 4.3 — Internationalization (i18n)</h3>
+            <ul>
+                <li>Settings → Internationalization: add locales (e.g. English, Malayalam).</li>
+                <li>Enable i18n on Article, Category (if desired), and any other content types that need per-language content.</li>
+                <li>Next.js: use <code>next-intl</code> or <code>next-i18next</code> and locale-aware routes (<code>/en/news/...</code>, <code>/ml/news/...</code>). Fetch with <code>?locale=en</code> or <code>?locale=ml</code> in Strapi API calls.</li>
+            </ul>
+
+            <h3>Step 4.4 — Roles &amp; permissions</h3>
+            <ul>
+                <li>Settings → Users &amp; Permissions: create roles (e.g. Editor, Publisher, Admin).</li>
+                <li>Grant permissions per content type (create, read, update, delete) and restrict public API so only needed endpoints are public (e.g. find, findOne for Article with tenant filter).</li>
+                <li>Optionally use “Pattern 2” (per-tenant roles) so editors only see their tenant’s content (customize admin or use Strapi’s role-based visibility).</li>
+            </ul>
+        </section>
+
+        <section id="phase5">
+            <h2>7. Phase 5 — Connect Next.js (mosc-temp)</h2>
+
+            <h3>Step 5.1 — Strapi URL</h3>
+            <p>When Strapi runs locally it is usually at <code>http://localhost:1337</code>. In production, use your Strapi Cloud or self-hosted URL.</p>
+
+            <h3>Step 5.2 — Environment variable in mosc-temp</h3>
+            <p>In <code>E:\project_workspace\mosc-temp</code>, add to <code>.env.local</code>:</p>
+            <pre><code>NEXT_PUBLIC_STRAPI_URL=http://localhost:1337
+# or for server-side only:
+STRAPI_URL=http://localhost:1337</code></pre>
+
+            <h3>Step 5.3 — Fetch content in Next.js</h3>
+            <ul>
+                <li>Resolve tenant (e.g. from hostname or path: <code>mosc.example.com</code> → <code>mosc</code>).</li>
+                <li>Fetch homepage, articles, most-read, sidebar block from Strapi REST (or GraphQL) with <code>filters[tenant][slug]=&lt;tenant&gt;</code> and <code>locale=&lt;locale&gt;</code>.</li>
+                <li>Example: <code>fetch(`${STRAPI_URL}/api/articles?filters[tenant][slug]=mosc&amp;sort=views:desc&amp;pagination[limit]=5&amp;locale=en`)</code>.</li>
+            </ul>
+
+            <h3>Step 5.4 — CORS</h3>
+            <p>In Strapi <code>config/middlewares.js</code> (or <code>middlewares.ts</code>), allow your Next.js origin (e.g. <code>http://localhost:3000</code>) so the browser can call the API.</p>
+        </section>
+
+        <section id="checklist">
+            <h2>8. Requirements Checklist</h2>
+            <p>Use this to confirm the CMS meets the spec before going live.</p>
+            <table>
+                <thead>
+                    <tr><th>Requirement</th><th>Implementation</th><th>Done</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Editor uploads news via GUI</td><td>Strapi Admin + Article (rich text, media)</td><td>☐</td></tr>
+                    <tr><td>Any language</td><td>i18n plugin + locales (en, ml, …)</td><td>☐</td></tr>
+                    <tr><td>Most-read section</td><td><code>views</code> on Article; sort by views DESC in API</td><td>☐</td></tr>
+                    <tr><td>Editable section banners</td><td>Homepage Layout + Media fields</td><td>☐</td></tr>
+                    <tr><td>Sidebar promotional block</td><td>Single Type (or collection) with video/social/banner</td><td>☐</td></tr>
+                    <tr><td>Embedded videos / social</td><td>Rich text embed + videoUrl / embedCode</td><td>☐</td></tr>
+                    <tr><td>Future ad slots</td><td>Advertisement Slot collection/component</td><td>☐</td></tr>
+                    <tr><td>Next.js consumer</td><td>mosc-temp at E:\project_workspace\mosc-temp</td><td>☐</td></tr>
+                    <tr><td>Multi-tenant</td><td>Tenant collection + relation + API filters</td><td>☐</td></tr>
+                    <tr><td>Roles (Editor, Admin)</td><td>Strapi roles &amp; permissions</td><td>☐</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>9. Summary: Order of Operations</h2>
+            <ol>
+                <li>Install Strapi <strong>locally</strong> in <code>cms/</code> inside <code>catholicatenews-in-temp</code> — either by cloning <code>strapi/strapi-cloud-template-blog</code> (recommended, see <a href="#phase1-alt">Phase 1 Alternative</a>) or by running <code>create-strapi-app</code>.</li>
+                <li>Bootstrap with an <strong>editorial-like schema</strong>: if you cloned the template, add only Homepage, Sidebar Block, Ad Slot, Tenant; otherwise create Article, Category, Homepage, Sidebar Block, Ad Slot, Tenant.</li>
+                <li>Enable <strong>i18n</strong> (Settings → Internationalization) and add <strong>tenant</strong> relation + API filters.</li>
+                <li>Configure <strong>roles &amp; permissions</strong> and optional lifecycle hooks.</li>
+                <li>Point <strong>mosc-temp</strong> at Strapi via env; implement tenant resolution and API calls.</li>
+            </ol>
+            <p class="note">This document is the single source for “next steps” to generate the CMS with all requirements from <a href="init_requirements_spec.html">init_requirements_spec.html</a>. Update this file as you complete each phase.</p>
+        </section>
+    </main>
+</body>
+</html>

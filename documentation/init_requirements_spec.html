@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initial Requirements Spec — Catholicate News / Strapi CMS</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 72rem; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.75rem; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+        h2 { font-size: 1.35rem; margin-top: 2rem; }
+        h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+        p { margin: 0.75rem 0; }
+        ul, ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+        li { margin: 0.25rem 0; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; }
+        th { background: #f5f5f5; }
+        pre, code { background: #f5f5f5; font-family: ui-monospace, monospace; font-size: 0.9em; }
+        pre { padding: 1rem; overflow-x: auto; border-radius: 4px; }
+        code { padding: 0.2em 0.4em; border-radius: 3px; }
+        pre code { padding: 0; background: none; }
+        section { margin-bottom: 2rem; }
+        .note { background: #f8f9fa; padding: 1rem; border-left: 4px solid #6c757d; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <h1>Initial Requirements Spec — Catholicate News Portal</h1>
+        </header>
+
+        <section>
+            <h2>1. Project Context & Requirements</h2>
+            <p>
+                Are there news portal libs or APIs where we can embed in our website where the news content is created
+                on your own — where you upload content using the provider GUI, etc.?
+            </p>
+            <ul>
+                <li>
+                    <strong>New display section <code>most_read</code></strong> — Most-read/popular articles block;
+                    section header/banner image editable.
+                </li>
+                <li>
+                    <strong>New display section <code>sidebar_promotional_block</code></strong> — Right sidebar:
+                    embedded video, “More Videos,” social widget, or rotating banner ads; main banner/video thumbnail
+                    (and optional ad slots) editable.
+                </li>
+                <li>
+                    <strong>New subsection “Sidebar &amp; Advertisement Areas”</strong> — Describes sidebar as one
+                    configurable section and “Generic ad slots (future)” for possible top/between-section banners later.
+                </li>
+            </ul>
+            <p>
+                <strong>Stakeholders:</strong> Editors can manage section images for “most read” and “sidebar
+                promotional block.” Need to have all the features and the UI should look like in the attached image.
+                The CMS will be embedded in an application built using the Next.js framework, and the content could
+                be in any language.
+            </p>
+        </section>
+
+        <section>
+            <h2>2. Headless / Embeddable News Portal Summary</h2>
+            <p>You’re looking for a headless / embeddable news-portal system where:</p>
+            <ul>
+                <li>Content is created &amp; managed by your editors (via a GUI, no code)</li>
+                <li>You embed/render it inside a Next.js app</li>
+                <li>Supports any language (Malayalam, English, etc.)</li>
+                <li>Supports custom sections: Most Read / Popular, right sidebar promotional block (video, social
+                    widget, ads, rotating banners), future generic ad slots (top, between sections)</li>
+                <li>Editors can control section images &amp; banners</li>
+                <li>Final UI should look like the attached MOSC/Catholicate News screenshot</li>
+            </ul>
+            <p>This is very doable — and there are a few proven, budget-friendly stacks that fit this exactly.</p>
+        </section>
+
+        <section>
+            <h2>3. Best-Fit Approach (Recommended)</h2>
+            <h3>Headless CMS + Next.js (fully custom UI)</h3>
+            <p>You do <em>not</em> embed a third-party “news widget.” Instead you:</p>
+            <ul>
+                <li>Use a CMS only for content + configuration</li>
+                <li>Build the exact UI you want in Next.js (pixel-close to your screenshot)</li>
+            </ul>
+            <p>This gives you full control, multilingual support, and future-proof ad slots.</p>
+
+            <h3>3.1 Strapi (Open-source, self-hosted) — Best overall</h3>
+            <p><strong>Why it’s ideal:</strong></p>
+            <ul>
+                <li>Free &amp; open-source</li>
+                <li>Rich editor GUI</li>
+                <li>Built-in i18n (multi-language)</li>
+                <li>Custom content types &amp; sections</li>
+                <li>Popularity / most-read logic</li>
+                <li>Role-based access (Editors, Admins)</li>
+                <li>REST &amp; GraphQL APIs (perfect for Next.js)</li>
+            </ul>
+
+            <h4>How your requirements map</h4>
+            <table>
+                <thead>
+                    <tr><th>Requirement</th><th>Strapi</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Editor uploads news</td><td>✅ Rich admin UI</td></tr>
+                    <tr><td>Any language</td><td>✅ i18n plugin</td></tr>
+                    <tr><td>Most-read section</td><td>✅ API + view count</td></tr>
+                    <tr><td>Editable section banners</td><td>✅ Media fields</td></tr>
+                    <tr><td>Sidebar promotional block</td><td>✅ Single Type</td></tr>
+                    <tr><td>Embedded videos / social</td><td>✅ Rich text / embed</td></tr>
+                    <tr><td>Future ad slots</td><td>✅ Reusable components</td></tr>
+                    <tr><td>Next.js compatible</td><td>✅ Excellent</td></tr>
+                </tbody>
+            </table>
+
+            <h4>Content models you’d define</h4>
+            <ul>
+                <li>Article</li>
+                <li>Category</li>
+                <li>Homepage Layout (single type)</li>
+                <li>Sidebar Promotional Block (single type)</li>
+                <li>Advertisement Slot (repeatable)</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>4. Suggested Architecture (Clean &amp; Scalable)</h2>
+            <pre><code>[ Editors ]
+    ↓
+[ Headless CMS (Strapi / Sanity) ]
+    ↓  (REST / GraphQL)
+[ Next.js App ]
+    ↓
+[ Users / Public Website ]
+
+CMS = content + layout config
+Next.js = rendering + performance + SEO</code></pre>
+        </section>
+
+        <section>
+            <h2>5. How to Model Your Exact Sections</h2>
+
+            <h3>5.1 Most Read section</h3>
+            <p><strong>Implementation:</strong></p>
+            <ul>
+                <li>Track views (Next.js API route or edge middleware)</li>
+                <li>Store view count in CMS or Redis</li>
+                <li>Query <code>orderBy: views DESC</code></li>
+            </ul>
+            <p><strong>Editor controls:</strong> Section title, section banner image, max number of items.</p>
+
+            <h3>5.2 Sidebar Promotional Block</h3>
+            <p>Single configurable CMS entry:</p>
+            <ul>
+                <li>Type selector: Video, Social embed, Banner ad</li>
+                <li>Thumbnail image</li>
+                <li>Video URL / embed code</li>
+                <li>“More videos” link</li>
+                <li>Optional rotation flag</li>
+            </ul>
+            <p>Editors can swap content without deployment.</p>
+
+            <h3>5.3 Generic Advertisement Slots (future-ready)</h3>
+            <p>Create reusable CMS component:</p>
+            <ul>
+                <li>Slot position: top | between_sections | sidebar</li>
+                <li>Image / video / HTML embed</li>
+                <li>Active date range</li>
+                <li>Priority / rotation</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>6. Multilingual Support</h2>
+            <p>All recommended CMS options support: Malayalam, English, any Unicode language, per-language slugs,
+                per-language SEO metadata.</p>
+            <p>Next.js side: <code>next-intl</code> or <code>next-i18next</code>; locale-aware routes:
+                <code>/ml/news/...</code>, <code>/en/news/...</code></p>
+        </section>
+
+        <section>
+            <h2>7. Matching the Exact Look (Your Screenshot)</h2>
+            <p>You will: build UI using Next.js + Tailwind; CMS only feeds data (no layout constraints). Pixel-match:
+                Header, Flash news, Multi-column layout, Sidebar blocks, Section separators.</p>
+            <p class="note">This is the correct approach — trying to embed a ready-made “news portal widget” will never
+                match this layout.</p>
+        </section>
+
+        <section>
+            <h2>8. Budget-Friendly Summary</h2>
+            <table>
+                <thead>
+                    <tr><th>Option</th><th>Cost</th><th>Verdict</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Strapi (self-hosted)</td><td>$0 infra only</td><td>⭐ Best</td></tr>
+                    <tr><td>Sanity</td><td>Free → Paid</td><td>⭐ Editor-friendly</td></tr>
+                    <tr><td>Directus</td><td>$0 infra only</td><td>⭐ Flexible</td></tr>
+                    <tr><td>WordPress headless</td><td>Free</td><td>❌ Heavier, less clean</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>9. Recommendation</h2>
+            <p><strong>Strapi + Next.js.</strong> You’ll get: full editorial control, exact UI match, multilingual
+                support, future ad &amp; video expansion, no vendor lock-in, and it fits your budget constraint
+                perfectly.</p>
+        </section>
+
+        <section>
+            <h2>10. Advantages of Headless CMS vs Manual DB + Admin UI</h2>
+            <p>Short answer: A headless CMS saves you time, risk, and long-term maintenance, without taking away UI
+                control in Next.js.</p>
+
+            <h3>Big-picture difference (TL;DR)</h3>
+            <table>
+                <thead>
+                    <tr><th>Area</th><th>Headless CMS</th><th>Custom DB + Admin UI</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Time to launch</td><td>Fast</td><td>Slow</td></tr>
+                    <tr><td>Editor experience</td><td>Ready-made &amp; polished</td><td>You must build it</td></tr>
+                    <tr><td>Content changes</td><td>No deploy needed</td><td>Often requires dev</td></tr>
+                    <tr><td>Multilingual</td><td>Built-in</td><td>Complex to build</td></tr>
+                    <tr><td>Permissions</td><td>Built-in</td><td>Easy to get wrong</td></tr>
+                    <tr><td>Scalability</td><td>Proven</td><td>Depends on your design</td></tr>
+                    <tr><td>Long-term cost</td><td>Lower</td><td>Higher</td></tr>
+                </tbody>
+            </table>
+
+            <h3>Editor experience (main reason)</h3>
+            <p>With a headless CMS, editors get: rich text editor, media library, image cropping, draft/publish
+                workflow, scheduling, preview — no developer involvement for daily ops. If you build it manually, you
+                must create admin auth, role management, WYSIWYG editor, media uploads, validation, preview modes —
+                this easily becomes 50–60% of total project effort.</p>
+
+            <h3>Permissions, multilingual, UI freedom</h3>
+            <p>CMS gives role-based access, field-level permissions, draft vs published, audit trails. Multilingual
+                is built-in (per-language content, slugs, fallbacks). The CMS does <em>not</em> control layout — Next.js
+                controls grid, typography, sidebar, ads, mobile; you still pixel-match your screenshot.</p>
+
+            <h3>Bottom line</h3>
+            <p>For your requirements (multiple sections, editors managing content &amp; images, sidebar videos &amp; ads,
+                multilingual, exact UI match, budget-conscious), headless CMS + Next.js is the smarter, safer, cheaper
+                choice.</p>
+        </section>
+
+        <section>
+            <h2>11. Multi-Tenant in Strapi</h2>
+            <p>Yes — Strapi can support multi-tenant setups. Strapi is not natively multi-tenant out of the box; you
+                implement tenancy by design pattern.</p>
+
+            <h3>Pattern 1: Single Strapi instance + Tenant field (most common)</h3>
+            <p>Best for: 5–100 clients, shared schema, low ops cost. Add a <code>tenant</code> (or organization)
+                content type; every content entry references a tenant; APIs are filtered by tenant; Next.js passes
+                <code>tenantId</code> or subdomain. Example API filter:
+                <code>/api/articles?filters[tenant][slug]=mosc</code>. Recommended for your use case.</p>
+
+            <h3>Pattern 2: Single instance + per-tenant roles</h3>
+            <p>Best for fewer tenants, strong editorial separation. Role explosion as tenants grow.</p>
+
+            <h3>Pattern 3: One Strapi instance per tenant</h3>
+            <p>Best for large clients, strict data separation, compliance. Higher infra and DevOps cost.</p>
+
+            <h3>Recommended for your case</h3>
+            <p>Pattern 1 + light Pattern 2: one Strapi instance with Tenant, Articles, Sidebar Blocks, Ads, Homepage
+                Config all linked to Tenant; one Next.js app with tenant resolved via domain/subdomain; fetch content
+                filtered by tenant.</p>
+            <p>Tenancy in Next.js: subdomain (<code>mosc.example.com</code>, <code>clienta.example.com</code>) or
+                path-based (<code>example.com/mosc</code>, <code>example.com/clienta</code>). Enforce tenant filters
+                at API layer, lock down roles, use lifecycle hooks to auto-assign tenant.</p>
+        </section>
+
+        <section>
+            <h2>12. AI Code Agents &amp; Strapi Generation</h2>
+            <p>Yes — AI code agents can generate most of the Strapi setup given screenshots and a written spec, with
+                manageable limits.</p>
+            <p><strong>What AI can reliably generate:</strong> Content types &amp; components (Article, Category, Tenant,
+                SidebarPromotionalBlock, AdvertisementSlot, HomepageConfig), API filters &amp; queries, roles &amp;
+                permissions (with guidance), lifecycle hooks (auto-assign tenant, view count, publish guards), seed data.</p>
+            <p><strong>What AI is not great at (yet):</strong> Translating screenshots to perfect schemas alone (use
+                screenshot + explicit spec), final permission hardening (human review mandatory), DevOps &amp; production
+                hardening.</p>
+            <p>Best practice: provide clear specs, understand architecture, review output once — you’ll build 2–3×
+                faster than manual coding.</p>
+        </section>
+
+        <section>
+            <h2>13. Strapi Editorial Template</h2>
+            <p>Ref: <a href="https://strapi.io/blog/introducing-backups-time-saving-templates-uptime-sl-as-and-a-new-rich-text-editor">Strapi blog — Time-saving templates</a>.</p>
+            <p><strong>What the template is:</strong> A pre-configured starting point (e.g. via Strapi Cloud templates)
+                with predefined content types, structure common to editorial sites, components and basic relations —
+                similar to a starter pack.</p>
+            <p><strong>How it helps:</strong> Saves initial setup time (hours to days), gives a common editorial
+                baseline, makes early demos &amp; proofs of concept faster, and the new rich text editor improves
+                editor experience.</p>
+            <p><strong>What it does not do:</strong> It is not a complete bespoke architecture. For multi-tenant
+                filtering, custom sidebar blocks with video/social, most-read ranking, custom ad slots, you still
+                customize the schema (tenant logic, view tracking, permissions, business rules).</p>
+            <p><strong>Bottom line:</strong> Yes — the editorial template is useful, speeds up initial setup, and
+                improves editor experience. No — it does not automatically meet all complex requirements; you still
+                build custom features in Strapi based on your project needs.</p>
+        </section>
+
+        <section>
+            <h2>14. Migration from WordPress &amp; Next Steps</h2>
+            <p>This project is currently based on WordPress. Per the requirements and analysis above, the goal is to
+                convert it to a Strapi-based CMS.</p>
+            <ul>
+                <li><strong>Bootstrap:</strong> Using the Strapi editorial template will save time and speed up the
+                    process; it will not meet every requirement out of the box — you will extend it (multi-tenant,
+                    most-read, sidebar blocks, ad slots, etc.).</li>
+                <li><strong>Local vs Strapi Cloud:</strong> You can develop locally (install Strapi on your machine) or
+                    use Strapi Cloud. For production, Strapi Cloud simplifies hosting; for full control and budget,
+                    self-host (e.g. VPS, Docker).</li>
+                <li><strong>Frontend:</strong> This CMS will be consumed by a Next.js project (front end). The news
+                    page content should be displayed in the <strong>mosc-temp</strong> project at
+                    <code>E:\project_workspace\mosc-temp</code>.</li>
+            </ul>
+            <p class="note">All of the above is captured in this HTML file at the same location
+                (<code>documentation/init_requirements_spec.html</code>) for reference and next steps.</p>
+        </section>
+    </main>
+</body>
+</html>
