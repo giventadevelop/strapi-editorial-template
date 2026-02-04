@@ -1,0 +1,39 @@
+---
+description: Multi-tenant assignment — tenant is assigned to users by Super Admin; editors never choose or see the tenant field.
+globs: documentation/**/*.html, src/api/**/schema.json, src/api/**/lifecycles.js, src/bootstrap.js
+alwaysApply: false
+---
+
+# Multi-Tenant Assignment (Editorial Template)
+
+## Technical mapping (user ↔ tenant)
+
+- **One user → one tenant (many-to-one):** Each logged-in user (Editor or similar) is assigned **exactly one** tenant via Editor Tenant Assignment. That user’s content always belongs to that tenant.
+- **One tenant → many users (one-to-many):** A single tenant can have many users assigned to it. So: one tenant ID is assigned to one user at login; that same tenant ID can be assigned to other users too. The mapping is **user : tenant = many-to-one** and **tenant : users = one-to-many**.
+
+## Principle
+
+- **Super Admin assigns a tenant to each user** (via Editor Tenant Assignment: map `adminUserEmail` → Tenant). This is done once when the user is set up.
+- **All content created by that user** (Article, Advertisement Slot, or any future tenant-scoped content type) **must use that tenant by default**. There is no manual selection of tenant.
+- **The tenant field must not be shown in the UI** for Editor (or any non–Super Admin) when creating or editing content. Editors must not see or choose a tenant ID (no “tenant selector”).
+
+## Requirements
+
+1. **No manual tenant selection**
+   Users with Editor (or similar) role must not be required to—and must not be able to—manually assign or choose a tenant ID for any content they create or edit.
+
+2. **Tenant assigned at user setup**
+   The only place tenant is “chosen” is when Super Admin creates/edits an **Editor Tenant Assignment** entry, linking an admin user (by email) to a Tenant. After that, all artifacts created by that user belong to that tenant by default.
+
+3. **Tenant field hidden in Content Manager**
+   For any content type that has a `tenant` relation:
+   - Set `pluginOptions.content-manager.visible: false` on the `tenant` attribute in the schema so the field is not displayed.
+   - Ensure Editor role permissions/layout do not show the tenant field in “Configure the view” for Create/Update.
+
+4. **Automatic assignment in code**
+   Use lifecycle hooks (`beforeCreate` and, if needed, `afterCreate`/`afterUpdate`) to set `tenant` from the current user’s Editor Tenant Assignment. Do not rely on the client or the UI to send tenant.
+
+## When Editing
+
+- **Documentation** (`documentation/user_guide/admin_user_guide.html`, `documentation/cms_setup_next_steps.html`): State clearly that (1) Super Admin assigns tenant to a user once via Editor Tenant Assignment, (2) all content by that user gets that tenant automatically, and (3) the tenant field is not displayed to editors—no manual tenant choice.
+- **New tenant-scoped content types**: Add `tenant` relation, set `visible: false` for content-manager, and add lifecycles that assign tenant from the logged-in user’s mapping (same pattern as Article and Advertisement Slot).

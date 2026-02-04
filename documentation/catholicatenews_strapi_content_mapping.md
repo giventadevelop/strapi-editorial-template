@@ -25,12 +25,14 @@ Reference for how each section of the Catholicate News portal maps to Strapi con
 ### 1. Featured News
 ```javascript
 // Articles marked as featured by editors
+// Note: Use filters[publishedAt][$notNull]=true instead of status=published
+// Use populate[0]=... for multiple relations (comma-separated can cause 400)
 const res = await fetch(
   `${STRAPI_URL}/api/articles?` +
   `filters[isFeatured][$eq]=true` +
   `&filters[tenant][tenantId][$eq]=${tenantId}` +
   `&filters[publishedAt][$notNull]=true` +
-  `&populate=cover,category,author` +
+  `&populate[0]=cover&populate[1]=category&populate[2]=author` +
   `&sort=publishedAt:desc` +
   `&pagination[limit]=6`
 );
@@ -39,12 +41,13 @@ const res = await fetch(
 ### 2. Main News
 ```javascript
 // Articles in "Main News" category
+// Use $eqi for case-insensitive match (Strapi may store slug as "Main-News")
 const res = await fetch(
   `${STRAPI_URL}/api/articles?` +
-  `filters[category][slug][$eq]=main-news` +
+  `filters[category][slug][$eqi]=main-news` +
   `&filters[tenant][tenantId][$eq]=${tenantId}` +
   `&filters[publishedAt][$notNull]=true` +
-  `&populate=cover,category,author` +
+  `&populate[0]=cover&populate[1]=category&populate[2]=author` +
   `&sort=publishedAt:desc` +
   `&pagination[limit]=10`
 );
@@ -53,12 +56,13 @@ const res = await fetch(
 ### 3. Press Release
 ```javascript
 // Articles in "Press Release" category
+// Use $eqi for case-insensitive match
 const res = await fetch(
   `${STRAPI_URL}/api/articles?` +
-  `filters[category][slug][$eq]=press-release` +
+  `filters[category][slug][$eqi]=press-release` +
   `&filters[tenant][tenantId][$eq]=${tenantId}` +
   `&filters[publishedAt][$notNull]=true` +
-  `&populate=cover,category,author` +
+  `&populate[0]=cover&populate[1]=category&populate[2]=author` +
   `&sort=publishedAt:desc` +
   `&pagination[limit]=10`
 );
@@ -71,7 +75,7 @@ const res = await fetch(
   `${STRAPI_URL}/api/articles?` +
   `filters[tenant][tenantId][$eq]=${tenantId}` +
   `&filters[publishedAt][$notNull]=true` +
-  `&populate=cover,category` +
+  `&populate[0]=cover&populate[1]=category` +
   `&sort=views:desc` +
   `&pagination[limit]=5`
 );

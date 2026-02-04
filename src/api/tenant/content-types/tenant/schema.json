@@ -27,7 +27,12 @@
       "targetField": "name"
     },
     "domain": {
-      "type": "string"
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text",
+      "maxLength": 255
     }
   }
 }

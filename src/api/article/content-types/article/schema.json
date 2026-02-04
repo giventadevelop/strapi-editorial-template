@@ -39,22 +39,34 @@
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::category.category",
-      "inversedBy": "articles"
+      "inversedBy": "articles",
+      "required": true
     },
     "tenant": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::tenant.tenant",
-      "description": "Multi-tenant: scope articles per site"
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
     },
     "views": {
       "type": "integer",
-      "default": 0
+      "default": 0,
+      "pluginOptions": {
+        "content-manager": { "visible": false }
+      }
     },
     "isFeatured": {
       "type": "boolean",
       "default": false,
-      "description": "Show in Featured News section"
+      "description": "Show in Featured News section",
+      "pluginOptions": {
+        "content-manager": { "visible": false }
+      }
     },
     "blocks": {
       "type": "dynamiczone",

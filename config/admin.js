@@ -1,4 +1,7 @@
 module.exports = ({ env }) => ({
+  secrets: {
+    encryptionKey: env('ENCRYPTION_KEY'),
+  },
   auth: {
     secret: env('ADMIN_JWT_SECRET'),
     sessions: {

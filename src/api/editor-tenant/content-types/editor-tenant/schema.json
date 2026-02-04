@@ -1,0 +1,29 @@
+{
+  "kind": "collectionType",
+  "collectionName": "editor_tenants",
+  "info": {
+    "singularName": "editor-tenant",
+    "pluralName": "editor-tenants",
+    "displayName": "Editor Tenant Assignment",
+    "description": "Map each editor (admin user) to a tenant. Content they create will auto-get this tenant."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "adminUserEmail": {
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "description": "Admin user's email (must match exactly the email they use to log in)"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "required": true,
+      "description": "Tenant to auto-assign to content created by this editor"
+    }
+  }
+}

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strapi Admin User Guide — Catholicate News / MOSC</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 72rem; margin: 0 auto; padding: 2rem; }
+        h1 { font-size: 1.75rem; border-bottom: 1px solid #ddd; padding-bottom: 0.5rem; }
+        h2 { font-size: 1.35rem; margin-top: 2.5rem; color: #0d6efd; }
+        h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+        h4 { font-size: 1.05rem; margin-top: 1rem; }
+        p { margin: 0.75rem 0; }
+        ul, ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+        li { margin: 0.35rem 0; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+        th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; }
+        th { background: #f5f5f5; }
+        pre, code { background: #f5f5f5; font-family: ui-monospace, monospace; font-size: 0.9em; }
+        pre { padding: 1rem; overflow-x: auto; border-radius: 4px; white-space: pre-wrap; }
+        code { padding: 0.2em 0.4em; border-radius: 3px; }
+        pre code { padding: 0; background: none; }
+        section { margin-bottom: 2rem; }
+        .note { background: #f8f9fa; padding: 1rem; border-left: 4px solid #6c757d; margin: 1rem 0; }
+        .step { background: #f0f9f0; padding: 0.75rem 1rem; margin: 0.5rem 0; border-left: 4px solid #198754; }
+        .step-num { font-weight: bold; color: #198754; }
+        .warning { background: #fff3cd; padding: 1rem; border-left: 4px solid #ffc107; margin: 1rem 0; }
+        .toc { background: #f8f9fa; padding: 1rem 1.5rem; border-radius: 4px; margin: 1rem 0; }
+        .toc ul { list-style: none; padding-left: 0; }
+        .toc li { margin: 0.35rem 0; }
+        .toc a { color: #0d6efd; text-decoration: none; }
+        .toc a:hover { text-decoration: underline; }
+        .diagram { max-width: 100%; border: 1px solid #ddd; border-radius: 4px; margin: 1rem 0; }
+        .section-badge { display: inline-block; background: #e7f3ff; color: #0d6efd; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.85em; margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <h1>Strapi Admin User Guide</h1>
+            <p><strong>Catholicate News / MOSC News Portal</strong> — Step-by-step instructions for editors and administrators to populate content in the Strapi CMS.</p>
+        </header>
+
+        <section class="note" style="background: #e7f3ff; border-left-color: #0d6efd;">
+            <h2 style="margin-top: 0;">Multi-Tenant & Editor Mapping</h2>
+            <p>This CMS supports <strong>multi-tenancy</strong>: content is scoped by tenant (e.g., MOSC, Catholicate News). Each tenant has a unique <strong>tenantId</strong> (e.g. <code>tenant_demo_002</code>) used by the frontend to filter content.</p>
+            <p><strong>Editor–Tenant mapping</strong> ensures that when an editor creates Articles or Advertisement Slots, the correct tenant is <strong>automatically attached</strong>. Editors do not select the tenant — it is assigned based on their login email. See <a href="#editor-tenant">§2. Assign Editors to Tenants</a>.</p>
+            <h3 id="tenant-assignment-policy">Tenant assignment policy (no manual tenant choice)</h3>
+            <ul>
+                <li><strong>Super Admin assigns a tenant to each user once</strong> — via <strong>Editor Tenant Assignment</strong> (user email → Tenant). This is done when the user is set up; there is no need for the user to choose a tenant later.</li>
+                <li><strong>Any content created by that user</strong> (Article, Advertisement Slot, or any tenant-scoped content type) <strong>gets that tenant by default</strong>. The system assigns it automatically; editors must not manually assign or select a tenant ID.</li>
+                <li><strong>The tenant field is not displayed</strong> in the Content Manager for Editors (or any non–Super Admin). The tenant field must not appear when creating or editing content so that users never choose or see it — it is always derived from their assignment.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>Layout Overview</h2>
+            <p>Use the mapping diagram below as a reference. Each section of the news portal is labeled with its corresponding Strapi content type.</p>
+            <figure>
+                <img src="../news_template_layout_mapping_diagram.png" alt="News template layout mapping diagram" class="diagram" width="800">
+                <figcaption><strong>Figure 1.</strong> News portal layout and Strapi content mapping</figcaption>
+            </figure>
+        </section>
+
+        <nav class="toc" aria-label="Table of contents">
+            <h2>Contents</h2>
+            <ul>
+                <li><a href="#prerequisites">Prerequisites</a></li>
+                <li><a href="#admin-users">0. Create Admin Users (Super Admin Only)</a></li>
+                <li><a href="#editor-permissions">0B. Configure Editor Role Permissions (Security)</a>
+                    <ul>
+                        <li><a href="#troubleshoot-missing-content">— Editor cannot see Advertisement Slot</a></li>
+                        <li><a href="#troubleshoot-tenant-field-visible">— Hide tenant/views/isFeatured (no “no permission” label)</a></li>
+                        <li><a href="#troubleshoot-create-error">— FOREIGN KEY when creating Article/Ad Slot</a></li>
+                        <li><a href="#troubleshoot-403-after-save">— 403 after save (open entry)</a></li>
+                        <li><a href="#troubleshoot-empty-list">— Published items show no data</a></li>
+                    </ul>
+                </li>
+                <li><a href="#switch-user">0C. Switch from Super Admin to New User (Logout / Login)</a></li>
+                <li><a href="#tenant-assignment-policy">— Tenant assignment policy (no manual tenant)</a></li>
+                <li><a href="#tenant">1. Create Tenant (Required First)</a></li>
+                <li><a href="#editor-tenant">2. Assign Editors to Tenants</a></li>
+                <li><a href="#categories">3. Create Categories</a></li>
+                <li><a href="#global">4. Global Settings (Header, Top Bar, Footer)</a></li>
+                <li><a href="#main-news">5. Main News — Enter Articles</a></li>
+                <li><a href="#featured-news">6. Featured News</a></li>
+                <li><a href="#press-release">7. Press Release</a></li>
+                <li><a href="#most-read">8. Most Read (Automatic)</a></li>
+                <li><a href="#homepage">9. Homepage Layout & Flash News</a></li>
+                <li><a href="#sidebar">10. Sidebar Promotional Block</a></li>
+                <li><a href="#ads">11. Advertisement Slots</a></li>
+            </ul>
+        </nav>
+
+        <section id="prerequisites">
+            <h2>Prerequisites</h2>
+            <ul>
+                <li>Log in to Strapi Admin at <code>http://localhost:1337/admin</code> (or your deployed URL).</li>
+                <li>Ensure you have Editor or Admin role.</li>
+                <li>Complete <strong>Tenant</strong>, <strong>Editor Tenant Assignment</strong>, and <strong>Categories</strong> first — they are required for articles.</li>
+            </ul>
+        </section>
+
+        <!-- ========== 0. CREATE ADMIN USERS ========== -->
+        <section id="admin-users">
+            <span class="section-badge">Section: Admin Users (Super Admin Only)</span>
+            <h2>0. Create Admin Users (Editors)</h2>
+            <p><strong>For Super Admins only.</strong> Create admin panel users (editors, authors, administrators) who will manage content. Each user gets access to the Strapi Admin panel at <code>/admin</code>.</p>
+
+            <h3>Step A: Create a new admin user</h3>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Click the <strong>Settings</strong> icon (gear icon) in the left sidebar.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Under "ADMINISTRATION PANEL", click <strong>Users</strong>.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Click the <strong>+ Add new user</strong> button (top right).</li>
+                <li class="step"><span class="step-num">Step 4.</span> Fill in the user details:
+                    <table>
+                        <tr><th>Field</th><th>Required</th><th>Description</th></tr>
+                        <tr><td>First name</td><td>Yes</td><td>User's first name</td></tr>
+                        <tr><td>Last name</td><td>No</td><td>User's last name</td></tr>
+                        <tr><td>Email</td><td>Yes</td><td>Login email (must be unique). <strong>Save this — you will need it for Editor Tenant Assignment.</strong></td></tr>
+                        <tr><td>Username</td><td>No</td><td>Optional username</td></tr>
+                        <tr><td>Password</td><td>Yes</td><td>Temporary password. The user can change it after first login.</td></tr>
+                        <tr><td>Active</td><td>—</td><td>Toggle on to allow login</td></tr>
+                        <tr><td>Roles</td><td>Yes</td><td>Select role(s) — see below for role descriptions</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 5.</span> Click <strong>Save</strong>.</li>
+            </ol>
+            <div class="note"><strong>Important:</strong> Copy the email address you entered. You will use it when creating the <strong>Editor Tenant Assignment</strong> to map this user to a tenant.</div>
+
+            <h3>Step B: Strapi admin roles</h3>
+            <p>Strapi has three default admin roles. Choose the appropriate role when creating a user:</p>
+            <table>
+                <tr><th>Role</th><th>Permissions</th><th>Use For</th></tr>
+                <tr><td><strong>Author</strong></td><td>Create and manage their own content</td><td>Content creators who only manage their own articles</td></tr>
+                <tr><td><strong>Editor</strong></td><td>Create, manage, and publish any content</td><td>News editors, content managers</td></tr>
+                <tr><td><strong>Super Admin</strong></td><td>Full access to all settings, users, and content</td><td>System administrators only</td></tr>
+            </table>
+            <p class="note"><strong>Recommendation:</strong> Use the <strong>Editor</strong> role for most content creators and news editors. Use <strong>Super Admin</strong> sparingly — only for IT administrators who need to manage users, tenants, and system settings.</p>
+
+            <h3>Step C: Grant content type permissions (if needed)</h3>
+            <p>If a user can't access a content type (e.g., Article, Advertisement Slot), you may need to configure role permissions:</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Settings</strong> → <strong>Administration panel</strong> → <strong>Roles</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Click the role you want to configure (e.g., Editor).</li>
+                <li class="step"><span class="step-num">Step 3.</span> Under "Permissions", expand each content type (e.g., Article, Category, Advertisement Slot).</li>
+                <li class="step"><span class="step-num">Step 4.</span> Check the permissions the role should have:
+                    <ul>
+                        <li><strong>Create</strong> — Create new entries</li>
+                        <li><strong>Read</strong> — View entries</li>
+                        <li><strong>Update</strong> — Edit entries</li>
+                        <li><strong>Delete</strong> — Remove entries</li>
+                        <li><strong>Publish</strong> — Publish draft entries (if Draft & Publish is enabled)</li>
+                    </ul>
+                </li>
+                <li class="step"><span class="step-num">Step 5.</span> Click <strong>Save</strong>.</li>
+            </ol>
+            <p class="note"><strong>Editor role defaults:</strong> The Editor role typically has Create, Read, Update, Delete, and Publish permissions on all content types. If your Editor users can't access Article or Advertisement Slot, check this configuration.</p>
+
+            <h3>Step D: After creating a user</h3>
+            <p>After the admin user is created, you <strong>must</strong> create an <strong>Editor Tenant Assignment</strong> entry (see <a href="#editor-tenant">§2. Assign Editors to Tenants</a>). Without this mapping, the tenant will not be auto-assigned when the user creates content.</p>
+        </section>
+
+        <!-- ========== 0B. CONFIGURE EDITOR ROLE PERMISSIONS ========== -->
+        <section id="editor-permissions">
+            <span class="section-badge">Section: Role Permissions (Super Admin Only)</span>
+            <h2>0B. Configure Editor Role Permissions (Security)</h2>
+            <p><strong>Critical for multi-tenant security.</strong> Configure the Editor role so editors can only access content from their assigned tenant and cannot modify Tenant or Editor Tenant Assignment entries.</p>
+
+            <h3>Step 1: Restrict Tenant and Editor Tenant Assignment</h3>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Settings</strong> → <strong>Administration panel</strong> → <strong>Roles</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Click <strong>Editor</strong> role.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Under "Permissions", find <strong>Tenant</strong> and <strong>Editor Tenant Assignment</strong>.</li>
+                <li class="step"><span class="step-num">Step 4.</span> <strong>Uncheck all permissions</strong> for both content types (Create, Read, Update, Delete).</li>
+                <li class="step"><span class="step-num">Step 5.</span> Click <strong>Save</strong>.</li>
+            </ol>
+            <div class="warning"><strong>Why this matters:</strong> Editors should not be able to create tenants, change their own tenant assignment, or see other tenants. Only Super Admin should manage Tenant and Editor Tenant Assignment.</div>
+
+            <h3>Step 2: Apply tenant filtering to Article and Advertisement Slot</h3>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> In the same Editor role configuration, find <strong>Article</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> For each permission (Create, Read, Update, Delete, Publish), click the <strong>Settings</strong> icon next to it.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Under "Advanced settings", find the <strong>Conditions</strong> dropdown.</li>
+                <li class="step"><span class="step-num">Step 4.</span> Select <strong>"Is same tenant as user"</strong> (under Multi-tenant category).</li>
+                <li class="step"><span class="step-num">Step 5.</span> Click <strong>Apply</strong>.</li>
+                <li class="step"><span class="step-num">Step 6.</span> Repeat for all Article permissions (Read, Update, Delete, Publish).</li>
+                <li class="step"><span class="step-num">Step 7.</span> Repeat the same process for <strong>Advertisement Slot</strong>.</li>
+                <li class="step"><span class="step-num">Step 8.</span> Click <strong>Save</strong> at the top.</li>
+            </ol>
+            <div class="note"><strong>Result:</strong> Editors can only see and manage Articles and Advertisement Slots that belong to their assigned tenant. They cannot see or modify content from other tenants.</div>
+
+            <h3>Step 3: Verify Author role (optional)</h3>
+            <p>If you use the <strong>Author</strong> role, apply the same restrictions:</p>
+            <ul>
+                <li>No access to Tenant or Editor Tenant Assignment</li>
+                <li>"Is same tenant as user" condition on Article and Advertisement Slot</li>
+            </ul>
+
+            <h3>Summary of role permissions</h3>
+            <table>
+                <tr><th>Content Type</th><th>Super Admin</th><th>Editor</th><th>Author</th></tr>
+                <tr><td>Tenant</td><td>Full access</td><td>No access</td><td>No access</td></tr>
+                <tr><td>Editor Tenant Assignment</td><td>Full access</td><td>No access</td><td>No access</td></tr>
+                <tr><td>Article</td><td>Full access</td><td>Create, Read, Update, Delete, Publish (with "Is same tenant" condition)</td><td>Create, Read, Update (own only, with "Is same tenant" condition)</td></tr>
+                <tr><td>Advertisement Slot</td><td>Full access</td><td>Create, Read, Update, Delete (with "Is same tenant" condition)</td><td>No access (or with condition)</td></tr>
+                <tr><td>Category, Global, Homepage, Sidebar</td><td>Full access</td><td>Full access (or restricted as needed)</td><td>Read only</td></tr>
+            </table>
+
+            <h3 id="troubleshoot-missing-content">Troubleshooting: Editor cannot see Advertisement Slot</h3>
+            <p>If an Editor logs in and <strong>Advertisement Slot does not appear</strong> in the Content Manager sidebar, the Editor role has no permissions for it. New content types are not auto-granted to roles.</p>
+            <p><strong>Automatic fix:</strong> This project includes bootstrap logic that grants Advertisement Slot permissions to the Editor role on Strapi startup. <strong>Restart Strapi</strong> (stop and run <code>npm run develop</code> again) and the Editor should see Advertisement Slot after logging in again.</p>
+            <p><strong>Manual fix (Super Admin only):</strong></p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Log in as <strong>Super Admin</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Go to <strong>Settings</strong> → <strong>Administration panel</strong> → <strong>Roles</strong>.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Click <strong>Editor</strong>.</li>
+                <li class="step"><span class="step-num">Step 4.</span> Under "Permissions", scroll to find <strong>Advertisement Slot</strong> (under Content Manager or Content types).</li>
+                <li class="step"><span class="step-num">Step 5.</span> <strong>Check</strong> Create, Read, Update, and Delete.</li>
+                <li class="step"><span class="step-num">Step 6.</span> For each permission, click the <strong>Settings</strong> icon → select <strong>"Is same tenant as user"</strong> (Multi-tenant) → Apply.</li>
+                <li class="step"><span class="step-num">Step 7.</span> Click <strong>Save</strong>.</li>
+            </ol>
+            <p>The Editor will then see Advertisement Slot in the Content Manager and can only manage ads for their assigned tenant.</p>
+
+            <h3 id="troubleshoot-tenant-field-visible">Troubleshooting: Editor still sees tenant selector or "No permissions to see this field"</h3>
+            <p>Per the <strong>tenant assignment policy</strong>, the tenant field (and for Article: <strong>views</strong>, <strong>isFeatured</strong>) must be <strong>fully hidden</strong> for Editors — not shown at all, and not shown with a "No permissions to see this field" message.</p>
+            <p><strong>Why "No permissions to see this field" appears:</strong> If you unchecked tenant (or related) permissions for the Editor role, the field stays in the form but Strapi shows that message. To <strong>suppress</strong> the field entirely, you must remove it from the <strong>edit view layout</strong>, not from role permissions.</p>
+            <p><strong>Fix (Super Admin only) — remove fields from the layout:</strong></p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Log in as <strong>Super Admin</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Go to <strong>Content Manager</strong> → select <strong>Article</strong> (or <strong>Advertisement Slot</strong>).</li>
+                <li class="step"><span class="step-num">Step 3.</span> Open <strong>Configure the view</strong> (gear icon or link), then go to the <strong>View</strong> / edit view section.</li>
+                <li class="step"><span class="step-num">Step 4.</span> For <strong>Article</strong>: find <strong>tenant</strong>, <strong>views</strong>, and <strong>isFeatured</strong> in the layout. Use the <strong>delete</strong> (trash) button to <strong>remove</strong> each from the view so they are not displayed at all. For <strong>Advertisement Slot</strong>: remove the <strong>tenant</strong> field from the view the same way.</li>
+                <li class="step"><span class="step-num">Step 5.</span> Click <strong>Save</strong>. Repeat for the other content type.</li>
+            </ol>
+            <p><strong>Important:</strong> Keep the Editor role's <strong>Read</strong> (and Create, Update, Delete) permission on Article and Advertisement Slot with the condition <strong>"Is same tenant as user"</strong>. Do not remove Read on the whole content type; only remove the fields from the <strong>layout</strong> so they do not appear in the form. Tenant is then assigned automatically in the backend.</p>
+            <p><strong>If the tenant field still appears after saving the layout:</strong> The Content Manager loads configuration from the server. Try a hard refresh (Ctrl+F5) or open the admin in an incognito/private window. If you had already opened the create form before removing the field from the layout, close the tab and open a new create entry. The backend always overwrites any tenant value sent by the form with the correct tenant for the logged-in user.</p>
+
+            <h3 id="troubleshoot-create-error">Troubleshooting: "FOREIGN KEY constraint failed" when creating Article or Advertisement Slot</h3>
+            <p>If the server log shows <code>insert into articles_tenant_lnk ... FOREIGN KEY constraint failed</code>, the relation was being stored with the wrong identifier. This project's lifecycles now use the tenant's numeric <strong>id</strong> (not documentId) for the link table. Restart Strapi so the updated lifecycles run. If the error persists, ensure the Editor has an <strong>Editor Tenant Assignment</strong> pointing to an existing Tenant, and that the Tenant record exists in the database.</p>
+
+            <h3 id="troubleshoot-403-after-save">Troubleshooting: 403 Forbidden when opening a saved Advertisement Slot or Article</h3>
+            <p>If create returns 201 but opening the new entry (or the list) returns <strong>403</strong>, the permission condition may not match the stored tenant. Restart Strapi after pulling the latest code (the RBAC condition was updated to match tenant by both id and documentId). If you still see 403 for an entry that was created <em>before</em> the fix, that entry may have no tenant assigned; create a <strong>new</strong> Advertisement Slot or Article and open it — the new one should load. Old entries without a tenant can be fixed by a Super Admin (edit and save, or assign tenant in the database).</p>
+
+            <h3 id="troubleshoot-empty-list">Troubleshooting: Published items show no data (empty TITLE, DESCRIPTION, SLUG)</h3>
+            <p>If the Article list view shows entries but TITLE, DESCRIPTION, and SLUG appear as hyphens (no data), the Editor role may have restricted <strong>field-level</strong> read access, or the list view is not allowed to load those fields.</p>
+            <p><strong>Fix (Super Admin only):</strong></p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Settings</strong> → <strong>Administration panel</strong> → <strong>Roles</strong> → <strong>Editor</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Under Article, ensure <strong>Read</strong> is checked and has the condition <strong>"Is same tenant as user"</strong>. Do not restrict which <strong>fields</strong> the Editor can read for the list (e.g. title, description, slug must be readable).</li>
+                <li class="step"><span class="step-num">Step 3.</span> In <strong>Content Manager</strong> → Article → <strong>Configure the view</strong> → list view <strong>View</strong>, ensure the columns you want (e.g. TITLE, DESCRIPTION, SLUG) are added to the view and saved.</li>
+            </ol>
+            <p>If the problem continues, restart Strapi and clear the browser cache; then log in again as the Editor and open the Article list.</p>
+        </section>
+
+        <!-- ========== 0C. SWITCH FROM SUPER ADMIN TO NEW USER ========== -->
+        <section id="switch-user">
+            <span class="section-badge">Section: Logout / Login</span>
+            <h2>0C. Switch from Super Admin to New User (Logout / Login)</h2>
+            <p>After creating a new admin user and assigning them to a tenant, you can log out as Super Admin and log in as that user to verify RBAC: the new user should only see and manage content for their assigned tenant.</p>
+
+            <h3>Step 1: Open the Strapi Admin panel</h3>
+            <p>In your browser, go to <strong><code>http://localhost:1337/admin</code></strong> (or your deployed Strapi URL + <code>/admin</code>). Do not use <code>http://localhost:1337/</code> alone — the admin panel is at <code>/admin</code>.</p>
+
+            <h3>Step 2: Log out as Super Admin</h3>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> In the <strong>top-right</strong> of the Strapi admin interface, find your <strong>profile icon</strong> (avatar) or your <strong>name</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Click it to open the user menu.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Select <strong>Logout</strong> (or <strong>Sign out</strong>).</li>
+                <li class="step"><span class="step-num">Step 4.</span> You will be redirected to the Strapi login page.</li>
+            </ol>
+            <div class="note">If you do not see a logout option, look under a <strong>Profile</strong> or user dropdown menu — Strapi places "Logout" or "Sign out" there.</div>
+
+            <h3>Step 3: Log in as the new user</h3>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> On the login page, enter the <strong>email address</strong> of the new admin user (the one you created and assigned to a tenant).</li>
+                <li class="step"><span class="step-num">Step 2.</span> Enter their <strong>password</strong> (the one you set when creating the user, or the one they use after changing it).</li>
+                <li class="step"><span class="step-num">Step 3.</span> Click <strong>Login</strong>.</li>
+            </ol>
+            <p>You are now logged in as the new user. Their access is limited by the RBAC conditions: they should only see and manage content (e.g. Articles, Advertisement Slots) that belong to their assigned tenant.</p>
+        </section>
+
+        <!-- ========== 1. TENANT ========== -->
+        <section id="tenant">
+            <span class="section-badge">Section: Tenant</span>
+            <h2>1. Create Tenant</h2>
+            <p>Tenants represent different sites or brands (e.g., MOSC, Catholicate News). Each tenant has a <strong>tenantId</strong> (e.g. <code>tenant_mosc_001</code>) that the frontend uses to filter content. Create at least one tenant before creating articles and before assigning editors.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> In the left sidebar, click <strong>Content Manager</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Under "COLLECTION TYPES", click <strong>Tenant</strong>.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Click <strong>Create new entry</strong>.</li>
+                <li class="step"><span class="step-num">Step 4.</span> Fill in:
+                    <table>
+                        <tr><th>Field</th><th>Description</th><th>Example</th></tr>
+                        <tr><td>name</td><td>Display name</td><td>MOSC News</td></tr>
+                        <tr><td>tenantId</td><td>Unique ID used by the frontend (e.g. <code>tenant_demo_002</code>)</td><td>tenant_mosc_001</td></tr>
+                        <tr><td>slug</td><td>URL-friendly identifier (click refresh icon to auto-generate from name)</td><td>mosc-news</td></tr>
+                        <tr><td>domain</td><td>Optional domain</td><td>mosc.example.com</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 5.</span> Click <strong>Save</strong>.</li>
+            </ol>
+        </section>
+
+        <!-- ========== 2. EDITOR TENANT ASSIGNMENT ========== -->
+        <section id="editor-tenant">
+            <span class="section-badge">Section: Editor–Tenant Mapping (Auto-assign Tenant)</span>
+            <h2>2. Assign Editors to Tenants</h2>
+            <p><strong>Required for auto-assigning tenant to content.</strong> This feature maps each admin user (editor) to a tenant. When they create Articles or Advertisement Slots, the tenant is assigned automatically — editors never select it manually.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Content Manager</strong> → <strong>Editor Tenant Assignment</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Click <strong>Create new entry</strong>.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Fill in:
+                    <table>
+                        <tr><th>Field</th><th>Description</th></tr>
+                        <tr><td>adminUserEmail</td><td>The <strong>exact</strong> email the editor uses to log in to Strapi Admin (e.g. <code>editor@example.com</code>)</td></tr>
+                        <tr><td>tenant</td><td>Select the Tenant this editor belongs to</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 4.</span> Click <strong>Save</strong>.</li>
+            </ol>
+            <div class="note"><strong>How it works:</strong> Create one Editor Tenant Assignment per editor. The <code>adminUserEmail</code> must match their login email exactly. When the editor creates an Article or Advertisement Slot, the system looks up their tenant and attaches it automatically. The tenant field is hidden from the content form.</div>
+            <p><strong>Content types with auto tenant:</strong> Article, Advertisement Slot.</p>
+        </section>
+
+        <!-- ========== 3. CATEGORIES ========== -->
+        <section id="categories">
+            <span class="section-badge">Section: Categories</span>
+            <h2>2. Create Categories</h2>
+            <p>Categories determine where articles appear: Main News, Press Release, etc. Create these categories before adding articles.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> In the left sidebar, go to <strong>Content Manager</strong> → <strong>Category</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Click <strong>Create new entry</strong>.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Create each category listed below. For each:
+                    <ul>
+                        <li>Enter <strong>name</strong> and <strong>slug</strong> (use the refresh icon to auto-generate slug from name).</li>
+                        <li>Optionally add a <strong>description</strong>.</li>
+                        <li>Click <strong>Save</strong>.</li>
+                    </ul>
+                </li>
+            </ol>
+            <table>
+                <tr><th>Category Name</th><th>Slug (use this)</th><th>Used For</th></tr>
+                <tr><td>Main News</td><td>main-news</td><td>Main News section</td></tr>
+                <tr><td>Press Release</td><td>press-release</td><td>Press Release section</td></tr>
+                <tr><td>Featured News</td><td>featured-news</td><td>Optional; can also use "Featured" toggle on articles</td></tr>
+            </table>
+        </section>
+
+        <!-- ========== 3. GLOBAL ========== -->
+        <section id="global">
+            <span class="section-badge">Section: Top Bar, Header, Footer</span>
+            <h2>4. Global Settings</h2>
+            <p>Global settings control the site title, logo (favicon), description, and SEO. This affects the top bar, header, and overall site identity.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Content Manager</strong> → <strong>Global</strong> (under SINGLE TYPES).</li>
+                <li class="step"><span class="step-num">Step 2.</span> You will see the single Global entry. Click it to edit.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Fill in:
+                    <table>
+                        <tr><th>Field</th><th>Description</th></tr>
+                        <tr><td>siteName</td><td>Site title shown in header (e.g. "The Malankara Orthodox Syrian Church")</td></tr>
+                        <tr><td>siteDescription</td><td>Brief site description</td></tr>
+                        <tr><td>favicon</td><td>Upload logo/icon (used in browser tab and header)</td></tr>
+                        <tr><td>defaultSeo</td><td>Meta title, meta description, share image for SEO</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 4.</span> Click <strong>Save</strong>.</li>
+            </ol>
+            <p class="note"><strong>Note:</strong> Date in the top bar is usually generated by the frontend (current date). Social icons and footer copyright/contact may be configured in the frontend or require additional fields — check with your developer.</p>
+        </section>
+
+        <!-- ========== 4. MAIN NEWS ========== -->
+        <section id="main-news">
+            <span class="section-badge">Section: Main News</span>
+            <h2>5. Main News — Enter Articles</h2>
+            <p>Articles in the <strong>Main News</strong> section are filtered by category <code>main-news</code>. Follow these steps to add a main news article.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Content Manager</strong> → <strong>Article</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Click <strong>Create new entry</strong>.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Fill in the form:
+                    <table>
+                        <tr><th>Field</th><th>Required</th><th>Description</th></tr>
+                        <tr><td>title</td><td>Yes</td><td>Article headline</td></tr>
+                        <tr><td>description</td><td>No</td><td>Short excerpt (max 80 chars)</td></tr>
+                        <tr><td>slug</td><td>Auto</td><td>Click refresh icon to generate from title</td></tr>
+                        <tr><td>cover</td><td>No</td><td>Upload cover image</td></tr>
+                        <tr><td>author</td><td>No</td><td>Select an Author</td></tr>
+                        <tr><td><strong>category</strong></td><td><strong>Yes (for Main News)</strong></td><td>Select <strong>Main News</strong></td></tr>
+                        <tr><td>tenant</td><td>Auto</td><td><strong>Auto-assigned</strong> from your Editor Tenant Assignment — you do not select this</td></tr>
+                        <tr><td>isFeatured</td><td>No</td><td>Leave unchecked for regular main news</td></tr>
+                        <tr><td>blocks</td><td>No</td><td>Add rich content (text, images, quotes, etc.)</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 4.</span> In the right panel, click <strong>Publish</strong> to make the article live. Until published, it will not appear on the frontend.</li>
+            </ol>
+            <div class="warning"><strong>Important:</strong> For an article to appear in Main News, you must set <strong>category</strong> to <strong>Main News</strong> and assign a <strong>tenant</strong>. Then <strong>Publish</strong> the article.</div>
+        </section>
+
+        <!-- ========== 5. FEATURED NEWS ========== -->
+        <section id="featured-news">
+            <span class="section-badge">Section: Featured News</span>
+            <h2>6. Featured News</h2>
+            <p>Featured articles appear in the "Featured News" section. You mark an article as featured using the <strong>isFeatured</strong> toggle.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Create or edit an <strong>Article</strong> (Content Manager → Article).</li>
+                <li class="step"><span class="step-num">Step 2.</span> Fill in title, description, cover, category, and content as usual. Tenant is auto-assigned.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Set <strong>isFeatured</strong> to <strong>Yes</strong> (or check the box).</li>
+                <li class="step"><span class="step-num">Step 4.</span> Click <strong>Save</strong> and <strong>Publish</strong>.</li>
+            </ol>
+            <p class="note">An article can be both in Main News (category) and Featured (isFeatured). The frontend fetches featured articles with <code>filters[isFeatured]=true</code>.</p>
+        </section>
+
+        <!-- ========== 6. PRESS RELEASE ========== -->
+        <section id="press-release">
+            <span class="section-badge">Section: Press Release</span>
+            <h2>7. Press Release</h2>
+            <p>Press release articles use the same Article content type but are filtered by category <strong>Press Release</strong>.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Content Manager</strong> → <strong>Article</strong> → <strong>Create new entry</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Fill in all fields (title, description, cover, author, blocks). Tenant is auto-assigned.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Set <strong>category</strong> to <strong>Press Release</strong> (not Main News).</li>
+                <li class="step"><span class="step-num">Step 4.</span> Save and <strong>Publish</strong>.</li>
+            </ol>
+        </section>
+
+        <!-- ========== 7. MOST READ ========== -->
+        <section id="most-read">
+            <span class="section-badge">Section: Most Read</span>
+            <h2>8. Most Read (Automatic)</h2>
+            <p>The "Most Read" section is populated automatically based on the <strong>views</strong> field. You do not need to enter anything manually.</p>
+            <ul>
+                <li>The frontend increments <code>views</code> when a user reads an article.</li>
+                <li>Articles are sorted by <code>views</code> (highest first) and the top 5 (or configured limit) are shown.</li>
+            </ul>
+            <p class="note">If you need to manually adjust view counts for testing, edit an Article and change the <strong>views</strong> field in the right panel (you may need to configure the Content-Type Builder to show it in the edit form).</p>
+        </section>
+
+        <!-- ========== 8. HOMEPAGE & FLASH NEWS ========== -->
+        <section id="homepage">
+            <span class="section-badge">Section: Homepage Layout, Flash News</span>
+            <h2>9. Homepage Layout & Flash News</h2>
+            <p>The Homepage Layout single type controls the hero banner, most-read section settings, and the red <strong>Flash News</strong> bar.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Content Manager</strong> → <strong>Homepage Layout</strong> (under SINGLE TYPES).</li>
+                <li class="step"><span class="step-num">Step 2.</span> Edit the single entry.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Fill in:
+                    <table>
+                        <tr><th>Field</th><th>Description</th></tr>
+                        <tr><td>title</td><td>e.g. "Home"</td></tr>
+                        <tr><td>heroBanner</td><td>Upload the main hero image for the homepage</td></tr>
+                        <tr><td>mostReadSectionTitle</td><td>Title for the Most Read section (e.g. "MOST READ")</td></tr>
+                        <tr><td>mostReadSectionBanner</td><td>Optional banner image for Most Read section</td></tr>
+                        <tr><td>mostReadMaxItems</td><td>Number of articles in Most Read (default 5)</td></tr>
+                        <tr><td><strong>flashNewsMessage</strong></td><td>Text for the red Flash News bar (urgent announcements)</td></tr>
+                        <tr><td><strong>flashNewsActive</strong></td><td>Toggle to show/hide the Flash News bar</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 4.</span> Click <strong>Save</strong>.</li>
+            </ol>
+            <p class="note">Set <strong>flashNewsActive</strong> to Yes only when you want the Flash News bar to appear. Leave the message blank or fill it with your urgent text.</p>
+        </section>
+
+        <!-- ========== 9. SIDEBAR ========== -->
+        <section id="sidebar">
+            <span class="section-badge">Section: Sidebar Promotional Block</span>
+            <h2>10. Sidebar Promotional Block</h2>
+            <p>This controls the right sidebar content: Facebook widget, video embed, or promotional banner.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Content Manager</strong> → <strong>Sidebar Promotional Block</strong> (under SINGLE TYPES).</li>
+                <li class="step"><span class="step-num">Step 2.</span> Edit the single entry.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Fill in:
+                    <table>
+                        <tr><th>Field</th><th>Description</th></tr>
+                        <tr><td>blockType</td><td>Choose: <strong>video</strong>, <strong>social</strong>, or <strong>banner</strong></td></tr>
+                        <tr><td>thumbnail</td><td>Image for video thumbnail or promo</td></tr>
+                        <tr><td>videoUrl</td><td>URL of the video (for video block type)</td></tr>
+                        <tr><td>embedCode</td><td>Paste Facebook embed code or video iframe HTML</td></tr>
+                        <tr><td>moreVideosLink</td><td>URL for "more videos" link</td></tr>
+                        <tr><td>rotateWithOthers</td><td>If multiple blocks, allow rotation</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 4.</span> Click <strong>Save</strong>.</li>
+            </ol>
+        </section>
+
+        <!-- ========== 10. ADS ========== -->
+        <section id="ads">
+            <span class="section-badge">Section: Advertisement Slot</span>
+            <h2>11. Advertisement Slots</h2>
+            <p>Advertisement slots control where ads appear on the news portal: at the top of the page, between news sections, or in the sidebar. You can create multiple ads for different positions. Follow these steps to add a new advertisement.</p>
+
+            <h3>Step-by-step: Add an Advertisement</h3>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Content Manager</strong> → <strong>Advertisement Slot</strong>.</li>
+                <li class="step"><span class="step-num">Step 2.</span> Click <strong>Create new entry</strong>.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Fill in the form:
+                    <table>
+                        <tr><th>Field</th><th>Required</th><th>Description</th></tr>
+                        <tr><td><strong>position</strong></td><td>Yes</td><td>Where the ad appears on the page. Choose one:
+                            <ul style="margin: 0.35rem 0 0 0.5rem;">
+                                <li><strong>top</strong> — Top banner area (above main content)</li>
+                                <li><strong>between_sections</strong> — Between news sections (e.g. Main News and Most Read)</li>
+                                <li><strong>sidebar</strong> — Right-hand sidebar</li>
+                            </ul>
+                        </td></tr>
+                        <tr><td>media</td><td>One of media or embedHtml</td><td>Upload an image or video for the ad. Use this when you have a static image or video file (e.g. PNG, JPG, MP4). Leave empty if using <strong>embedHtml</strong> instead.</td></tr>
+                        <tr><td>embedHtml</td><td>One of media or embedHtml</td><td>Paste ad network code (e.g. Google AdSense, other third-party scripts). Use this for ads served by external networks. Leave empty if using <strong>media</strong> instead.</td></tr>
+                        <tr><td>startDate</td><td>No</td><td>When the ad becomes active. Leave empty to show immediately.</td></tr>
+                        <tr><td>endDate</td><td>No</td><td>When the ad stops showing. Leave empty to show indefinitely.</td></tr>
+                        <tr><td>priority</td><td>No</td><td>Display order when multiple ads share the same position. Higher number = shown first or more prominently.</td></tr>
+                        <tr><td>tenant</td><td>Auto</td><td><strong>Auto-assigned</strong> from your Editor Tenant Assignment — you do not select this.</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 4.</span> Choose how to display the ad:
+                    <ul>
+                        <li><strong>Image or video ad:</strong> Upload a file in <strong>media</strong>. Leave <strong>embedHtml</strong> blank.</li>
+                        <li><strong>Ad network (e.g. Google AdSense):</strong> Paste the HTML/script code in <strong>embedHtml</strong>. Leave <strong>media</strong> empty.</li>
+                    </ul>
+                </li>
+                <li class="step"><span class="step-num">Step 5.</span> Optionally set <strong>startDate</strong> and <strong>endDate</strong> to schedule when the ad is active.</li>
+                <li class="step"><span class="step-num">Step 6.</span> Click <strong>Save</strong>.</li>
+            </ol>
+
+            <div class="note"><strong>Note:</strong> Advertisement slots are saved immediately — there is no Draft/Publish step. The ad will appear on the frontend as soon as you save, assuming the date range (if set) is active and the frontend filters by your tenant.</div>
+        </section>
+
+        <section>
+            <h2>Quick Reference — Section to Content Type</h2>
+            <table>
+                <tr><th>Portal Section</th><th>Strapi Content Type</th><th>Location in Admin</th></tr>
+                <tr><td>Tenants (tenantId for filtering)</td><td>Tenant</td><td>Content Manager → Tenant</td></tr>
+                <tr><td>Editor–Tenant mapping</td><td>Editor Tenant Assignment</td><td>Content Manager → Editor Tenant Assignment</td></tr>
+                <tr><td>Top bar, header, footer</td><td>Global</td><td>Content Manager → Global</td></tr>
+                <tr><td>Flash News (red bar)</td><td>Homepage Layout</td><td>Content Manager → Homepage Layout</td></tr>
+                <tr><td>Main News</td><td>Article (category = Main News, tenant auto-assigned)</td><td>Content Manager → Article</td></tr>
+                <tr><td>Featured News</td><td>Article (isFeatured = true)</td><td>Content Manager → Article</td></tr>
+                <tr><td>Press Release</td><td>Article (category = Press Release)</td><td>Content Manager → Article</td></tr>
+                <tr><td>Most Read</td><td>Article (auto by views)</td><td>Automatic</td></tr>
+                <tr><td>Sidebar (Facebook, video)</td><td>Sidebar Promotional Block</td><td>Content Manager → Sidebar Promotional Block</td></tr>
+                <tr><td>Ads</td><td>Advertisement Slot</td><td>Content Manager → Advertisement Slot</td></tr>
+            </table>
+        </section>
+
+        <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; color: #6c757d; font-size: 0.9em;">
+            <p>This guide corresponds to the layout in <code>news_template_layout_mapping_diagram.png</code>. For API details, see <code>catholicatenews_strapi_content_mapping.md</code>. Multi-tenant filtering uses <code>filters[tenant][tenantId][$eq]=&lt;tenantId&gt;</code>.</p>
+        </footer>
+    </main>
+</body>
+</html>

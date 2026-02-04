@@ -8,6 +8,7 @@
     "deploy": "strapi deploy",
     "develop": "strapi develop",
     "seed:example": "node ./scripts/seed.js",
+    "grant:editor-ads": "node ./scripts/grant-editor-ad-permissions.js",
     "start": "strapi start",
     "strapi": "strapi"
   },

@@ -38,7 +38,12 @@
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::tenant.tenant",
-      "description": "Optional: scope ad slot per tenant"
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
     }
   }
 }

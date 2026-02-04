@@ -271,6 +271,15 @@ cd cms</code></pre>
                 <li>In Strapi Admin, create a tenant (e.g. slug <code>mosc</code>). Assign it to content entries.</li>
                 <li>Use lifecycle hooks to auto-assign tenant from the current user’s context if you have per-tenant roles.</li>
             </ul>
+            <div class="decision" style="margin-top: 1rem;">
+                <h4>Tenant assignment policy (no manual tenant choice)</h4>
+                <p><strong>Super Admin assigns a tenant to each user once</strong> via <strong>Editor Tenant Assignment</strong> (map admin user email → Tenant). After that:</p>
+                <ul>
+                    <li><strong>Any content type</strong> created by that user (Article, Advertisement Slot, etc.) <strong>must use that tenant by default</strong>. There is no need for the user to manually assign or choose a tenant ID.</li>
+                    <li><strong>The tenant field must not be displayed</strong> in the Content Manager for Editors (or any non–Super Admin). The tenant field must not appear when creating or editing content — it is always set automatically from the user's assignment.</li>
+                </ul>
+                <p>See <code>documentation/user_guide/admin_user_guide.html</code> for step-by-step Editor Tenant Assignment and role configuration.</p>
+            </div>
 
             <h3>Step 4.2 — API filtering by tenant</h3>
             <p>Next.js (or API consumers) must always filter by tenant, e.g.:</p>

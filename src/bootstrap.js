@@ -269,6 +269,316 @@ async function main() {
 }
 
 
+const TENANT_CONDITION_UID = 'plugin::api.is-same-tenant-as-user';
+let tenantConditionId = TENANT_CONDITION_UID;
+
+async function registerTenantRBACConditions() {
+  // Custom RBAC condition: filter content by user's assigned tenant
+  const conditionProvider = strapi.admin?.services?.permission?.conditionProvider;
+  if (!conditionProvider) {
+    strapi.log.warn('Admin condition provider unavailable; tenant RBAC condition not registered.');
+    return;
+  }
+
+  if (!conditionProvider.has(TENANT_CONDITION_UID)) {
+    await conditionProvider.register({
+      displayName: 'Is same tenant as user',
+      name: 'is-same-tenant-as-user',
+      plugin: 'api',
+      category: 'Multi-tenant',
+      async handler(user) {
+        if (!user) return { id: { $eq: null } };
+        let email = user.email;
+        if (!email && user.id) {
+          const adminUser = await strapi.db.query('admin::user').findOne({
+            where: { id: user.id },
+            select: ['email'],
+          });
+          email = adminUser?.email;
+        }
+        if (!email) return { id: { $eq: null } };
+        const emailLower = String(email).toLowerCase();
+        const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
+          where: {},
+          populate: { tenant: true },
+        });
+        const mapping = mappings.find(
+          (m) => (m.adminUserEmail || '').toLowerCase() === emailLower
+        );
+        if (!mapping?.tenant) {
+          return { id: { $eq: null } };
+        }
+        const tenantDoc = mapping.tenant;
+        const tenantDocumentId = tenantDoc.documentId ?? tenantDoc.document_id;
+        const tenantId = tenantDoc.id != null ? Number(tenantDoc.id) : null;
+        if (tenantId == null && !tenantDocumentId) return { id: { $eq: null } };
+        // Match tenant: stored as numeric FK. Return simple equality (tenant: id) for findOne/findMany.
+        if (tenantId != null) {
+          return { tenant: tenantId };
+        }
+        if (tenantDocumentId) {
+          return {
+            $or: [
+              { tenant: { documentId: { $eq: tenantDocumentId } } },
+              { tenant: { $eq: tenantDocumentId } }
+            ]
+          };
+        }
+        return { id: { $eq: null } };
+      },
+    });
+  }
+
+  tenantConditionId = conditionProvider.has(TENANT_CONDITION_UID)
+    ? TENANT_CONDITION_UID
+    : conditionProvider.keys().find((key) => key.endsWith('is-same-tenant-as-user')) ?? TENANT_CONDITION_UID;
+}
+
+/**
+ * Ensure Editor role has tenant-scoped permissions for key collection types.
+ * New content types are not auto-granted to roles; Editors need explicit permissions.
+ */
+async function ensureEditorTenantScopedPermissions() {
+  const subjects = [
+    'api::article.article',
+    'api::advertisement-slot.advertisement-slot',
+  ];
+  const actions = [
+    'plugin::content-manager.explorer.create',
+    'plugin::content-manager.explorer.read',
+    'plugin::content-manager.explorer.update',
+    'plugin::content-manager.explorer.delete',
+  ];
+  const targetConditions = [];
+
+  try {
+    const knex = strapi.db.connection;
+    // Strapi 5 uses code 'strapi-editor' for the Editor role
+    const editorRole = await strapi.db.query('admin::role').findOne({
+      where: { code: 'strapi-editor' },
+    });
+    if (!editorRole) {
+      strapi.log.warn('Editor role not found, skipping tenant permission grant');
+      return;
+    }
+
+    const roleId = editorRole.id;
+
+    for (const subject of subjects) {
+      for (const action of actions) {
+        const rows = await knex('admin_permissions as p')
+          .select('p.id', 'p.document_id', 'p.conditions')
+          .innerJoin('admin_permissions_role_lnk as l', 'l.permission_id', 'p.id')
+          .where('p.action', action)
+          .andWhere('p.subject', subject)
+          .andWhere('l.role_id', roleId)
+          .orderBy('p.id', 'asc');
+
+        if (rows.length > 0) {
+          const keep = rows[0];
+          const currentConditions = Array.isArray(keep.conditions)
+            ? keep.conditions
+            : JSON.parse(keep.conditions || '[]');
+          if (JSON.stringify(currentConditions) !== JSON.stringify(targetConditions)) {
+            await knex('admin_permissions')
+              .where({ id: keep.id })
+              .update({ conditions: JSON.stringify(targetConditions) });
+            strapi.log.info(`Updated Editor permission conditions: ${action} on ${subject}`);
+          }
+
+          if (rows.length > 1) {
+            const duplicateIds = rows.slice(1).map((row) => row.id);
+            if (duplicateIds.length > 0) {
+              await knex('admin_permissions_role_lnk').whereIn('permission_id', duplicateIds).del();
+              await knex('admin_permissions').whereIn('id', duplicateIds).del();
+              strapi.log.info(`Removed duplicate Editor permissions: ${action} on ${subject}`);
+            }
+          }
+          continue;
+        }
+
+        const created = await strapi.db.query('admin::permission').create({
+          data: {
+            action,
+            subject,
+            conditions: targetConditions,
+          },
+          select: ['id', 'documentId'],
+        });
+        const permissionId = created.id;
+
+        const [{ count }] = await knex('admin_permissions_role_lnk')
+          .where({ role_id: roleId })
+          .count({ count: '*' });
+        const permissionOrd = Number(count) + 1;
+
+        await knex('admin_permissions_role_lnk').insert({
+          permission_id: permissionId,
+          role_id: roleId,
+          permission_ord: permissionOrd,
+        });
+        await knex('admin_permissions')
+          .where({ id: permissionId })
+          .update({ document_id: created.documentId ?? permissionId });
+
+        strapi.log.info(`Granted Editor permission: ${action} on ${subject}`);
+      }
+    }
+  } catch (err) {
+    strapi.log.error('ensureEditorTenantScopedPermissions failed:', err.message);
+  }
+}
+
+/**
+ * Hide tenant field in Content Manager edit view for tenant-scoped content types.
+ * Schema pluginOptions.content-manager.visible: false is the primary mechanism; this tries to
+ * update stored layout so the tenant field is not shown (e.g. if layout was customized).
+ */
+async function hideTenantFieldInContentManagerLayout() {
+  const contentTypes = ['api::article.article', 'api::advertisement-slot.advertisement-slot'];
+  try {
+    const store = strapi.store({ type: 'plugin', name: 'content-manager' });
+    const config = (await store.get({ key: 'configuration' })) || {};
+    const contentTypesConfig = config.content_types || {};
+    let updated = false;
+    for (const uid of contentTypes) {
+      const ct = contentTypesConfig[uid];
+      if (!ct) continue;
+      const edit = ct.edit || {};
+      const layouts = edit.layouts || edit.layout;
+      if (layouts && Array.isArray(layouts)) {
+        for (const row of layouts) {
+          if (Array.isArray(row)) {
+            const idx = row.findIndex((cell) => cell?.name === 'tenant' || cell?.field === 'tenant');
+            if (idx !== -1) {
+              row.splice(idx, 1);
+              updated = true;
+            }
+          }
+        }
+      }
+    }
+    if (updated) {
+      await store.set({ key: 'configuration', value: config });
+      strapi.log.info('Content Manager: tenant field removed from edit layout for tenant-scoped types');
+    }
+  } catch (err) {
+    strapi.log.warn('Could not update Content Manager layout for tenant field:', err.message);
+  }
+}
+
+/**
+ * Enforce tenant scoping at Document Service level for Editor role.
+ * This avoids 403s on single-document reads while still scoping data by tenant.
+ */
+async function registerTenantDocumentMiddleware() {
+  const tenantScopedUids = [
+    'api::article.article',
+    'api::advertisement-slot.advertisement-slot',
+  ];
+
+  async function resolveEditorTenant() {
+    const requestContext = require('./utils/request-context');
+    const ctx = requestContext.get();
+    const user = ctx?.state?.user || ctx?.state?.admin;
+    if (!user?.id) return null;
+
+    const adminUser = await strapi.db.query('admin::user').findOne({
+      where: { id: user.id },
+      populate: { roles: true },
+      select: ['email'],
+    });
+    if (!adminUser?.email) return null;
+    const isEditor = (adminUser.roles || []).some((r) => r.code === 'strapi-editor');
+    if (!isEditor) return null;
+
+    const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
+      where: {},
+      populate: { tenant: true },
+    });
+    const mapping = mappings.find(
+      (m) => (m.adminUserEmail || '').toLowerCase() === String(adminUser.email).toLowerCase()
+    );
+    const tenant = mapping?.tenant;
+    if (!tenant) return null;
+    return { id: tenant.id, documentId: tenant.documentId ?? tenant.document_id };
+  }
+
+  strapi.documents.use(async (context, next) => {
+    const { uid, action, params } = context;
+    if (!tenantScopedUids.includes(uid)) {
+      return next();
+    }
+
+    const tenant = await resolveEditorTenant();
+    if (!tenant?.id) {
+      return next();
+    }
+
+    if (action === 'findMany') {
+      context.params = {
+        ...params,
+        filters: params?.filters
+          ? { $and: [params.filters, { tenant: tenant.id }] }
+          : { tenant: tenant.id },
+      };
+      return next();
+    }
+
+    const result = await next();
+
+    if (action === 'findOne' || action === 'update' || action === 'delete' || action === 'publish' || action === 'unpublish') {
+      const tenantValue = result?.tenant;
+      const tenantId =
+        typeof tenantValue === 'object'
+          ? tenantValue?.id ?? tenantValue?.documentId
+          : tenantValue;
+      if (tenantId != null && tenantId !== tenant.id && tenantId !== tenant.documentId) {
+        const error = new Error('Forbidden');
+        error.status = 403;
+        throw error;
+      }
+    }
+
+    return result;
+  });
+}
+
+/**
+ * Ensure homepage, sidebar-promotional-block, advertisement-slot have public find permission
+ * so the Content API returns data (avoids 404 for single types).
+ */
+async function ensureContentApiPublicPermissions() {
+  const publicRole = await strapi.query('plugin::users-permissions.role').findOne({
+    where: { type: 'public' },
+  });
+  if (!publicRole) return;
+  const toEnsure = [
+    { controller: 'homepage', actions: ['find'] },
+    { controller: 'sidebar-promotional-block', actions: ['find'] },
+    { controller: 'advertisement-slot', actions: ['find', 'findOne'] },
+  ];
+  for (const { controller, actions } of toEnsure) {
+    for (const action of actions) {
+      const actionId = `api::${controller}.${controller}.${action}`;
+      const existing = await strapi.query('plugin::users-permissions.permission').findOne({
+        where: { action: actionId, role: publicRole.id },
+      });
+      if (!existing) {
+        await strapi.query('plugin::users-permissions.permission').create({
+          data: { action: actionId, role: publicRole.id },
+        });
+        strapi.log.info(`Content API: granted public ${action} for ${controller}`);
+      }
+    }
+  }
+}
+
 module.exports = async () => {
   await seedExampleApp();
+  await ensureContentApiPublicPermissions();
+  await registerTenantRBACConditions();
+  await ensureEditorTenantScopedPermissions();
+  await hideTenantFieldInContentManagerLayout();
+  await registerTenantDocumentMiddleware();
 };
