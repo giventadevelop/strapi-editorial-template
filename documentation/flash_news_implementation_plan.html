@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flash News Implementation Plan</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #db1111; padding-bottom: 0.5rem; }
+    h2 { color: #2d2d2d; margin-top: 2rem; }
+    h3 { color: #444; margin-top: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem 0.75rem; text-align: left; }
+    th { background: #f5f5f5; }
+    pre, code { background: #f8f8f8; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { padding: 1rem; overflow-x: auto; }
+    ul { margin: 0.5rem 0; }
+    li { margin: 0.25rem 0; }
+    .meta { color: #666; font-size: 0.9rem; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>Flash News Implementation Plan</h1>
+  <p><strong>Reference</strong>: <code>documentation/news_portal/strapi/index.html</code> (catholicatenews.in)</p>
+  <p><strong>Purpose</strong>: Implement flash news scrolling from Strapi, matching the reference layout.</p>
+
+  <h2>1. Flash News – Reference Implementation</h2>
+
+  <h3>Structure in index.html</h3>
+  <pre><code>&lt;div class="flash-news"&gt;
+  &lt;div class="flash-title"&gt;Flash News&lt;/div&gt;
+  &lt;div class="owl-carousel tb-flash-carousel"&gt;
+    &lt;div class="carousel-item"&gt;
+      &lt;a href="https://catholicatenews.in/article-slug-1/"&gt;Headline 1&lt;/a&gt;
+    &lt;/div&gt;
+    &lt;div class="carousel-item"&gt;
+      &lt;a href="https://catholicatenews.in/article-slug-2/"&gt;Headline 2&lt;/a&gt;
+    &lt;/div&gt;
+    &lt;!-- ... more items --&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+
+  <h3>Behaviour</h3>
+  <ul>
+    <li><strong>Owl Carousel</strong> (<code>owl.carousel.min.js</code>) scrolls items horizontally</li>
+    <li>Each item: link (title) → article detail</li>
+    <li>Label: "Flash News" in a coloured bar</li>
+    <li>CSS: <code>.flash-news</code> (green background), <code>.flash-title</code> (red, angled clip-path)</li>
+  </ul>
+
+  <h3>Current MOSC implementation (different)</h3>
+  <ul>
+    <li>Single message from <code>homepage.flashNewsMessage</code> (Strapi <code>homepage</code> single type)</li>
+    <li>One <code>FlashBar</code> component with a single line</li>
+    <li>No carousel, no multiple items</li>
+  </ul>
+
+  <h2>2. Flash News – Strapi-Driven Implementation</h2>
+
+  <h3>Option A: Flash news as a collection (recommended)</h3>
+  <p><strong>Content type</strong>: <code>flash-news-item</code></p>
+  <table>
+    <thead>
+      <tr><th>Field</th><th>Type</th><th>Required</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>content</code></td><td>Text (long or medium)</td><td>Yes</td><td>Sentence or two shown in the ticker</td></tr>
+      <tr><td><code>article</code></td><td>Relation (Article)</td><td>No</td><td>Optional link to article detail</td></tr>
+      <tr><td><code>externalUrl</code></td><td>URL</td><td>No</td><td>Optional external link (if no article)</td></tr>
+      <tr><td><code>order</code></td><td>Integer</td><td>No</td><td>Display order (asc)</td></tr>
+      <tr><td><code>startDate</code></td><td>Date</td><td>No</td><td>Earliest date to show this item</td></tr>
+      <tr><td><code>endDate</code></td><td>Date</td><td>No</td><td>Latest date to show this item (inclusive)</td></tr>
+      <tr><td><code>publishedAt</code></td><td>DateTime</td><td>Yes</td><td>Visibility control</td></tr>
+      <tr><td><code>tenant</code></td><td>Relation (Tenant)</td><td>Yes</td><td>Multi-tenant</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Logic</strong>: The ticker displays <code>content</code>. If <code>article</code> is set, the item links to <code>/mosc/news/{article.slug}</code>; else if <code>externalUrl</code> is set, it links there; otherwise it is text-only (no link). Show the item only when today is between <code>startDate</code> and <code>endDate</code> (if set); if either date is null, that bound is ignored.</p>
+  <p><strong>API</strong>:</p>
+  <pre>GET /api/flash-news-items?filters[tenant][tenantId][$eq]=xxx&amp;filters[publishedAt][$notNull]=true&amp;sort=order:asc,publishedAt:desc&amp;pagination[limit]=10</pre>
+  <p>Filter by date window on the client or with Strapi filters: <code>filters[startDate][$lte]=today</code> and <code>filters[endDate][$gte]=today</code> (if your Strapi version supports it).</p>
+
+  <h3>Option B: Reuse articles with a flag</h3>
+  <p>Add <code>isFlashNews: boolean</code> to Article and a <code>flashOrder: number</code>.</p>
+  <ul>
+    <li>Query: <code>filters[isFlashNews][$eq]=true</code></li>
+    <li>Sort: <code>flashOrder:asc,publishedAt:desc</code></li>
+    <li>Simpler schema but mixes flash with regular articles.</li>
+  </ul>
+
+  <h3>Option C: Keep homepage single type, extend it</h3>
+  <p>Add <code>flashNewsItems</code> (JSON or Component) to <code>homepage</code>:</p>
+  <pre><code>{
+  "flashNewsItems": [
+    { "content": "Sentence or two for ticker.", "articleSlug": "...", "order": 1, "startDate": "2026-02-01", "endDate": "2026-02-28" },
+    { "content": "Another ticker line.", "externalUrl": "https://...", "order": 2 }
+  ]
+}</code></pre>
+  <p>Easier to manage in one place; less flexible for large numbers of items.</p>
+
+  <h2>3. Recommended Approach: Collection + Carousel UI</h2>
+
+  <h3>Strapi schema: <code>flash-news-item</code></h3>
+  <ol>
+    <li>Create collection type <code>flash-news-item</code></li>
+    <li>Fields: <code>content</code>, <code>article</code> (relation), <code>externalUrl</code>, <code>order</code>, <code>startDate</code>, <code>endDate</code>, <code>publishedAt</code>, <code>tenant</code></li>
+    <li>Admin: Manage flash items in Strapi admin</li>
+  </ol>
+
+  <h3>Frontend: Flash news carousel</h3>
+  <ol>
+    <li><strong>Data</strong>: Extend <code>getNewsHomePageData</code> to fetch <code>/flash-news-items</code></li>
+    <li><strong>Component</strong>: Replace <code>FlashBar</code> with <code>FlashNewsCarousel</code>
+      <ul>
+        <li>Horizontal scrolling carousel</li>
+        <li>Each item: <code>&lt;a href={...}&gt;{content}&lt;/a&gt;</code></li>
+        <li>Use CSS <code>marquee</code> or a lightweight carousel (e.g. embla-carousel, swiper) instead of owl-carousel for Next.js</li>
+      </ul>
+    </li>
+  </ol>
+
+  <h3>Carousel behaviour (match reference)</h3>
+  <ul>
+    <li>Horizontal auto-scroll (ticker)</li>
+    <li>One item visible at a time (or a few on wide screens)</li>
+    <li>Smooth transitions</li>
+    <li>Pause on hover</li>
+    <li>Optional link: article or external URL when set; otherwise plain ticker text</li>
+  </ul>
+
+  <h3>Visual styling (from index.html)</h3>
+  <ul>
+    <li>Container: <code>flash-news</code> — coloured bar (e.g. <code>#4ad822</code> or MOSC primary)</li>
+    <li>Title: <code>flash-title</code> — "Flash News" label, distinct background (e.g. <code>#db1111</code>), optional clip-path</li>
+    <li>Items: readable font, truncate if long</li>
+  </ul>
+
+  <h2>4. Flash News Data Shape (for API)</h2>
+  <pre><code>interface FlashNewsItem {
+  id: number;
+  documentId?: string;
+  content: string;         // sentence or two shown in ticker
+  slug?: string;           // from article relation
+  externalUrl?: string | null;
+  articleId?: number;
+  order?: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  publishedAt?: string;
+}
+
+// Normalized for UI
+interface FlashNewsItemUI {
+  content: string;  // ticker text
+  href: string;     // /mosc/news/{slug} or externalUrl
+  isExternal: boolean;
+}</code></pre>
+
+  <h2>5. Implementation Checklist</h2>
+  <ul>
+    <li>Create Strapi collection <code>flash-news-item</code></li>
+    <li>Add fetch in <code>getNewsHomePageData</code> for flash items</li>
+    <li>Add <code>FlashNewsCarousel</code> component (scroll like reference)</li>
+    <li>Replace <code>FlashBar</code> usage with <code>FlashNewsCarousel</code> when flash items exist</li>
+    <li>Fallback: show nothing (or single-message bar) if no items</li>
+    <li>Update <code>catholicatenews_strapi_content_mapping.md</code></li>
+    <li>Add admin guide section for flash news</li>
+  </ul>
+
+  <p class="meta"><strong>Created</strong>: 2026-02-04 | <strong>Status</strong>: Implementation plan – ready for Strapi schema and frontend tasks</p>
+</body>
+</html>

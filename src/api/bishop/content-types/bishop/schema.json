@@ -1,0 +1,70 @@
+{
+  "kind": "collectionType",
+  "collectionName": "bishops",
+  "info": {
+    "singularName": "bishop",
+    "pluralName": "bishops",
+    "displayName": "Directory – Bishops",
+    "description": "Bishop: name, type (catholicos/diocesan/retired), contact and optional diocese"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Full title/name (e.g. H. G. Dr. Thomas Mar Athanasius Metropolitan)"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "address": {
+      "type": "text"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phones": {
+      "type": "text",
+      "description": "Phone number(s), comma-separated if multiple"
+    },
+    "bishopType": {
+      "type": "enumeration",
+      "enum": ["catholicos", "diocesan", "retired"],
+      "required": true,
+      "description": "Catholicos, Diocesan Bishops, or Retired Bishops"
+    },
+    "diocese": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::diocese.diocese",
+      "description": "Optional: diocese for diocesan bishops"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order within same bishopType"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

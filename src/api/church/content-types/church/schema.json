@@ -1,0 +1,53 @@
+{
+  "kind": "collectionType",
+  "collectionName": "churches",
+  "info": {
+    "singularName": "church",
+    "pluralName": "churches",
+    "displayName": "Directory – Churches",
+    "description": "Church (place of worship): name, location, diocese, optional priests; address/phone support India, Kerala, USA formats"
+  },
+  "options": { "draftAndPublish": false },
+  "pluginOptions": {},
+  "attributes": {
+    "name": { "type": "string", "required": true },
+    "slug": { "type": "uid", "targetField": "name", "required": true },
+    "location": {
+      "type": "string",
+      "description": "Short location label (e.g. Aduthala, Nanthancode)"
+    },
+    "address": { "type": "text", "description": "Full address (freeform); use structured fields for forms" },
+    "addressLine1": { "type": "string", "description": "Street / area (India, USA)" },
+    "addressLine2": { "type": "string", "description": "Additional line" },
+    "city": { "type": "string", "description": "City / town" },
+    "state": { "type": "string", "description": "State / region (e.g. Kerala, Texas)" },
+    "postalCode": { "type": "string", "description": "PIN / ZIP" },
+    "country": { "type": "string", "description": "Country (India, USA, etc.)" },
+    "phones": { "type": "text", "description": "Phone number(s), comma-separated" },
+    "phoneSecondary": { "type": "string", "description": "Second phone number" },
+    "email": { "type": "string" },
+    "website": { "type": "string" },
+    "image": { "type": "media", "multiple": false, "required": false, "allowedTypes": ["images"] },
+    "diocese": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::diocese.diocese",
+      "required": true,
+      "inversedBy": "churches"
+    },
+    "priests": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::priest.priest",
+      "mappedBy": "church",
+      "description": "Priests associated with this church (e.g. sample data)"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": { "content-manager": { "visible": false } }
+    }
+  }
+}

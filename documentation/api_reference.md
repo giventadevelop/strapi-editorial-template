@@ -17,13 +17,21 @@ Strapi auto-exposes REST endpoints for each content type. The following are avai
 | **Author** | `GET /api/authors`, `GET /api/authors/:documentId` | Yes |
 | **Global** | `GET /api/global` | Yes |
 | **About** | `GET /api/about` | Yes |
-| **Advertisement Slot** | `GET /api/advertisement-slots`, `GET /api/advertisement-slots/:documentId` | Configure in Admin → Users & Permissions |
-| **Sidebar Promotional Block** | `GET /api/sidebar-promotional-block` | Configure in Admin |
+| **Advertisement Slot** | `GET /api/advertisement-slots`, `GET /api/advertisement-slots/:documentId` | Via bootstrap (public find) |
+| **Flash News Item** | `GET /api/flash-news-items`, `GET /api/flash-news-items/:documentId` | Via bootstrap (public find) |
+| **Sidebar Promotional Block** | `GET /api/sidebar-promotional-block` | Via bootstrap (public find) |
 | **Homepage Layout** | `GET /api/homepage` | Configure in Admin |
+| **Directory – Home** | `GET /api/directory-home` | Via bootstrap (public find) |
+| **Directory – Bishops** | `GET /api/bishops`, `GET /api/bishops/:documentId` | Via bootstrap (public find, findOne) |
+| **Directory – Dioceses** | `GET /api/dioceses`, `GET /api/dioceses/:documentId` | Via bootstrap (public find, findOne) |
+| **Directory – Parishes** | `GET /api/parishes`, `GET /api/parishes/:documentId` | Via bootstrap (public find, findOne) |
+| **Directory – Churches** | `GET /api/churches`, `GET /api/churches/:documentId` | Via bootstrap (public find, findOne) |
+| **Directory – Priests** | `GET /api/priests`, `GET /api/priests/:documentId` | Via bootstrap (public find, findOne) |
+| **Directory – Entries** | `GET /api/directory-entries`, `GET /api/directory-entries/:documentId` | Via bootstrap (public find, findOne) |
 | **Tenant** | `GET /api/tenants`, `GET /api/tenants/:documentId` | Configure in Admin (usually restricted) |
 | **Editor Tenant Assignment** | `GET /api/editor-tenant-assignments`, etc. | Admin-only (no public access) |
 
-**Note:** The seed script grants public `find` and `findOne` only for: article, category, author, global, about. For advertisement-slot, homepage, sidebar-promotional-block, grant permissions in **Settings → Users & Permissions → Public** (or use an API token with a custom role).
+**Note:** The seed script grants public `find` and `findOne` for: article, category, author, global, about. Bootstrap also grants public find for: homepage, sidebar-promotional-block, advertisement-slot, flash-news-item, directory-home, bishop, diocese, parish, church, priest, directory-entry.
 
 ---
 
@@ -54,6 +62,9 @@ GET /api/articles?filters[tenant][tenantId][$eq]=tenant_mosc_001&filters[publish
 # Advertisement slots for a tenant (sidebar)
 GET /api/advertisement-slots?filters[tenant][tenantId][$eq]=tenant_mosc_001&filters[position][$eq]=sidebar
 
+# Flash News Items for a tenant (carousel/ticker)
+GET /api/flash-news-items?filters[tenant][tenantId][$eq]=tenant_mosc_001&filters[publishedAt][$notNull]=true&sort=order:asc&populate[0]=article&pagination[limit]=20
+
 # Main News for a tenant
 GET /api/articles?filters[tenant][tenantId][$eq]=tenant_mosc_001&filters[category][slug][$eq]=main-news&filters[publishedAt][$notNull]=true
 ```
@@ -70,6 +81,127 @@ const url = `${STRAPI_URL}/api/articles?` +
   `&populate=cover,category,author` +
   `&sort=publishedAt:desc`;
 ```
+
+---
+
+## 2.1 Flash News Items API
+
+Scrolling flash news carousel/ticker items. Each item can link to an article or an external URL.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/flash-news-items` | List flash news items (tenant-scoped) |
+| GET | `/api/flash-news-items/:documentId` | Single flash news item by documentId |
+
+### Query parameters (list)
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `filters[tenant][tenantId][$eq]` | Yes | Tenant ID (e.g. `tenant_mosc_001`) |
+| `filters[publishedAt][$notNull]` | Recommended | Only published items (`true`) |
+| `sort` | No | `order:asc` (display order), or `order:asc,publishedAt:desc` |
+| `populate[0]` | No | `article` — to get linked article (slug, title) for href |
+| `pagination[limit]` | No | Default 25; use e.g. `20` for carousel |
+| `pagination[page]` | No | For pagination |
+
+### Response fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `documentId` | string | Unique document ID |
+| `title` | string | Entry title (admin / label) |
+| `content` | string | Ticker text shown in carousel |
+| `article` | object \| null | Related article (when populated); use `article.slug` for internal link |
+| `externalUrl` | string \| null | External link when no article |
+| `order` | number | Display order (lower = first) |
+| `startDate` | string \| null | ISO date; show only on or after this date |
+| `endDate` | string \| null | ISO date; show only on or before this date |
+| `publishedAt` | string \| null | Publication timestamp |
+
+### Frontend integration example
+
+```javascript
+// Fetch flash news items for the current tenant
+const tenantId = getTenantIdFromRequest(req); // e.g. from hostname or route
+
+const res = await fetch(
+  `${STRAPI_URL}/api/flash-news-items?` +
+  `filters[tenant][tenantId][$eq]=${encodeURIComponent(tenantId)}` +
+  `&filters[publishedAt][$notNull]=true` +
+  `&sort=order:asc` +
+  `&populate[0]=article` +
+  `&pagination[limit]=20`,
+  {
+    headers: process.env.STRAPI_API_TOKEN
+      ? { Authorization: `Bearer ${process.env.STRAPI_API_TOKEN}` }
+      : {},
+  }
+);
+const { data } = await res.json();
+
+// Filter by startDate/endDate client-side (optional)
+const today = new Date().toISOString().split('T')[0];
+const visible = data.filter((item) => {
+  if (item.startDate && item.startDate > today) return false;
+  if (item.endDate && item.endDate < today) return false;
+  return true;
+});
+
+// Build link for each item
+visible.forEach((item) => {
+  const href = item.article?.slug
+    ? `/article/${item.article.slug}` // or your article route
+    : item.externalUrl || '#';
+  // Render: item.content, href
+});
+```
+
+### Next.js (Server Component)
+
+```javascript
+export default async function FlashNewsCarousel() {
+  const tenantId = process.env.TENANT_ID; // or from headers/params
+
+  const res = await fetch(
+    `${process.env.STRAPI_URL}/api/flash-news-items?` +
+    `filters[tenant][tenantId][$eq]=${tenantId}` +
+    `&filters[publishedAt][$notNull]=true` +
+    `&sort=order:asc` +
+    `&populate[0]=article` +
+    `&pagination[limit]=20`,
+    {
+      next: { revalidate: 60 }, // revalidate every 60 seconds
+      headers: process.env.STRAPI_API_TOKEN
+        ? { Authorization: `Bearer ${process.env.STRAPI_API_TOKEN}` }
+        : {},
+    }
+  );
+  const { data } = await res.json();
+
+  return (
+    <div className="flash-news-carousel">
+      {data?.map((item) => {
+        const href = item.article?.slug
+          ? `/news/${item.article.slug}`
+          : item.externalUrl || '#';
+        return (
+          <a key={item.documentId} href={href}>
+            {item.content}
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+```
+
+### Notes
+
+- **Date filtering:** `startDate` and `endDate` are optional. Filter client-side if you want items to show only within a date range.
+- **Link priority:** Use `article.slug` for internal links; fall back to `externalUrl` when no article is linked.
+- **Populate:** Use `populate[0]=article` to get article data (slug, title) for building hrefs. Use `populate[0]=article&populate[1]=article.cover` if you need the article cover image.
 
 ---
 

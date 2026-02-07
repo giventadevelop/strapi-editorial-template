@@ -1,0 +1,29 @@
+{
+  "collectionName": "components_directory_section_cards",
+  "info": {
+    "name": "Section Card",
+    "icon": "picture",
+    "displayName": "Section Card",
+    "description": "Image, title, description and link for a directory section (e.g. Bishops, Dioceses)"
+  },
+  "options": {},
+  "attributes": {
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "linkUrl": {
+      "type": "string",
+      "description": "URL for this section (e.g. /bishops, /dioceses)"
+    }
+  }
+}

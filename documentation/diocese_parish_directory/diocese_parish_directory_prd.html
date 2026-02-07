@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diocese & Parish Directory – Replication Plan (directory.mosc.in)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 920px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #0d5c2e; padding-bottom: 0.5rem; }
+    h2 { color: #2d2d2d; margin-top: 2rem; }
+    h3 { color: #444; margin-top: 1.5rem; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem 0.75rem; text-align: left; }
+    th { background: #f0f4f0; }
+    pre, code { background: #f8f8f8; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { padding: 1rem; overflow-x: auto; }
+    ul, ol { margin: 0.5rem 0; }
+    li { margin: 0.25rem 0; }
+    .meta { color: #666; font-size: 0.9rem; margin-top: 2rem; }
+    .toc { background: #f8faf8; padding: 1rem 1.5rem; border-radius: 8px; margin: 1rem 0; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc a { color: #0d5c2e; text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .note { background: #fff8e6; border-left: 4px solid #e6b800; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .recommend { background: #e8f5e9; border-left: 4px solid #0d5c2e; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .warning { background: #ffebee; border-left: 4px solid #c62828; padding: 0.75rem 1rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Diocese & Parish Directory – Replication Plan</h1>
+  <p><strong>Source portal</strong>: <a href="https://directory.mosc.in/" target="_blank" rel="noopener">https://directory.mosc.in/</a></p>
+  <p><strong>Context</strong>: This Strapi project already models <a href="https://catholicatenews.in/">catholicatenews.in</a> (with a local clone at <code>E:\project_workspace\catholicatenews-in-temp</code>). This document describes how to replicate the <strong>directory.mosc.in</strong> portal (structure, content types, data population, and editor experience) within the same Strapi instance.</p>
+
+  <div class="toc">
+    <strong>Contents</strong>
+    <ul>
+      <li><a href="#approach">1. Best approach: infer from online vs local clone</a></li>
+      <li><a href="#structure">2. Structure and features inferred from directory.mosc.in</a></li>
+      <li><a href="#content-types">3. Strapi collection types and components</a></li>
+      <li><a href="#editor-hierarchy">4. Editor experience: News vs Directory (two hierarchies)</a></li>
+      <li><a href="#data-population">5. Automated data population</a></li>
+      <li><a href="#implementation-phases">6. Implementation phases</a></li>
+    </ul>
+  </div>
+
+  <h2 id="approach">1. Best approach: infer from online vs local clone</h2>
+
+  <h3>Can we infer everything from the online site?</h3>
+  <p><strong>Yes, for structure and modelling.</strong> The live site is enough to infer:</p>
+  <ul>
+    <li>All <strong>sections</strong> (Home, Bishops, Dioceses, Parishes, Priests, Institutions, Church Dignitaries, Working Committee, Managing Committee, Spiritual Organisations, Pilgrim Centres, Seminaries)</li>
+    <li><strong>URL patterns</strong> (e.g. <code>/bishops/?the-holy-synod=diocesan-bishops</code>, <code>/dioceses/diocese-of-thiruvananthapuram/</code>, <code>/directories/?type=seminaries</code>)</li>
+    <li><strong>Data shape</strong> per section (fields like name, address, email, phone, website, image, relations such as diocese → parishes/priests)</li>
+    <li><strong>Control flow</strong> (filter by diocese for parishes/priests; filter bishops by type; list “directory” entries by type)</li>
+  </ul>
+  <p>So you <strong>do not need to download the entire site first</strong> to design the Strapi schema or the implementation plan. The analysis in this document is based on the live site.</p>
+
+  <h3>When a local clone helps</h3>
+  <ul>
+    <li><strong>Automated data population</strong>: To bulk-import existing data into Strapi, you need a reliable data source. Options:
+      <ol>
+        <li><strong>Scraping the live site</strong>: Possible (e.g. fetch HTML, parse with Cheerio/JSDOM), but fragile (HTML changes, rate limits, ToS).</li>
+        <li><strong>Local clone</strong>: If you download a static clone (e.g. same as catholicatenews-in-temp), you can run Node scripts over local HTML/JSON to extract entities and then POST to Strapi (or insert into DB). More stable and repeatable.</li>
+      </ol>
+    </li>
+    <li><strong>Edge cases</strong>: Some detail pages (e.g. parish detail, priest detail) might reveal extra fields; a local clone makes it easy to grep and inspect.</li>
+  </ul>
+  <div class="recommend">
+    <strong>Recommendation</strong>: Use the <strong>online site to design</strong> the data model and this plan. For <strong>automated population</strong>, prefer a <strong>local clone + import scripts</strong> that parse the clone and call Strapi APIs (or use Strapi’s programmatic create services). If the live site has no API and you want to avoid scraping, the local clone is the practical source for bulk import.
+  </div>
+
+  <h2 id="structure">2. Structure and features inferred from directory.mosc.in</h2>
+
+  <h3>High-level sections and URLs</h3>
+  <table>
+    <thead>
+      <tr><th>Section</th><th>URL pattern</th><th>Behaviour</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Home</td><td><code>/</code></td><td>Intro blocks (image, title, description, link) for each section</td></tr>
+      <tr><td>Bishops</td><td><code>/bishops/</code>, <code>?the-holy-synod=retired-bishops|diocesan-bishops|the-primate</code></td><td>List by type (Retired, Diocesan, Catholicos); each bishop has image, name, address, email, phone(s)</td></tr>
+      <tr><td>Dioceses</td><td><code>/dioceses/</code>, <code>/dioceses/{slug}/</code></td><td>List and detail; slug e.g. <code>diocese-of-thiruvananthapuram</code>; address, email, phone(s), website, image</td></tr>
+      <tr><td>Parishes</td><td><code>/parishes/</code>, <code>?diocese={slug}</code></td><td>Filter by diocese; parish belongs to one diocese</td></tr>
+      <tr><td>Priests</td><td><code>/priests</code>, filter by diocese</td><td>Filter by diocese; priest linked to diocese (and often parish)</td></tr>
+      <tr><td>Institutions</td><td><code>/directories/?type=directory-mosc-ininstitutions</code></td><td>Name, address, phone(s), email, website</td></tr>
+      <tr><td>Church Dignitaries</td><td><code>/directories/?type=church-dignitaries</code></td><td>Name, address, phone(s), email, optional role (e.g. Association Secretary)</td></tr>
+      <tr><td>Working Committee</td><td><code>/directories/?type=working-committee</code></td><td>Same shape as other directory entries</td></tr>
+      <tr><td>The Managing Committee</td><td><code>/directories/?type=the-managing-committee</code></td><td>Same shape</td></tr>
+      <tr><td>Spiritual Organisations</td><td><code>/directories/?type=spiritual-organisations</code></td><td>Same shape</td></tr>
+      <tr><td>Pilgrim Centres</td><td><code>/directories/?type=major-pilgrim-centres</code></td><td>Same shape</td></tr>
+      <tr><td>Seminaries</td><td><code>/directories/?type=seminaries</code></td><td>Name, address, phone(s), email, website</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Data patterns per entity</h3>
+  <ul>
+    <li><strong>Bishop</strong>: Image, full title/name (e.g. “H. G. Dr. Thomas Mar Athanasius Metropolitan”), address, email, one or more phone numbers, optional diocese (for diocesan bishops). Sub-list by type: Catholicos, Diocesan Bishops, Retired Bishops.</li>
+    <li><strong>Diocese</strong>: Name, slug, address, email, phone(s), optional website, optional image.</li>
+    <li><strong>Parish</strong>: Name, diocese (relation), address, contact (and likely vicar/priest); list filtered by diocese.</li>
+    <li><strong>Priest</strong>: Name/title, diocese (relation), possibly parish, contact; list filtered by diocese.</li>
+    <li><strong>“Directory” entries</strong> (Institutions, Church Dignitaries, Working Committee, Managing Committee, Spiritual Organisations, Pilgrim Centres, Seminaries): Shared pattern — <strong>name/title</strong>, <strong>address</strong>, <strong>email</strong>, <strong>phone(s)</strong>, <strong>website</strong> (optional), optional <strong>role/description</strong>, optional image. Distinguished only by <strong>type</strong> (slug or enum).</li>
+  </ul>
+
+  <h2 id="content-types">3. Strapi collection types and components</h2>
+
+  <h3>Shared component: Contact block (optional)</h3>
+  <p>Reusable for address, email, phones, website. Example:</p>
+  <table>
+    <thead>
+      <tr><th>Component field</th><th>Type</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>address</code></td><td>Text</td></tr>
+      <tr><td><code>email</code></td><td>String (or multiple as JSON)</td></tr>
+      <tr><td><code>phones</code></td><td>JSON array of strings, or repeatable component</td></tr>
+      <tr><td><code>website</code></td><td>String (URL)</td></tr>
+    </tbody>
+  </table>
+  <p>Alternatively, keep these as top-level fields on each content type for simplicity and filtering.</p>
+
+  <h3>Collection types</h3>
+  <table>
+    <thead>
+      <tr><th>Content type</th><th>Kind</th><th>Key attributes</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Directory Home</strong></td>
+        <td>Single type</td>
+        <td>Repeatable section cards: image, title, description, link (URL or relation). One card per main section (Bishops, Dioceses, Parishes, …). Optional intro text.</td>
+      </tr>
+      <tr>
+        <td><strong>Bishop</strong></td>
+        <td>Collection</td>
+        <td><code>name</code> (string), <code>slug</code> (uid), <code>image</code> (media), <code>address</code>, <code>email</code>, <code>phones</code> (JSON or text), <code>bishopType</code> (enum: catholicos | diocesan | retired), <code>diocese</code> (relation, optional), <code>order</code> (integer), <code>tenant</code> (relation, hidden, auto-assigned)</td>
+      </tr>
+      <tr>
+        <td><strong>Diocese</strong></td>
+        <td>Collection</td>
+        <td><code>name</code>, <code>slug</code> (uid), <code>address</code>, <code>email</code>, <code>phones</code>, <code>website</code>, <code>image</code>, <code>description</code> (text, optional), <code>tenant</code></td>
+      </tr>
+      <tr>
+        <td><strong>Parish</strong></td>
+        <td>Collection</td>
+        <td><code>name</code>, <code>slug</code>, <code>diocese</code> (relation → Diocese), <code>address</code>, <code>email</code>, <code>phones</code>, optional <code>vicar</code> (relation → Priest), <code>tenant</code></td>
+      </tr>
+      <tr>
+        <td><strong>Priest</strong></td>
+        <td>Collection</td>
+        <td><code>name</code>, <code>slug</code>, <code>title</code> (e.g. Vicar, Fr.), <code>diocese</code> (relation), <code>parish</code> (relation, optional), <code>address</code>, <code>email</code>, <code>phones</code>, <code>image</code>, <code>tenant</code></td>
+      </tr>
+      <tr>
+        <td><strong>Directory Entry</strong></td>
+        <td>Collection</td>
+        <td><code>name</code>, <code>slug</code>, <code>directoryType</code> (enum: institutions | church-dignitaries | working-committee | managing-committee | spiritual-organisations | pilgrim-centres | seminaries), <code>address</code>, <code>email</code>, <code>phones</code>, <code>website</code>, <code>role</code> or <code>description</code> (text), <code>image</code>, <code>order</code>, <code>tenant</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Relationships</h3>
+  <ul>
+    <li><strong>Diocese</strong> → has many <strong>Parishes</strong>; has many <strong>Priests</strong> (when priest is diocesan).</li>
+    <li><strong>Bishop</strong> → optional <strong>Diocese</strong> (for diocesan bishops).</li>
+    <li><strong>Parish</strong> → belongs to one <strong>Diocese</strong>; optional current <strong>Vicar</strong> (Priest).</li>
+    <li><strong>Priest</strong> → one <strong>Diocese</strong>; optional current <strong>Parish</strong> (vicar of).</li>
+    <li>All directory collection types (Bishop, Diocese, Parish, Priest, Directory Entry) can use <strong>tenant</strong> for multi-tenancy, with tenant auto-assigned from Editor Tenant Assignment (same pattern as Article).</li>
+  </ul>
+
+  <h3>Admin display names (for clarity)</h3>
+  <p>Use clear names so editors see “Directory” vs “News”:</p>
+  <ul>
+    <li>Directory Home → <strong>Directory – Home</strong></li>
+    <li>Bishop → <strong>Directory – Bishops</strong></li>
+    <li>Diocese → <strong>Directory – Dioceses</strong></li>
+    <li>Parish → <strong>Directory – Parishes</strong></li>
+    <li>Priest → <strong>Directory – Priests</strong></li>
+    <li>Directory Entry → <strong>Directory – Entries</strong> (Institutions, Dignitaries, Committees, etc.)</li>
+  </ul>
+
+  <h2 id="editor-hierarchy">4. Editor experience: News vs Directory (two hierarchies)</h2>
+
+  <h3>Can the same editor manage both News and Directory?</h3>
+  <p><strong>Yes.</strong> One user (e.g. Editor role) can have access to both news content and directory content. Whether they see both depends on:</p>
+  <ul>
+    <li><strong>Permissions</strong>: Grant the Editor role permission to create/read/update the new Directory content types (Bishop, Diocese, Parish, Priest, Directory Entry, Directory Home).</li>
+    <li><strong>Tenant</strong>: If directory is tenant-scoped (recommended for consistency), assign that user to the same tenant used for the directory (or to a tenant that “owns” both news and directory for that site). Same Editor Tenant Assignment mechanism: one user → one tenant; that tenant can own both articles and directory entities.</li>
+  </ul>
+
+  <h3>Making News and Directory clearly distinguishable</h3>
+  <p>Two ways to keep “News” and “Directory” as two clear hierarchies in the admin:</p>
+  <ol>
+    <li><strong>Content-Type Groups (Strapi admin)</strong>
+      <ul>
+        <li>In Strapi v4, you can define <strong>Content-Type Groups</strong> in the admin so the left sidebar shows sections like “News” and “Directory”.</li>
+        <li>Put Article, Category, Author, Flash News Item, Advertisement Slot, etc. under a group <strong>News</strong>.</li>
+        <li>Put Bishop, Diocese, Parish, Priest, Directory Entry, Directory Home under a group <strong>Directory</strong>.</li>
+        <li>Shared types (Tenant, Global, Homepage if shared) can stay in a “Settings” or “Common” group.</li>
+      </ul>
+    </li>
+    <li><strong>Naming convention (no plugin)</strong>
+      <ul>
+        <li>Prefix display names with “Directory –” (e.g. “Directory – Bishops”) so in the default Strapi sidebar they visually group together and are distinct from “Article”, “Category”, “Flash News Item”, etc.</li>
+      </ul>
+    </li>
+  </ol>
+  <div class="recommend">
+    <strong>Recommendation</strong>: Use the <strong>"Directory – …"</strong> display name prefix for all directory content types so editors see a clear, distinguishable hierarchy (News vs Directory) with no code changes. Add a custom admin menu later if you need collapsible sidebar sections.
+  </div>
+
+  <h2 id="data-population">5. Automated data population</h2>
+
+  <h3>Options</h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Pros</th><th>Cons</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Scrape live site</strong></td>
+        <td>No local clone needed; always current.</td>
+        <td>HTML structure changes break parser; rate limits; ToS; need to handle pagination and detail pages.</td>
+      </tr>
+      <tr>
+        <td><strong>Local clone + import script</strong></td>
+        <td>Stable, repeatable; can re-run; no live site load.</td>
+        <td>Requires downloading the site once; clone may be static (no API).</td>
+      </tr>
+      <tr>
+        <td><strong>Manual entry / CSV import</strong></td>
+        <td>Full control; no scraping.</td>
+        <td>Not “automatic”; labour-intensive for large data.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Recommended: automated import from a local clone</h3>
+  <ol>
+    <li><strong>Obtain a local clone</strong> of directory.mosc.in (e.g. wget, HTTrack, or browser “Save as” for key sections). Store it in a folder similar to <code>E:\project_workspace\catholicatenews-in-temp</code>, e.g. <code>E:\project_workspace\directory-mosc-in-temp</code>.</li>
+    <li><strong>Write a Node script</strong> that:
+      <ul>
+        <li>Reads HTML (or exported JSON if you export from the CMS) from the clone.</li>
+        <li>Parses dioceses (from <code>/dioceses/</code> and detail pages), bishops (from <code>/bishops/?the-holy-synod=...</code>), parishes (from parish list/detail by diocese), priests, and directory entries (from <code>/directories/?type=...</code>).</li>
+        <li>Maps each entity to the Strapi payload (with tenant ID, slug, etc.).</li>
+        <li>Uses Strapi’s REST API (<code>POST /api/dioceses</code>, etc.) or Strapi’s programmatic API (e.g. <code>strapi.documents('api::diocese.diocese').create(...)</code>) from a bootstrap script or a one-off script run inside the Strapi app.</li>
+      </ul>
+    </li>
+    <li><strong>Run the script</strong> once (or periodically if you refresh the clone) to populate the database. For media (images), either download assets and upload via Strapi’s upload API, or keep URLs pointing to the original site initially.</li>
+  </ol>
+  <p>This gives you <strong>automated</strong> population of current data from the site into the CMS, with the clone as the stable source. The script can be re-run after schema or clone updates with care (e.g. match by slug, update existing).</p>
+
+  <h3>Order of creation (for relations)</h3>
+  <p>Create in dependency order so relations resolve:</p>
+  <ol>
+    <li>Tenant (if not exists)</li>
+    <li>Dioceses</li>
+    <li>Bishops (with optional diocese relation)</li>
+    <li>Priests (with diocese relation; parish optional or later)</li>
+    <li>Parishes (with diocese relation; vicar/priest optional or later)</li>
+    <li>Directory entries (no relation to diocese/parish; only directoryType)</li>
+    <li>Directory Home (section cards)</li>
+  </ol>
+
+  <h2 id="implementation-phases">6. Implementation phases</h2>
+
+  <ol>
+    <li><strong>Phase 1 – Schema</strong>
+      <ul>
+        <li>Create shared component(s) for contact fields if desired.</li>
+        <li>Create content types: Directory Home (single), Bishop, Diocese, Parish, Priest, Directory Entry.</li>
+        <li>Add relations and <code>tenant</code> (with <code>visible: false</code> and lifecycles for auto-assignment).</li>
+        <li>Configure Content-Type Groups: News vs Directory.</li>
+      </ul>
+    </li>
+    <li><strong>Phase 2 – Permissions & bootstrap</strong>
+      <ul>
+        <li>Grant Editor role find/create/update for all Directory types.</li>
+        <li>In bootstrap (or admin): ensure public find for Directory APIs if the frontend is public.</li>
+      </ul>
+    </li>
+    <li><strong>Phase 3 – Import script</strong>
+      <ul>
+        <li>Download or use existing local clone of directory.mosc.in.</li>
+        <li>Implement parser (e.g. Cheerio) for dioceses, bishops, parishes, priests, directory entries.</li>
+        <li>Implement importer that calls Strapi API or in-app services; handle media (upload or reference).</li>
+        <li>Run and verify data in Strapi.</li>
+      </ul>
+    </li>
+    <li><strong>Phase 4 – Frontend</strong>
+      <ul>
+        <li>Build directory frontend (or integrate into existing Next/app) to consume Directory APIs and replicate layout and control flow (filters by diocese, bishops by type, directory by type).</li>
+      </ul>
+    </li>
+  </ol>
+
+  <hr>
+  <p class="meta">Document: Diocese & Parish Directory replication plan. Source: directory.mosc.in. Same Strapi instance as catholicatenews.in; editors can manage both News and Directory with two clear hierarchies (News vs Directory).</p>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "kind": "singleType",
+  "collectionName": "directory_homes",
+  "info": {
+    "singularName": "directory-home",
+    "pluralName": "directory-homes",
+    "displayName": "Directory – Home",
+    "description": "Directory landing: intro and section cards (Bishops, Dioceses, Parishes, etc.)"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "introText": {
+      "type": "text",
+      "description": "Optional intro text for the directory home page"
+    },
+    "sectionCards": {
+      "type": "component",
+      "repeatable": true,
+      "component": "directory.section-card",
+      "description": "One card per main section (Bishops, Dioceses, Parishes, …)"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

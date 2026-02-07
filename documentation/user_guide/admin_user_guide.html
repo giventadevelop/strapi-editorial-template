@@ -86,7 +86,11 @@
                 <li><a href="#featured-news">6. Featured News</a></li>
                 <li><a href="#press-release">7. Press Release</a></li>
                 <li><a href="#most-read">8. Most Read (Automatic)</a></li>
-                <li><a href="#homepage">9. Homepage Layout & Flash News</a></li>
+                <li><a href="#homepage">9. Homepage Layout & Flash News</a>
+                    <ul>
+                        <li><a href="#flash-news-items">— Flash News Items (collection)</a></li>
+                    </ul>
+                </li>
                 <li><a href="#sidebar">10. Sidebar Promotional Block</a></li>
                 <li><a href="#ads">11. Advertisement Slots</a></li>
             </ul>
@@ -458,6 +462,36 @@
                 <li class="step"><span class="step-num">Step 4.</span> Click <strong>Save</strong>.</li>
             </ol>
             <p class="note">Set <strong>flashNewsActive</strong> to Yes only when you want the Flash News bar to appear. Leave the message blank or fill it with your urgent text.</p>
+
+            <h3 id="flash-news-items">Flash News Items (collection)</h3>
+            <p>The <strong>Flash News Item</strong> collection provides multiple scrolling ticker items. Each item has a <strong>title</strong> (entry label), <strong>content</strong> (text shown in the ticker), and optional link to an Article or external URL.</p>
+            <ol>
+                <li class="step"><span class="step-num">Step 1.</span> Go to <strong>Content Manager</strong> → <strong>Flash News Item</strong> (under COLLECTION TYPES).</li>
+                <li class="step"><span class="step-num">Step 2.</span> Create or edit an entry. Fields appear in this order: <strong>title</strong> (at top), content, article, externalUrl, order, startDate, endDate.</li>
+                <li class="step"><span class="step-num">Step 3.</span> Fill in:
+                    <table>
+                        <tr><th>Field</th><th>Description</th></tr>
+                        <tr><td><strong>title</strong></td><td>Entry title for the admin list (shown in edit view header)</td></tr>
+                        <tr><td><strong>content</strong></td><td>Text shown in the ticker (sentence or two)</td></tr>
+                        <tr><td>article</td><td>Optional: link to an Article (opens relation picker)</td></tr>
+                        <tr><td>externalUrl</td><td>Optional: external link if no article</td></tr>
+                        <tr><td>order</td><td>Display order (lower first)</td></tr>
+                        <tr><td>startDate / endDate</td><td>Show only when today is between these dates</td></tr>
+                    </table>
+                </li>
+                <li class="step"><span class="step-num">Step 4.</span> Click <strong>Save</strong>, then <strong>Publish</strong>.</li>
+            </ol>
+            <div class="note">
+                <strong>Selecting an Article:</strong> Click the <strong>article</strong> field (or “Add relation”). A <strong>dropdown/combobox</strong> opens with your tenant’s articles (up to 50 per page).
+                <ul style="margin-top: 0.5rem;">
+                    <li><strong>Search / type-ahead:</strong> Type in the same box to filter by article title. The list narrows as you type (search runs against the backend, so it stays within your tenant’s articles).</li>
+                    <li><strong>Load more:</strong> If there are more than one page of results, use <strong>Load More</strong> below the list to fetch the next page.</li>
+                    <li><strong>Create a relation:</strong> Use the “Create a relation” option in the dropdown to open the create-article flow in a modal (the new article will get your tenant automatically).</li>
+                </ul>
+            </div>
+            <div class="warning" id="troubleshoot-relation-picker-empty">
+                <strong>Relation picker shows no articles or “No relations found”:</strong> The article list is filtered by your tenant. Ensure (1) you have an <strong>Editor Tenant Assignment</strong> (Content Manager → Editor Tenant Assignment) with your login email and the correct Tenant, and (2) that tenant has Articles (create some under Content Manager → Article). If you are Super Admin and see an empty list, either create an Editor user and assign them to a tenant, or create articles for the tenant your test user is assigned to.
+            </div>
         </section>
 
         <!-- ========== 9. SIDEBAR ========== -->

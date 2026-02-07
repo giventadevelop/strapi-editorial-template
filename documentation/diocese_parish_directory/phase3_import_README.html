@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phase 3 – Directory import from local clone</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #0d5c2e; padding-bottom: 0.5rem; }
+    h2 { color: #2d2d2d; margin-top: 2rem; }
+    ul, ol { margin: 0.5rem 0; }
+    li { margin: 0.25rem 0; }
+    code, pre { background: #f0f0f0; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { padding: 1rem; overflow-x: auto; white-space: pre-wrap; }
+    a { color: #0d5c2e; }
+    .note { background: #fff8e6; border-left: 4px solid #e6b800; padding: 0.75rem 1rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Phase 3 – Directory import from local clone</h1>
+  <p>This document describes how to run the automated import of directory data from the local clone of <a href="https://directory.mosc.in/">directory.mosc.in</a> into Strapi.</p>
+
+  <h2>Prerequisites</h2>
+  <ol>
+    <li><strong>Local clone</strong> of the directory site (set <code>STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR</code> in <code>.env</code>, or see <strong>How to run</strong>).</li>
+    <li><strong>Strapi</strong> project with Phase 1 (schema) and Phase 2 (permissions) applied.</li>
+    <li><strong>cheerio</strong>, <strong>dotenv</strong> installed: run <code>npm install</code> in the project root.</li>
+  </ol>
+
+  <h2>What the script does</h2>
+  <ul>
+    <li><strong>Parses</strong> (with Cheerio):
+      <ul>
+        <li><strong>Dioceses</strong> from <code>dioceses/index.html</code> (name, slug, address, email, phones, website, image).</li>
+        <li><strong>Bishops</strong> from <code>bishops/index.html@the-holy-synod=diocesan-bishops.html</code>, <code>retired-bishops.html</code>, <code>the-primate.html</code> (name, slug, bishopType, address, email, phones, image).</li>
+        <li><strong>Directory entries</strong> from <code>directories/index.html@type=*.html</code> for all seven types (name, slug, directoryType, address, email, phones, website, image).</li>
+        <li><strong>Priests</strong> from diocese-based priest list pages when present (see below). The live site lists priests by diocese (e.g. <a href="https://directory.mosc.in/priests/?search=&amp;diocese=637">priests/?diocese=637</a>); the script looks for saved HTML for each diocese and imports name, title, address, email, phones, image, and diocese relation.</li>
+        <li><strong>Churches</strong> from parish list pages when present (see <strong>Church list pages</strong>). The live site lists churches by diocese (e.g. <a href="https://directory.mosc.in/parishes/?diocese=573">parishes/?diocese=573</a>); the script creates <strong>Directory – Churches</strong> and randomly assigns 2 priests (same diocese) per church for sample data.</li>
+      </ul>
+    </li>
+    <li><strong>Creates</strong> in Strapi (in order): Tenant (if missing) → Dioceses → Bishops → Directory entries → Priests → Churches (then assigns 2 priests per church).</li>
+    <li><strong>Uploads media</strong>: images from the clone are uploaded to Strapi and attached to dioceses, bishops, directory entries, priests, and churches when the HTML references local image files under the clone (e.g. <code>../assets/upload/...</code>).</li>
+  </ul>
+
+  <h2>Config from .env</h2>
+  <p>The script loads <code>.env</code> via <strong>dotenv</strong> and reads these two variables. Set them in your project root <code>.env</code> file (see <code>.env.example</code>):</p>
+  <ul>
+    <li><strong>STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR</strong> – Path to the directory.mosc.in clone (e.g. <code>E:\project_workspace\directory-mosc-in-temp</code>). Fallback: <code>CLONE_DIR</code> or a default path.</li>
+    <li><strong>TENANT_ID</strong> – Tenant ID used for all imported directory content (default: <code>directory_mosc_001</code>). The script creates this tenant if it does not exist.</li>
+  </ul>
+  <p>Both are read from the <code>.env</code> file when you run the script; you can override them with environment variables if needed.</p>
+
+  <h2>How to run</h2>
+  <p>From the project root:</p>
+  <pre><code>npm run seed:data_import_seed_directory_mosc_in</code></pre>
+  <p>Or run the script directly (it will still load <code>.env</code>):</p>
+  <pre><code># Windows (PowerShell)
+$env:STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR = "E:\project_workspace\directory-mosc-in-temp"
+$env:TENANT_ID = "directory_mosc_001"
+node scripts/data_import_seed_directory_mosc_in.js
+
+# Linux / macOS
+STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR=/path/to/clone TENANT_ID=directory_mosc_001 node scripts/data_import_seed_directory_mosc_in.js</code></pre>
+
+  <h2>Delete all directory entries</h2>
+  <p>To wipe all Directory content (Bishops, Churches, Dioceses, Entries, Parishes, Priests) before a clean re-import, run:</p>
+  <pre><code>npm run delete:directory_entries</code></pre>
+  <p>To only see how many entries would be deleted (no changes):</p>
+  <pre><code>DRY_RUN=1 npm run delete:directory_entries</code></pre>
+  <p>Run this with Strapi stopped (or from another terminal). Then run the import again (see <strong>How to run</strong> above).</p>
+
+  <h2>Bishops and directory section pages (local or remote)</h2>
+  <p>The script looks for bishops and directory entries in your clone. If a file is missing and <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code> is set, it fetches that page from the live site.</p>
+  <p><strong>Bishops</strong> – expected local paths under <code>bishops/</code>:</p>
+  <ul>
+    <li><code>bishops/index.html@the-holy-synod=the-primate.html</code> (The Catholicos)</li>
+    <li><code>bishops/index.html@the-holy-synod=diocesan-bishops.html</code></li>
+    <li><code>bishops/index.html@the-holy-synod=retired-bishops.html</code></li>
+  </ul>
+  <p><strong>Directory sections</strong> – expected local paths under <code>directories/</code>:</p>
+  <ul>
+    <li><code>directories/index.html@type=directory-mosc-ininstitutions.html</code>, <code>index.html@type=church-dignitaries.html</code>, <code>index.html@type=working-committee.html</code>, <code>index.html@type=the-managing-committee.html</code>, <code>index.html@type=spiritual-organisations.html</code>, <code>index.html@type=major-pilgrim-centres.html</code>, <code>index.html@type=seminaries.html</code></li>
+  </ul>
+  <p>If any of these files are missing, set <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code> and the script will fetch the corresponding page from <code>https://directory.mosc.in</code>. Images (local paths or URLs from the HTML) are uploaded to Strapi when possible.</p>
+
+  <h2>Priest list pages</h2>
+  <p>The online directory shows priests per diocese (e.g. <strong>List by Diocese</strong> → Diocese of Adoor- Kadampanad). <strong>All parsing is from your local clone</strong>; the script does not call the live site unless you enable optional fetch (see below).</p>
+  <p>The script first looks for these exact filenames (your clone may not have them):</p>
+  <ul>
+    <li><code>priests/priests.html@diocese=&lt;id&gt;.html</code></li>
+    <li><code>priests/index.html@diocese=&lt;id&gt;.html</code></li>
+    <li><code>priests@diocese=&lt;id&gt;.html</code> or <code>priests.html@diocese=&lt;id&gt;.html</code> at clone root</li>
+  </ul>
+  <p><strong>Discovery:</strong> If those are not present, the script scans the <code>priests/</code> folder for any HTML file whose content looks like a list (e.g. contains <code>article.dioceses-name</code> and “Diocese : …”). It infers the diocese from the first “Diocese :” line in the page or from the filename (e.g. <code>diocese=637</code>).</p>
+  <p><strong>Optional fetch from live site:</strong> If no priest list is found locally for a diocese, set <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code> in <code>.env</code>. The script will then fetch <code>https://directory.mosc.in/priests/?diocese=&lt;id&gt;</code> for each missing diocese. Images from fetched pages (full or relative URLs) are downloaded and uploaded to Strapi when available.</p>
+
+  <h2>Church list pages</h2>
+  <p>The online directory shows churches (parishes) per diocese (e.g. <a href="https://directory.mosc.in/parishes/?diocese=573">parishes/?diocese=573</a>). Again, <strong>parsing is from the local clone</strong> unless optional fetch is enabled.</p>
+  <p>The script looks for:</p>
+  <ul>
+    <li><code>parishes/parishes.html@diocese=&lt;id&gt;.html</code></li>
+    <li><code>parishes/index.html@diocese=&lt;id&gt;.html</code></li>
+    <li><code>parishes@diocese=&lt;id&gt;.html</code> or <code>parishes.html@diocese=&lt;id&gt;.html</code> at clone root</li>
+  </ul>
+  <p><strong>Discovery:</strong> It also scans <code>parishes/</code> for any HTML that looks like a church list and infers diocese from content or filename.</p>
+  <p><strong>Optional fetch:</strong> With <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code>, the script will fetch <code>https://directory.mosc.in/parishes/?diocese=&lt;id&gt;</code> for dioceses that have no local list page. For each church created, the script randomly assigns 2 priests from the same diocese (sample data; no real church–priest mapping on the source site).</p>
+  <p><strong>Note on <code>directories/</code>:</strong> The clone folder <code>directories/</code> contains type-based listing pages (institutions, church dignitaries, etc.) and one subfolder per person/institution. Those are not diocese-filtered priest or church lists; they are used for <strong>Directory entries</strong> only. Priest and church lists come from <code>priests/</code> and <code>parishes/</code> (or from the live site when fetch is enabled).</p>
+
+  <h2>After import</h2>
+  <ol>
+    <li>Open Strapi Admin and check <strong>Directory – Dioceses</strong>, <strong>Directory – Bishops</strong>, <strong>Directory – Entries</strong>, <strong>Directory – Priests</strong>, and <strong>Directory – Churches</strong> (when list pages were present).</li>
+    <li><strong>Editor role:</strong> If an editor sees e.g. “31 entries found” but “No content found” in the list, they are not assigned to the directory tenant. Assign their email to the same tenant via <strong>Editor Tenant Assignment</strong> in Admin, or run:<br>
+      <code>node scripts/assign-editor-to-directory-tenant.js editor@example.com</code><br>
+      Then have the editor log out and log back in.</li>
+    <li>To show directory data on the frontend, filter by tenant, e.g.<br>
+      <code>GET /api/dioceses?filters[tenant][tenantId][$eq]=directory_mosc_001</code>.</li>
+    <li>Optionally create <strong>Directory – Home</strong> section cards manually (or extend the script to parse <code>index.html</code> and create the Directory Home single type).</li>
+    <li><strong>Directory – Parishes</strong> (administrative unit) is a separate content type and is <strong>not</strong> populated by this script; add parishes manually. <strong>Directory – Churches</strong> is populated from parish/church list pages when present; if you see 0 churches, add list pages or set <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code>. <strong>Directory – Priests</strong> is populated from priest list pages when present.</li>
+    <li><strong>Images:</strong> If bishop/diocese/entry images are missing in the admin, they were skipped during import; you can attach images manually per entry.</li>
+  </ol>
+
+  <h2>Re-running</h2>
+  <div class="note">
+    The import script does not check for existing entries. Re-running it will create duplicates. To re-import cleanly: run <code>npm run delete:directory_entries</code> (see <strong>Delete all directory entries</strong> above), then run <code>npm run seed:data_import_seed_directory_mosc_in</code> again. Alternatively, delete directory content manually in Admin or clear the database.
+  </div>
+</body>
+</html>

@@ -1,0 +1,79 @@
+{
+  "kind": "collectionType",
+  "collectionName": "dioceses",
+  "info": {
+    "singularName": "diocese",
+    "pluralName": "dioceses",
+    "displayName": "Directory – Dioceses",
+    "description": "Diocese: name, contact and optional image"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "address": {
+      "type": "text"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phones": {
+      "type": "text",
+      "description": "Phone number(s), comma-separated if multiple"
+    },
+    "website": {
+      "type": "string"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "description": {
+      "type": "text"
+    },
+    "parishes": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::parish.parish",
+      "mappedBy": "diocese",
+      "description": "Parishes in this diocese"
+    },
+    "churches": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::church.church",
+      "mappedBy": "diocese",
+      "description": "Churches in this diocese"
+    },
+    "priests": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::priest.priest",
+      "mappedBy": "diocese",
+      "description": "Priests in this diocese"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

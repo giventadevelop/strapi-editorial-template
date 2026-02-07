@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diocese & Parish Directory – Initial Prompt</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 920px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #0d5c2e; padding-bottom: 0.5rem; }
+    h2 { color: #2d2d2d; margin-top: 2rem; }
+    ul { margin: 0.5rem 0; }
+    li { margin: 0.25rem 0; }
+    .meta { color: #666; font-size: 0.9rem; margin-top: 2rem; }
+    a { color: #0d5c2e; }
+  </style>
+</head>
+<body>
+  <h1>Diocese & Parish Directory – Initial Prompt</h1>
+  <p class="meta">This file preserves the original requirements prompt for the directory.mosc.in replication. See <a href="index.html">index.html</a> for the implementation plan and answers.</p>
+
+  <h2>Context</h2>
+  <p>The current setup on data and configuration is now modeled around the online portal <a href="https://catholicatenews.in/">https://catholicatenews.in/</a> and the local copy which I downloaded a clone of the site which I downloaded into the local which can be found at the location <code>E:\project_workspace\catholicatenews-in-temp</code> so now all the attributes content type manager everything has been done like that and I am able to and we are able to retrieve data display it in the frontend etc.</p>
+
+  <p>Similar to the above I am also trying to clone <a href="https://directory.mosc.in/">https://directory.mosc.in/</a> and replicate the data:</p>
+  <ul>
+    <li>Home</li>
+    <li>Bishops</li>
+    <li>Dioceses</li>
+    <li>Parishes</li>
+    <li>Priests</li>
+    <li>Institutions</li>
+    <li>Church Dignitaries</li>
+    <li>Working Committee</li>
+    <li>The Managing Committee</li>
+    <li>Spiritual Organisations</li>
+    <li>Pilgrim Centres</li>
+    <li>Seminaries</li>
+  </ul>
+  <p>… and the control flow and features from this portal into this Strapi trying to replicate as much as possible with the current structure.</p>
+
+  <h2>Questions</h2>
+  <ul>
+    <li>What would be the best approach to do that?</li>
+    <li>Will you be able to take a look at the online site and replicate the features and the structure of the data, what kind of collection types we need and other components we need — will you be able to infer all those details from the online site and create working plan model things, or do we still need to download the entire site in the local from which you can infer and model the data?</li>
+    <li>Once after the modelled, will you be able to populate automatically all the current data in the site into this current CMS system? The data population should be automatic automated.</li>
+    <li>Also once logged in user with the editor — will that user be able to manage news and the directory at the same time but also we want them to be distinguishable? For the same when logged in these two entities news and the directory should easily be distinguishable under two different hierarchies.</li>
+    <li>Let me know the best approach we can do.</li>
+  </ul>
+
+  <p class="meta">Create an HTML based documentation to answer all these at the location <code>documentation/diocese_parish_directory</code>.</p>
+</body>
+</html>

@@ -9,9 +9,9 @@ Reference for how each section of the Catholicate News portal maps to Strapi con
 | **Top bar** (date, social icons, search) | `Global` (single) | siteName, favicon, siteDescription, defaultSeo | `GET /api/global` |
 | **Header** (logo, site title) | `Global` | siteName, favicon | `GET /api/global` |
 | **Navigation** (HOME, MAIN NEWS, FEATURED NEWS, PRESS RELEASE) | Hardcoded or `Global` | — | Define in frontend or via Global config |
-| **Flash News** (red scrolling bar) | `Homepage Layout` (single) | flashNewsMessage, flashNewsActive | `GET /api/homepage` |
+| **Flash News** (scrolling carousel) | `Flash News Item` (collection) | content, article, externalUrl, order, startDate, endDate, tenant | `GET /api/flash-news-items` (see below) |
 | **Main News** | `Article` (collection) | category, tenant | Filter: `category.slug=main-news` |
-| **Featured News** | `Article` (collection) | isFeatured | Filter: `isFeatured=true` |
+| **Featured News** | `Article` (collection) | category or isFeatured | Filter: `category.slug=featured-news` (Option B) or `isFeatured=true` (Option A) |
 | **Press Release** | `Article` (collection) | category | Filter: `category.slug=press-release` |
 | **Most Read** | `Article` (collection) | views | Sort: `views:desc`, limit 5 |
 | **Sidebar** (Facebook, video, promo) | `Sidebar Promotional Block` (single) | blockType, embedCode, videoUrl, thumbnail | `GET /api/sidebar-promotional-block` |
@@ -24,12 +24,11 @@ Reference for how each section of the Catholicate News portal maps to Strapi con
 
 ### 1. Featured News
 ```javascript
-// Articles marked as featured by editors
-// Note: Use filters[publishedAt][$notNull]=true instead of status=published
-// Use populate[0]=... for multiple relations (comma-separated can cause 400)
+// Option B: Articles in "Featured News" category (use $eqi for case-insensitive slug)
+// Option A alternative: filters[isFeatured][$eq]=true
 const res = await fetch(
   `${STRAPI_URL}/api/articles?` +
-  `filters[isFeatured][$eq]=true` +
+  `filters[category][slug][$eqi]=featured-news` +
   `&filters[tenant][tenantId][$eq]=${tenantId}` +
   `&filters[publishedAt][$notNull]=true` +
   `&populate[0]=cover&populate[1]=category&populate[2]=author` +
@@ -81,20 +80,30 @@ const res = await fetch(
 );
 ```
 
-### 5. Flash News
+### 5. Flash News (carousel items)
 ```javascript
-const res = await fetch(`${STRAPI_URL}/api/homepage?populate=*`);
-const { flashNewsMessage, flashNewsActive } = res.data;
-// Show red bar only if flashNewsActive === true
+// Collection: flash-news-items. Display content; link to article or externalUrl.
+const today = new Date().toISOString().split('T')[0];
+const res = await fetch(
+  `${STRAPI_URL}/api/flash-news-items?` +
+  `filters[tenant][tenantId][$eq]=${tenantId}` +
+  `&filters[publishedAt][$notNull]=true` +
+  `&sort=order:asc,publishedAt:desc` +
+  `&pagination[limit]=10` +
+  `&populate[0]=article`
+);
+// Each item: content (ticker text), article (slug for href), externalUrl. Show only when today between startDate and endDate (if set).
 ```
 
 ### 6. Sidebar & Ads
 ```javascript
 const sidebar = await fetch(`${STRAPI_URL}/api/sidebar-promotional-block`);
+// Fetch both sidebar and top ads; split by position client-side
 const ads = await fetch(
   `${STRAPI_URL}/api/advertisement-slots?` +
-  `filters[position][$eq]=sidebar` +
-  `&filters[tenant][tenantId][$eq]=${tenantId}`
+  `filters[$or][0][position][$eq]=sidebar&filters[$or][1][position][$eq]=top` +
+  `&filters[tenant][tenantId][$eq]=${tenantId}` +
+  `&populate=media`
 );
 ```
 

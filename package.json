@@ -8,11 +8,17 @@
     "deploy": "strapi deploy",
     "develop": "strapi develop",
     "seed:example": "node ./scripts/seed.js",
+    "seed:flash-news": "node ./scripts/seed-flash-news.js",
+    "seed:data_import_seed_directory_mosc_in": "node ./scripts/data_import_seed_directory_mosc_in.js",
     "grant:editor-ads": "node ./scripts/grant-editor-ad-permissions.js",
+    "assign:editor-directory-tenant": "node ./scripts/assign-editor-to-directory-tenant.js",
+    "delete:directory_entries": "node ./scripts/delete_directory_entries.js",
     "start": "strapi start",
     "strapi": "strapi"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
+    "cheerio": "^1.0.0",
     "@strapi/plugin-cloud": "5.34.0",
     "@strapi/plugin-users-permissions": "5.34.0",
     "@strapi/strapi": "5.34.0",

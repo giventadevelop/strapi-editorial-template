@@ -7,6 +7,7 @@ module.exports = [
   'strapi::query',
   'strapi::body',
   'global::request-context', // store request ctx for tenant injection in lifecycles
+  'global::content-manager-article-relation', // Editor: request more articles in list/relation picker
   'global::content-manager-hide-tenant', // hide tenant/views/isFeatured for Editor UI
   'strapi::session',
   'strapi::favicon',

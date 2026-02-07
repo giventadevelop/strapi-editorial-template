@@ -1,0 +1,78 @@
+{
+  "kind": "collectionType",
+  "collectionName": "directory_entries",
+  "info": {
+    "singularName": "directory-entry",
+    "pluralName": "directory-entries",
+    "displayName": "Directory – Entries",
+    "description": "Institutions, Church Dignitaries, Committees, Spiritual Organisations, Pilgrim Centres, Seminaries"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "directoryType": {
+      "type": "enumeration",
+      "enum": [
+        "institutions",
+        "church-dignitaries",
+        "working-committee",
+        "managing-committee",
+        "spiritual-organisations",
+        "pilgrim-centres",
+        "seminaries"
+      ],
+      "required": true,
+      "description": "Section this entry belongs to"
+    },
+    "address": {
+      "type": "text"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phones": {
+      "type": "text",
+      "description": "Phone number(s), comma-separated if multiple"
+    },
+    "website": {
+      "type": "string"
+    },
+    "description": {
+      "type": "text",
+      "description": "Optional role or description (e.g. Association Secretary)"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order within same directoryType"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

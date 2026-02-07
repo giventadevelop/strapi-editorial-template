@@ -342,6 +342,24 @@ async function ensureEditorTenantScopedPermissions() {
   const subjects = [
     'api::article.article',
     'api::advertisement-slot.advertisement-slot',
+    'api::flash-news-item.flash-news-item',
+    'api::directory-home.directory-home',
+    'api::bishop.bishop',
+    'api::catholicos.catholicos',
+    'api::diocesan-bishop.diocesan-bishop',
+    'api::retired-bishop.retired-bishop',
+    'api::diocese.diocese',
+    'api::parish.parish',
+    'api::church.church',
+    'api::priest.priest',
+    'api::directory-entry.directory-entry',
+    'api::institution.institution',
+    'api::church-dignitary.church-dignitary',
+    'api::working-committee.working-committee',
+    'api::managing-committee.managing-committee',
+    'api::spiritual-organisation.spiritual-organisation',
+    'api::pilgrim-centre.pilgrim-centre',
+    'api::seminary.seminary',
   ];
   const actions = [
     'plugin::content-manager.explorer.create',
@@ -435,7 +453,28 @@ async function ensureEditorTenantScopedPermissions() {
  * update stored layout so the tenant field is not shown (e.g. if layout was customized).
  */
 async function hideTenantFieldInContentManagerLayout() {
-  const contentTypes = ['api::article.article', 'api::advertisement-slot.advertisement-slot'];
+  const contentTypes = [
+    'api::article.article',
+    'api::advertisement-slot.advertisement-slot',
+    'api::flash-news-item.flash-news-item',
+    'api::directory-home.directory-home',
+    'api::bishop.bishop',
+    'api::catholicos.catholicos',
+    'api::diocesan-bishop.diocesan-bishop',
+    'api::retired-bishop.retired-bishop',
+    'api::diocese.diocese',
+    'api::parish.parish',
+    'api::church.church',
+    'api::priest.priest',
+    'api::directory-entry.directory-entry',
+    'api::institution.institution',
+    'api::church-dignitary.church-dignitary',
+    'api::working-committee.working-committee',
+    'api::managing-committee.managing-committee',
+    'api::spiritual-organisation.spiritual-organisation',
+    'api::pilgrim-centre.pilgrim-centre',
+    'api::seminary.seminary',
+  ];
   try {
     const store = strapi.store({ type: 'plugin', name: 'content-manager' });
     const config = (await store.get({ key: 'configuration' })) || {};
@@ -475,16 +514,55 @@ async function registerTenantDocumentMiddleware() {
   const tenantScopedUids = [
     'api::article.article',
     'api::advertisement-slot.advertisement-slot',
+    'api::flash-news-item.flash-news-item',
+    'api::directory-home.directory-home',
+    'api::bishop.bishop',
+    'api::catholicos.catholicos',
+    'api::diocesan-bishop.diocesan-bishop',
+    'api::retired-bishop.retired-bishop',
+    'api::diocese.diocese',
+    'api::parish.parish',
+    'api::church.church',
+    'api::priest.priest',
+    'api::directory-entry.directory-entry',
+    'api::institution.institution',
+    'api::church-dignitary.church-dignitary',
+    'api::working-committee.working-committee',
+    'api::managing-committee.managing-committee',
+    'api::spiritual-organisation.spiritual-organisation',
+    'api::pilgrim-centre.pilgrim-centre',
+    'api::seminary.seminary',
   ];
 
-  async function resolveEditorTenant() {
+  async function getAdminUserIdFromContext() {
     const requestContext = require('./utils/request-context');
     const ctx = requestContext.get();
-    const user = ctx?.state?.user || ctx?.state?.admin;
-    if (!user?.id) return null;
+    if (!ctx) return null;
+    const fromState = ctx.state?.user?.id ?? ctx.state?.admin?.id;
+    if (fromState != null) return fromState;
+    const authz = ctx.request?.header?.authorization || ctx.request?.headers?.authorization;
+    if (!authz || typeof authz !== 'string') return null;
+    const parts = authz.trim().split(/\s+/);
+    if (parts[0].toLowerCase() !== 'bearer' || !parts[1]) return null;
+    const manager = strapi.sessionManager;
+    if (!manager) return null;
+    try {
+      const result = manager('admin').validateAccessToken(parts[1]);
+      if (!result?.isValid || result?.payload?.userId == null) return null;
+      const raw = result.payload.userId;
+      const num = Number(raw);
+      return Number.isFinite(num) && String(num) === String(raw) ? num : raw;
+    } catch {
+      return null;
+    }
+  }
+
+  async function resolveEditorTenant() {
+    const currentAdminUserId = await getAdminUserIdFromContext();
+    if (currentAdminUserId == null) return null;
 
     const adminUser = await strapi.db.query('admin::user').findOne({
-      where: { id: user.id },
+      where: { id: currentAdminUserId },
       populate: { roles: true },
       select: ['email'],
     });
@@ -511,16 +589,19 @@ async function registerTenantDocumentMiddleware() {
     }
 
     const tenant = await resolveEditorTenant();
-    if (!tenant?.id) {
+    if (!tenant?.id && !tenant?.documentId) {
       return next();
     }
 
     if (action === 'findMany') {
+      // Strapi 5 may store relation by id or documentId; filter so either matches
+      const tenantFilter =
+        tenant.documentId != null
+          ? { $or: [{ tenant: tenant.id }, { tenant: { documentId: tenant.documentId } }] }
+          : { tenant: tenant.id };
       context.params = {
         ...params,
-        filters: params?.filters
-          ? { $and: [params.filters, { tenant: tenant.id }] }
-          : { tenant: tenant.id },
+        filters: params?.filters ? { $and: [params.filters, tenantFilter] } : tenantFilter,
       };
       return next();
     }
@@ -557,6 +638,14 @@ async function ensureContentApiPublicPermissions() {
     { controller: 'homepage', actions: ['find'] },
     { controller: 'sidebar-promotional-block', actions: ['find'] },
     { controller: 'advertisement-slot', actions: ['find', 'findOne'] },
+    { controller: 'flash-news-item', actions: ['find', 'findOne'] },
+    { controller: 'directory-home', actions: ['find'] },
+    { controller: 'bishop', actions: ['find', 'findOne'] },
+    { controller: 'diocese', actions: ['find', 'findOne'] },
+    { controller: 'parish', actions: ['find', 'findOne'] },
+    { controller: 'church', actions: ['find', 'findOne'] },
+    { controller: 'priest', actions: ['find', 'findOne'] },
+    { controller: 'directory-entry', actions: ['find', 'findOne'] },
   ];
   for (const { controller, actions } of toEnsure) {
     for (const action of actions) {
@@ -574,11 +663,64 @@ async function ensureContentApiPublicPermissions() {
   }
 }
 
+/**
+ * Move title field to the top of Flash News Item edit layout.
+ * Layout is stored in content-manager configuration; reorder so title appears first.
+ */
+async function ensureFlashNewsItemTitleFirst() {
+  const uid = 'api::flash-news-item.flash-news-item';
+  try {
+    const store = strapi.store({ type: 'plugin', name: 'content-manager' });
+    const config = (await store.get({ key: 'configuration' })) || {};
+    const contentTypesConfig = config.content_types || {};
+    const ct = contentTypesConfig[uid];
+    if (!ct?.edit) return;
+
+    const edit = ct.edit;
+    const layouts = edit.layouts || edit.layout;
+    if (!layouts || !Array.isArray(layouts)) return;
+
+    let titleCell = null;
+    let foundRowIdx = -1;
+    let foundCellIdx = -1;
+
+    for (let ri = 0; ri < layouts.length; ri++) {
+      const row = layouts[ri];
+      if (!Array.isArray(row)) continue;
+      const ci = row.findIndex((c) => (c?.name ?? c?.field) === 'title');
+      if (ci !== -1) {
+        titleCell = row[ci];
+        foundRowIdx = ri;
+        foundCellIdx = ci;
+        break;
+      }
+    }
+    if (!titleCell) return;
+
+    // Remove title from current position
+    layouts[foundRowIdx].splice(foundCellIdx, 1);
+    if (layouts[foundRowIdx].length === 0) layouts.splice(foundRowIdx, 1);
+
+    // Insert title as first cell of first row
+    if (layouts.length === 0) {
+      layouts.push([titleCell]);
+    } else {
+      layouts[0].unshift(titleCell);
+    }
+
+    await store.set({ key: 'configuration', value: config });
+    strapi.log.info('Content Manager: title moved to top of Flash News Item edit layout');
+  } catch (err) {
+    strapi.log.warn('Could not reorder Flash News Item layout:', err.message);
+  }
+}
+
 module.exports = async () => {
   await seedExampleApp();
   await ensureContentApiPublicPermissions();
   await registerTenantRBACConditions();
   await ensureEditorTenantScopedPermissions();
   await hideTenantFieldInContentManagerLayout();
+  await ensureFlashNewsItemTitleFirst();
   await registerTenantDocumentMiddleware();
 };

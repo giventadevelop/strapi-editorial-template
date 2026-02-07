@@ -1,0 +1,62 @@
+{
+  "kind": "collectionType",
+  "collectionName": "flash_news_items",
+  "info": {
+    "singularName": "flash-news-item",
+    "pluralName": "flash-news-items",
+    "displayName": "Flash News Item",
+    "description": "Scrolling flash news carousel items; link to article or external URL"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "maxLength": 255,
+      "description": "Entry title for admin list and display"
+    },
+    "content": {
+      "type": "text",
+      "required": true,
+      "description": "Sentence or two shown in the ticker"
+    },
+    "article": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::article.article",
+      "description": "Optional link to article detail"
+    },
+    "externalUrl": {
+      "type": "string",
+      "maxLength": 2048,
+      "description": "Optional external link (if no article)"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order (asc)"
+    },
+    "startDate": {
+      "type": "date",
+      "description": "Earliest date to show this item"
+    },
+    "endDate": {
+      "type": "date",
+      "description": "Latest date to show this item (inclusive)"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}
