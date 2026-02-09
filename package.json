@@ -13,6 +13,7 @@
     "grant:editor-ads": "node ./scripts/grant-editor-ad-permissions.js",
     "assign:editor-directory-tenant": "node ./scripts/assign-editor-to-directory-tenant.js",
     "delete:directory_entries": "node ./scripts/delete_directory_entries.js",
+    "test:bishop_upload": "node ./scripts/test_bishop_upload.js",
     "start": "strapi start",
     "strapi": "strapi"
   },

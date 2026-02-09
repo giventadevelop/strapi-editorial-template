@@ -1,0 +1,62 @@
+---
+description: Strapi 5 media (image) relation fix — Document Service rejects connect/set for plugin::upload.file; link via files_related_mph after create/update.
+globs: scripts/**/*.js, src/api/**/lifecycles.js
+alwaysApply: false
+---
+
+# Strapi 5 Media / Image Relation Fix
+
+## Problem
+
+Strapi 5 Document Service **does not accept** `connect` or `set` for **media** fields (`plugin::upload.file`). Passing `data.image = { connect: [{ documentId: fileDocumentId }] }` (or scalar `data.image = fileDocumentId`) on create/update can return **"Invalid relations"**. The file upload itself succeeds; linking it to the content entry fails.
+
+## Solution
+
+Link the media to the document **via the DB morph table** after create (or when update fails with "Invalid relations"):
+
+- **Table:** `files_related_mph` (Strapi 5)
+- **Columns:** `file_id`, `related_id`, `related_type`, `field`, `order`
+- Resolve entity and file **internal `id`** from their `documentId`, then insert/update the morph row.
+
+## Helper Pattern
+
+Use a generic helper so any content type with an image (or other media) field can be fixed:
+
+```javascript
+async function setMediaRelationViaDb(strapi, contentTypeUid, entityDocumentId, fileDocumentId, fieldName = 'image') {
+  if (!entityDocumentId || !fileDocumentId) return false;
+  const entityRow = await strapi.db.query(contentTypeUid).findOne({
+    where: { documentId: entityDocumentId },
+    select: ['id'],
+  });
+  const fileRow = await strapi.db.query('plugin::upload.file').findOne({
+    where: { documentId: fileDocumentId },
+    select: ['id'],
+  });
+  if (!entityRow?.id || !fileRow?.id) return false;
+  const db = strapi.db.connection;
+  const morphTable = 'files_related_mph';
+  await db(morphTable).where({ related_id: entityRow.id, related_type: contentTypeUid, field: fieldName }).del();
+  await db(morphTable).insert({
+    file_id: fileRow.id,
+    related_id: entityRow.id,
+    related_type: contentTypeUid,
+    field: fieldName,
+    order: 1,
+  });
+  return true;
+}
+```
+
+## When to Use
+
+1. **After create:** When creating an entry with an image, still pass `image: imageConnect` to `strapi.documents(uid).create({ data })`. If create succeeds (with or without image linked), **always** call `setMediaRelationViaDb` after create so the image is linked even when the Document Service ignored the relation.
+2. **On update:** When updating an existing entry with an image, try Document Service update first; if it throws "Invalid relations", call `setMediaRelationViaDb(strapi, contentTypeUid, entityDocumentId, fileDocumentId, 'image')`.
+
+## Content Type UID
+
+Use the full UID for `related_type`, e.g. `api::bishop.bishop`, `api::diocese.diocese`, `api::church.church`, `api::priest.priest`, `api::directory-entry.directory-entry`, `api::catholicos.catholicos`, etc.
+
+## Reference
+
+- Import script that implements this: `scripts/data_import_seed_directory_mosc_in.js` (search for `setMediaRelationViaDb`, `files_related_mph`).

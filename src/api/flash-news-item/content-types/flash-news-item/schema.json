@@ -4,7 +4,7 @@
   "info": {
     "singularName": "flash-news-item",
     "pluralName": "flash-news-items",
-    "displayName": "Flash News Item",
+    "displayName": "Editorial – Flash News Item",
     "description": "Scrolling flash news carousel items; link to article or external URL"
   },
   "options": {

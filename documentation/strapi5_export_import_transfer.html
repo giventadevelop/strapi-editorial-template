@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strapi 5 – Install (Windows), Export, Import, Transfer &amp; .env</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #4945ff; padding-bottom: 0.5rem; }
+    h2 { color: #2d2d2d; margin-top: 2rem; }
+    h3 { color: #3d3d3d; margin-top: 1.5rem; }
+    ul, ol { margin: 0.5rem 0; }
+    li { margin: 0.25rem 0; }
+    code, pre { background: #f5f5f5; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { padding: 1rem; overflow-x: auto; white-space: pre-wrap; border: 1px solid #e0e0e0; }
+    a { color: #4945ff; }
+    .note { background: #f0f4ff; border-left: 4px solid #4945ff; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .warn { background: #fff8e6; border-left: 4px solid #e6b800; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .caution { background: #ffebee; border-left: 4px solid #d32f2f; padding: 0.75rem 1rem; margin: 1rem 0; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; }
+    th { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h1>Strapi 5 – Install (Windows), Export, Import &amp; Transfer</h1>
+  <p>This document covers:</p>
+  <ul>
+    <li><strong>Installing Strapi 5 on Windows</strong> – prerequisites and setup.</li>
+    <li><strong>Configuring the upload (image) plugin</strong> – same setup as this project (local provider, security, body limits).</li>
+    <li><strong>Environment variables (.env)</strong> – which properties you need (no credentials shown).</li>
+    <li><strong>API tokens and encryption key</strong> – whether you can reuse tokens or the same encryption key across installations.</li>
+    <li><strong>Transfer</strong> – stream data from one running Strapi instance to another (same schema).</li>
+    <li><strong>Export / Import</strong> – export to a file, copy the file, then import on the destination.</li>
+    <li><strong>Strapi Cloud</strong> – deploy and optionally import or transfer data into Cloud.</li>
+  </ul>
+
+  <div class="caution">
+    <strong>Admin users and API tokens are never transferred or exported.</strong> You must recreate admin users (and API tokens) on the destination after any migration. The <code>createdBy</code> and <code>updatedBy</code> fields in content will be empty after import/transfer.
+  </div>
+
+  <h2>1. Installing Strapi 5 on Windows</h2>
+  <ol>
+    <li><strong>Node.js</strong> – Install Node.js LTS (e.g. 20.x or 22.x) from <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>. Use the Windows installer. Restart the terminal (or IDE) after installation.</li>
+    <li><strong>npm</strong> – Comes with Node.js. Verify: <code>node -v</code> and <code>npm -v</code>.</li>
+    <li><strong>Create a new project</strong> (or clone this repo):
+      <pre><code>npx create-strapi-app@latest my-project --quickstart</code></pre>
+      <code>--quickstart</code> uses SQLite and opens the admin in the browser. For a custom database, omit <code>--quickstart</code> and follow the prompts.
+    </li>
+    <li><strong>Or use this project</strong> – Clone the repo, then in the project root:
+      <pre><code>npm install</code></pre>
+      Copy <code>.env.example</code> to <code>.env</code> (Windows: <code>copy .env.example .env</code>; macOS/Linux: <code>cp .env.example .env</code>). Edit <code>.env</code> and set the required variables (see §3). Do not commit <code>.env</code>.
+    </li>
+    <li><strong>Build and run</strong>:
+      <pre><code>npm run build
+npm run develop</code></pre>
+      For production: <code>npm run start</code>. Admin is usually at <code>http://localhost:1337/admin</code>.
+    </li>
+  </ol>
+  <p>If you see permission or path-length issues on Windows, run the terminal as Administrator or enable long paths (e.g. <code>git config core.longpaths true</code> in the repo).</p>
+
+  <h2>2. Configuring the upload (image) plugin</h2>
+  <p>This project configures the built-in upload plugin so dashboard image uploads work and do not hang (Strapi 5 requires an explicit upload security configuration). Apply the same on the other machine (or in Strapi Cloud if you deploy this code).</p>
+  <h3>2.1 Upload plugin – <code>config/plugins.js</code></h3>
+  <p>Create or merge this in <code>config/plugins.js</code>:</p>
+  <pre><code>module.exports = ({ env }) => ({
+  upload: {
+    config: {
+      provider: 'local',
+      sizeLimit: 250 * 1024 * 1024, // 250 MB (must match body middleware below)
+      security: {
+        allowedTypes: ['image/*', 'video/*', 'audio/*', 'application/pdf', 'application/*'],
+        deniedTypes: ['application/x-sh', 'application/x-executable', 'application/x-dosexec'],
+      },
+    },
+  },
+});</code></pre>
+  <p>Without <code>security</code>, Strapi 5 can log &quot;No upload security configuration found&quot; and dashboard uploads may hang or fail.</p>
+  <h3>2.2 Body middleware – <code>config/middlewares.js</code></h3>
+  <p>Ensure the <code>strapi::body</code> middleware allows large multipart uploads (e.g. 250 MB). Replace or add this entry in the <code>config/middlewares.js</code> array:</p>
+  <pre><code>{
+  name: 'strapi::body',
+  config: {
+    formLimit: '256mb',
+    jsonLimit: '256mb',
+    textLimit: '256mb',
+    formidable: {
+      maxFileSize: 250 * 1024 * 1024, // 250 MB — multipart uploads (Media Library)
+    },
+  },
+},</code></pre>
+  <p>Keep other middlewares (e.g. <code>strapi::logger</code>, <code>strapi::security</code>, <code>strapi::cors</code>, etc.) as in the default or this project. Restart Strapi after changing <code>plugins.js</code> or <code>middlewares.js</code>.</p>
+
+  <h2>3. Environment variables (.env)</h2>
+  <p>Only <strong>property names</strong> are listed below. Set values in <code>.env</code>; never commit real credentials. Use <code>.env.example</code> as a template and copy it to <code>.env</code> then fill in.</p>
+  <table>
+    <thead>
+      <tr><th>Property</th><th>Required</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>HOST</code></td><td>Optional</td><td>Server bind address (default <code>0.0.0.0</code>).</td></tr>
+      <tr><td><code>PORT</code></td><td>Optional</td><td>Server port (default <code>1337</code>).</td></tr>
+      <tr><td><code>APP_KEYS</code></td><td>Yes</td><td>Comma-separated list of at least one key (e.g. <code>key1,key2</code>). Used for session signing.</td></tr>
+      <tr><td><code>API_TOKEN_SALT</code></td><td>Yes</td><td>Salt for hashing API tokens (admin-created tokens).</td></tr>
+      <tr><td><code>ENCRYPTION_KEY</code></td><td>Yes</td><td>Used by admin panel (e.g. encrypting transfer tokens).</td></tr>
+      <tr><td><code>ADMIN_JWT_SECRET</code></td><td>Yes</td><td>Secret for admin JWT (admin login).</td></tr>
+      <tr><td><code>TRANSFER_TOKEN_SALT</code></td><td>Yes (if using transfer)</td><td>Salt for transfer tokens (data transfer feature).</td></tr>
+      <tr><td><code>JWT_SECRET</code></td><td>Yes (if using Users &amp; Permissions)</td><td>Secret for API JWT (front-end / plugin users).</td></tr>
+      <tr><td><code>DATABASE_CLIENT</code></td><td>Optional</td><td><code>sqlite</code>, <code>postgres</code>, or <code>mysql</code>. Default <code>sqlite</code>.</td></tr>
+      <tr><td><code>DATABASE_FILENAME</code></td><td>SQLite</td><td>Path to SQLite file (e.g. <code>.tmp/data.db</code>).</td></tr>
+      <tr><td><code>DATABASE_URL</code></td><td>Postgres</td><td>Full connection string for PostgreSQL.</td></tr>
+      <tr><td><code>DATABASE_HOST</code>, <code>DATABASE_PORT</code>, <code>DATABASE_NAME</code>, <code>DATABASE_USERNAME</code>, <code>DATABASE_PASSWORD</code></td><td>MySQL/Postgres</td><td>Connection details when not using <code>DATABASE_URL</code>.</td></tr>
+      <tr><td><code>DATABASE_SSL</code>, <code>DATABASE_SSL_*</code></td><td>Optional</td><td>SSL options for database (e.g. <code>DATABASE_SSL_KEY</code>, <code>DATABASE_SSL_CERT</code>).</td></tr>
+      <tr><td><code>DATABASE_SCHEMA</code></td><td>Optional (Postgres)</td><td>Schema name (default <code>public</code>).</td></tr>
+      <tr><td><code>STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR</code>, <code>TENANT_ID</code></td><td>Optional</td><td>Used by this project’s directory import script only; not required for a plain Strapi run.</td></tr>
+    </tbody>
+  </table>
+  <p>Summary: for a minimal run you need <code>APP_KEYS</code>, <code>API_TOKEN_SALT</code>, <code>ENCRYPTION_KEY</code>, <code>ADMIN_JWT_SECRET</code>, and <code>JWT_SECRET</code> (if using API users). For transfer, add <code>TRANSFER_TOKEN_SALT</code>. For Postgres, set <code>DATABASE_CLIENT=postgres</code> and <code>DATABASE_URL</code> (or individual <code>DATABASE_*</code>). For SQLite, default <code>DATABASE_FILENAME</code> is usually enough.</p>
+
+  <h2>4. API tokens and encryption key – reuse across installations?</h2>
+  <ul>
+    <li><strong>API tokens (admin-created) / JWT</strong> – <strong>No.</strong> Export and transfer do <strong>not</strong> include API tokens or admin users. You cannot copy the same API token from this installation and use it on another. Each installation has its own tokens (and salts). After import or transfer, create new API tokens (and admin users) on the destination. The token value you see in the admin is only shown once; it is hashed with <code>API_TOKEN_SALT</code> in the database, so even with the same DB copy, the salt on the other machine would differ unless you deliberately copy <code>API_TOKEN_SALT</code> and the DB – still not recommended; create new tokens on the new instance.</li>
+    <li><strong>Export file encryption key (<code>-k</code>)</strong> – <strong>Yes.</strong> The key you use with <code>strapi export -k "…"</code> and <code>strapi import -k "…"</code> is only for encrypting/decrypting the export file. You can use the same key on the source (for export) and on the destination (for import), or any secure key you prefer on the destination. It does not affect API tokens or JWT.</li>
+  </ul>
+
+  <h2>5. Prerequisites (transfer and export/import)</h2>
+  <ul>
+    <li><strong>Identical schema</strong> – Source and destination must have the same content types (same project code or a copy). Content type names, attributes, and relations must match.</li>
+    <li><strong>Strapi 5</strong> – Commands and behavior described here are for Strapi 5.</li>
+    <li>For <strong>transfer</strong>: both instances must be runnable and reachable (destination first); you need a <strong>transfer token</strong> from the destination.</li>
+    <li>For <strong>export/import</strong>: you need the export file and (if encrypted) the encryption key on the destination.</li>
+  </ul>
+
+  <h2>6. Option A – Transfer (stream to another machine)</h2>
+  <p>Use this when you can run both Strapi instances and want to push or pull data over the network. Data is streamed; no intermediate file.</p>
+
+  <h3>6.1 Enable transfer tokens (destination)</h3>
+  <ol>
+    <li>On the <strong>destination</strong> machine, ensure <code>config/admin.js</code> has a transfer token salt (this project uses <code>env('TRANSFER_TOKEN_SALT')</code>). Set <code>TRANSFER_TOKEN_SALT</code> in <code>.env</code> (e.g. a long random string).</li>
+    <li>Build and start Strapi on the destination: <code>npm run build</code> then <code>npm run start</code> (or <code>npm run develop</code> for dev).</li>
+    <li>Open the admin panel (e.g. <code>http://destination-server:1337/admin</code>), register the first admin user if needed.</li>
+    <li>Go to <strong>Settings → Global settings → Transfer Tokens</strong>.</li>
+    <li>Click <strong>Create new Transfer Token</strong>. Set name, optional description, duration (e.g. 30 days), and <strong>Token type</strong>:
+      <ul>
+        <li><strong>Push</strong> – allows transfers from another instance <em>into</em> this one (use when you run <code>strapi transfer --to &lt;this-admin-url&gt;</code> from source).</li>
+        <li><strong>Pull</strong> – allows this instance to pull from another (use when you run <code>strapi transfer --from &lt;source-admin-url&gt;</code> on destination).</li>
+        <li><strong>Full Access</strong> – both.</li>
+      </ul>
+    </li>
+    <li>Save and <strong>copy the token immediately</strong> (it is shown only once). Store it securely (e.g. in a password manager or env var <code>STRAPI_TRANSFER_TOKEN</code> on the source machine).</li>
+  </ol>
+
+  <h3>6.2 Push data from source to destination</h3>
+  <ol>
+    <li>On the <strong>source</strong> machine, in the project root (same codebase as destination), run:
+      <pre><code>npm run strapi transfer -- --to https://destination-server.example.com/admin</code></pre>
+      Use the full URL to the <strong>admin</strong> (including <code>/admin</code>). For local testing: <code>http://localhost:1337/admin</code> or <code>http://127.0.0.1:1337/admin</code>.
+    </li>
+    <li>When prompted, paste the <strong>destination</strong> transfer token (Push or Full Access).</li>
+    <li>Confirm when asked: <em>"The transfer will delete all of the remote Strapi assets and its database. Are you sure you want to proceed?"</em></li>
+  </ol>
+  <p>To avoid prompts (e.g. in scripts):</p>
+  <pre><code>npm run strapi transfer -- --to https://destination-server.example.com/admin --to-token YOUR_TRANSFER_TOKEN --force</code></pre>
+
+  <h3>6.3 Pull data from source into destination</h3>
+  <p>Instead of running the command on the source, run it on the <strong>destination</strong> and pull from the source:</p>
+  <ol>
+    <li>Start the <strong>source</strong> Strapi server and ensure it is reachable from the destination (URL and firewall).</li>
+    <li>On the destination machine, in the project root:
+      <pre><code>npm run strapi transfer -- --from https://source-server.example.com/admin</code></pre>
+    </li>
+    <li>When prompted, paste the <strong>source</strong> transfer token (Pull or Full Access).</li>
+    <li>Confirm the warning (local database and assets will be replaced).</li>
+  </ol>
+
+  <div class="warn">
+    <strong>Limitations:</strong> If the destination uses SQLite, other DB connections are blocked during transfer. If you use WebSockets or Socket.io, temporarily disable them or use a different port/route, or transfer may fail.
+  </div>
+
+  <h2>7. Option B – Export then Import (file-based)</h2>
+  <p>Use this when you cannot run both instances at once, or you want a backup file to copy to another machine (or to Strapi Cloud).</p>
+
+  <h3>7.1 Export on the source machine</h3>
+  <ol>
+    <li>On the <strong>source</strong> machine, in the project root, run one of the following.</li>
+    <li><strong>Default (encrypted + compressed)</strong> – you will be prompted for an encryption key, or pass it with <code>-k</code>:
+      <pre><code>npm run strapi export -- -f my-export
+# Or with key (store this key securely; you need it for import):
+npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pre>
+      This creates <code>my-export.tar.gz.enc</code> in the project root.
+    </li>
+    <li><strong>Without encryption</strong> (easier for local copy, less secure):
+      <pre><code>npm run strapi export -- --no-encrypt -f my-export</code></pre>
+      Creates <code>my-export.tar.gz</code>.
+    </li>
+    <li><strong>Plain tar</strong> (no compression, no encryption) – useful to inspect or edit before import:
+      <pre><code>npm run strapi export -- --no-encrypt --no-compress -f my-export</code></pre>
+      Creates <code>my-export.tar</code>. You can extract it and inspect <code>configuration/</code>, <code>entities/</code>, <code>links/</code>, <code>schemas/</code>, <code>metadata.json</code>.
+    </li>
+  </ol>
+  <p>Then <strong>copy the export file</strong> to the destination machine (or to Strapi Cloud if you use import there – see Strapi Cloud docs).</p>
+
+  <h3>7.2 Import on the destination machine</h3>
+  <ol>
+    <li>On the <strong>destination</strong>, use the <strong>same project code</strong> (same schema). Place the export file in the project root or note its path.</li>
+    <li>Run:
+      <pre><code>npm run strapi import -- -f ./my-export.tar.gz.enc</code></pre>
+      If the file is encrypted, you will be prompted for the key, or pass it:
+      <pre><code>npm run strapi import -- -f ./my-export.tar.gz.enc -k "your-secure-encryption-key"</code></pre>
+    </li>
+    <li>For non-interactive use: <code>--force</code> (and <code>-k</code> for encrypted files):
+      <pre><code>npm run strapi import -- -f ./my-export.tar.gz.enc -k "your-secure-encryption-key" --force</code></pre>
+    </li>
+    <li>Confirm when asked: the import <strong>deletes all existing data</strong> (database and uploads) before importing.</li>
+  </ol>
+  <div class="caution">
+    Import <strong>replaces</strong> the destination database and uploads. Admin users are not in the export; recreate them on the destination after import.
+  </div>
+
+  <h2>8. What is included / excluded</h2>
+  <table>
+    <thead>
+      <tr><th>Data</th><th>Transfer</th><th>Export/Import</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Content (entities, relations)</td><td>Yes</td><td>Yes</td></tr>
+      <tr><td>Uploaded files (media)</td><td>Yes</td><td>Yes (if stored locally; not from 3rd party providers like S3/Cloudinary)</td></tr>
+      <tr><td>Project configuration</td><td>Yes</td><td>Yes</td></tr>
+      <tr><td>Schemas</td><td>Yes (must match)</td><td>Yes (must match)</td></tr>
+      <tr><td>Admin users</td><td>No</td><td>No</td></tr>
+      <tr><td>API tokens</td><td>No</td><td>No</td></tr>
+      <tr><td>createdBy / updatedBy</td><td>N/A</td><td>Empty after import</td></tr>
+    </tbody>
+  </table>
+
+  <h2>9. Strapi Cloud</h2>
+  <p>You can run the same Strapi project on Strapi Cloud and optionally move your data there.</p>
+
+  <h3>9.1 Deploy the project to Strapi Cloud (first time)</h3>
+  <ol>
+    <li>Prerequisites: Google, GitHub, or GitLab account; local Strapi project <strong>under 100MB</strong>.</li>
+    <li>In the project root:
+      <pre><code>npx strapi login</code></pre>
+      Complete login in the browser (Google/GitHub/GitLab).
+    </li>
+    <li>Deploy:
+      <pre><code>npx strapi deploy</code></pre>
+      This creates a new Strapi Cloud project (Free plan) and deploys your code. It may take a few minutes.</li>
+    <li>After deploy, the Cloud dashboard will show your project URL (e.g. <code>https://your-project.strapiapp.com</code>). Open the admin at <code>https://your-project.strapiapp.com/admin</code> and create your first admin user.</li>
+  </ol>
+
+  <h3>9.2 Import data into Strapi Cloud</h3>
+  <p>You have two main options:</p>
+  <ul>
+    <li><strong>Transfer (recommended)</strong> – From your self-hosted machine, run <code>strapi transfer --to https://your-project.strapiapp.com/admin</code>. Create a <strong>Transfer Token</strong> in the Strapi Cloud admin (Settings → Global settings → Transfer Tokens) with type <strong>Push</strong> or <strong>Full Access</strong>, then use that token when prompted. This streams content, files, and config into Cloud (same schema required).</li>
+    <li><strong>Export then Import</strong> – Export from self-hosted (see §3.1). Strapi Cloud projects can run CLI commands in some setups; refer to the <a href="https://docs.strapi.io/cloud" target="_blank" rel="noopener">Strapi Cloud documentation</a> for how to run <code>strapi import</code> on your Cloud project (e.g. via Cloud dashboard or support). If Cloud does not expose a shell, use <strong>transfer</strong> instead.</li>
+  </ul>
+  <p>After data is in Cloud, recreate admin users (and API tokens) in the Cloud admin as needed.</p>
+
+  <h3>9.3 Link an existing Strapi Cloud project</h3>
+  <p>If you already created a project in the Strapi Cloud dashboard and want to link your local repo to it:</p>
+  <pre><code>npx strapi link</code></pre>
+  <p>Follow the prompts to select the Cloud project. Then you can deploy with <code>npx strapi deploy</code> or use transfer/import as above.</p>
+
+  <h2>10. Quick reference</h2>
+  <table>
+    <thead>
+      <tr><th>Goal</th><th>Command / step</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Push data to another server</td><td>On source: <code>npm run strapi transfer -- --to https://destination/admin</code> (use destination’s transfer token)</td></tr>
+      <tr><td>Pull data from another server</td><td>On destination: <code>npm run strapi transfer -- --from https://source/admin</code> (use source’s transfer token)</td></tr>
+      <tr><td>Export to file</td><td><code>npm run strapi export -- -f my-export</code> (add <code>-k KEY</code> or <code>--no-encrypt</code> as needed)</td></tr>
+      <tr><td>Import from file</td><td><code>npm run strapi import -- -f ./my-export.tar.gz.enc</code> (add <code>-k KEY</code>, <code>--force</code> as needed)</td></tr>
+      <tr><td>Deploy to Strapi Cloud</td><td><code>npx strapi login</code> then <code>npx strapi deploy</code></td></tr>
+      <tr><td>Transfer into Strapi Cloud</td><td>Create Push token in Cloud admin; on self-hosted: <code>strapi transfer --to https://your-project.strapiapp.com/admin</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2>11. Official documentation</h2>
+  <ul>
+    <li><a href="https://docs.strapi.io/cms/data-management/transfer" target="_blank" rel="noopener">Data transfer (Strapi 5)</a></li>
+    <li><a href="https://docs.strapi.io/cms/data-management/export" target="_blank" rel="noopener">Data export (Strapi 5)</a></li>
+    <li><a href="https://docs.strapi.io/cms/data-management/import" target="_blank" rel="noopener">Data import (Strapi 5)</a></li>
+    <li><a href="https://docs.strapi.io/cms/features/data-management" target="_blank" rel="noopener">Data Management feature (transfer tokens)</a></li>
+    <li><a href="https://docs.strapi.io/cloud/getting-started/deployment-cli" target="_blank" rel="noopener">Strapi Cloud – Deployment with CLI</a></li>
+  </ul>
+</body>
+</html>

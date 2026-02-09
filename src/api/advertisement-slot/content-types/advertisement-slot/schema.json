@@ -4,7 +4,7 @@
   "info": {
     "singularName": "advertisement-slot",
     "pluralName": "advertisement-slots",
-    "displayName": "Advertisement Slot",
+    "displayName": "Editorial – Advertisement Slot",
     "description": "Ad placements with position, media and date range"
   },
   "options": {

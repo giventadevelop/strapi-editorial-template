@@ -13,6 +13,9 @@
  * Config from .env: STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR, TENANT_ID
  * Optional: STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1 to fetch missing pages from live site: bishops, directory sections, priests, churches when not in clone.
  * Run: npm run seed:data_import_seed_directory_mosc_in
+ *
+ * Bishop image upload test: Run with TEST_BISHOP_UPLOAD_ONLY=1 (or npm run test:bishop_upload) to process only
+ * the first 5 bishops that have an imagePath, log upload result, and verify image is linked after create.
  */
 
 try {
@@ -92,26 +95,31 @@ function extractAddress($wrap) {
 
 let $;
 
-function parseDioceses(cloneDir) {
-  const htmlPath = path.join(cloneDir, 'dioceses', 'index.html');
-  if (!fs.existsSync(htmlPath)) {
-    console.warn('Dioceses list not found:', htmlPath);
-    return [];
-  }
-  const html = fs.readFileSync(htmlPath, 'utf8');
+/** Get first image src from an article. Matches live directory.mosc.in: article/img, article/figure/img, article/a/figure/img. */
+function getArticleImageSrc(art) {
+  const src =
+    art.find('img.wp-post-image').attr('src') ||
+    art.find('a figure img').attr('src') ||
+    art.find('figure img').attr('src') ||
+    (art.find('img').first().length ? art.find('img').first().attr('src') : null);
+  return src || undefined;
+}
+
+/** Parse dioceses list HTML (live: article[1]/img; fallback article.dioceses-name). */
+function parseDiocesesFromHtml(html) {
+  if (!html) return [];
   $ = cheerio.load(html);
   const items = [];
-  $('article.dioceses-name').each((_, article) => {
-    const art = $(article);
-    const wrap = art.find('.content-wrap');
+  function pushDiocese(art) {
+    const wrap = art.find('.content-wrap').length ? art.find('.content-wrap') : art;
     const name = text(wrap.find('h3').first());
     if (!name) return;
     const address = extractAddress(wrap);
     const email = extractEmail(wrap);
     const phones = extractPhones(wrap);
     const website = extractWebsite(wrap);
-    let imgSrc = art.find('img.wp-post-image').attr('src') || art.find('figure img').attr('src');
-    if (imgSrc && imgSrc.includes('dioceses-default-image')) imgSrc = null;
+    let imgSrc = getArticleImageSrc(art);
+    if (imgSrc && imgSrc.includes('dioceses-default-image')) imgSrc = undefined;
     items.push({
       name,
       slug: slugify(name),
@@ -119,10 +127,44 @@ function parseDioceses(cloneDir) {
       email: email || undefined,
       phones: phones || undefined,
       website: website || undefined,
-      imagePath: imgSrc || undefined,
+      imagePath: imgSrc,
     });
-  });
+  }
+  $('article.dioceses-name').each((_, article) => pushDiocese($(article)));
+  if (items.length === 0) {
+    $('article').each((_, article) => pushDiocese($(article)));
+  }
   return items;
+}
+
+function parseDioceses(cloneDir) {
+  const htmlPath = path.join(cloneDir, 'dioceses', 'index.html');
+  if (!fs.existsSync(htmlPath)) {
+    console.warn('Dioceses list not found:', htmlPath);
+    return [];
+  }
+  const html = fs.readFileSync(htmlPath, 'utf8');
+  return parseDiocesesFromHtml(html);
+}
+
+/** Get dioceses from local clone or live site when FETCH_MISSING_PAGES and no local file. */
+async function getDioceses(cloneDir) {
+  const htmlPath = path.join(cloneDir, 'dioceses', 'index.html');
+  if (fs.existsSync(htmlPath)) {
+    const html = fs.readFileSync(htmlPath, 'utf8');
+    return parseDiocesesFromHtml(html);
+  }
+  if (FETCH_MISSING_PAGES) {
+    try {
+      const html = await fetchUrl(`${LIVE_BASE}/dioceses/`);
+      const items = parseDiocesesFromHtml(html);
+      if (items.length) console.log('  Fetched dioceses from live site:', items.length, 'dioceses');
+      return items;
+    } catch (e) {
+      console.warn('  Fetch dioceses failed:', e.message);
+    }
+  }
+  return [];
 }
 
 const BISHOP_TYPE_FILE = {
@@ -138,19 +180,19 @@ const BISHOP_TYPE_LIVE_URL = {
   'index.html@the-holy-synod=retired-bishops.html': `${LIVE_BASE}/bishops/?the-holy-synod=retired-bishops`,
 };
 
+/** Parse bishops list HTML (live: article/figure/img for catholicos, diocesan, retired). */
 function parseBishopsFromHtml(html, bishopType) {
   if (!html) return [];
   $ = cheerio.load(html);
   const all = [];
-  $('article.dioceses-name').each((_, article) => {
-    const art = $(article);
-    const wrap = art.find('.content-wrap');
+  function pushBishop(art) {
+    const wrap = art.find('.content-wrap').length ? art.find('.content-wrap') : art;
     const name = text(wrap.find('h3').first());
     if (!name) return;
     const address = extractAddress(wrap);
     const email = extractEmail(wrap);
     const phones = extractPhones(wrap);
-    const img = art.find('figure img').attr('src') || art.find('img.wp-post-image').attr('src');
+    const img = getArticleImageSrc(art);
     all.push({
       name,
       slug: slugify(name),
@@ -159,9 +201,13 @@ function parseBishopsFromHtml(html, bishopType) {
       email: email || undefined,
       phones: phones || undefined,
       order: all.length,
-      imagePath: img || undefined,
+      imagePath: img,
     });
-  });
+  }
+  $('article.dioceses-name').each((_, article) => pushBishop($(article)));
+  if (all.length === 0) {
+    $('article').each((_, article) => pushBishop($(article)));
+  }
   return all;
 }
 
@@ -227,14 +273,14 @@ const DIRECTORY_TYPE_LIVE_URL = {
   'index.html@type=seminaries.html': `${LIVE_BASE}/directories/?type=seminaries`,
 };
 
+/** Parse directory list HTML (live: article[1]/a/figure/img for church-dignitaries, institutions, etc.). */
 function parseDirectoryEntriesFromHtml(html, directoryType) {
   if (!html) return [];
   $ = cheerio.load(html);
   const all = [];
   let order = 0;
-  $('article.directories-item').each((_, article) => {
-    const art = $(article);
-    const wrap = art.find('.content-wrap');
+  function pushEntry(art) {
+    const wrap = art.find('.content-wrap').length ? art.find('.content-wrap') : art;
     const h3 = wrap.find('h3 a').first();
     const name = text(h3) || text(wrap.find('h3').first());
     if (!name) return;
@@ -243,7 +289,7 @@ function parseDirectoryEntriesFromHtml(html, directoryType) {
     const phones = extractPhones(wrap);
     const website = extractWebsite(wrap);
     const slug = slugify(name);
-    const img = art.find('figure img').attr('src') || art.find('img.wp-post-image').attr('src');
+    const img = getArticleImageSrc(art);
     all.push({
       name,
       slug: slug || `entry-${order}`,
@@ -253,9 +299,13 @@ function parseDirectoryEntriesFromHtml(html, directoryType) {
       phones: phones || undefined,
       website: website || undefined,
       order: order++,
-      imagePath: img || undefined,
+      imagePath: img,
     });
-  });
+  }
+  $('article.directories-item').each((_, article) => pushEntry($(article)));
+  if (all.length === 0) {
+    $('article').each((_, article) => pushEntry($(article)));
+  }
   return all;
 }
 
@@ -440,30 +490,47 @@ function findParishListPages(cloneDir, dioceseIds) {
 }
 
 function parseParishListPage(htmlPath, dioceseNameFromId, htmlOverride) {
-  const html = htmlOverride || (htmlPath && fs.existsSync(htmlPath) ? fs.readFileSync(htmlPath, 'utf8') : null);
-  if (!html) return { items: [], htmlBaseDir: htmlPath ? path.dirname(htmlPath) : '' };
+  const html = htmlOverride || (htmlPath && typeof htmlPath === 'string' && fs.existsSync(htmlPath) ? fs.readFileSync(htmlPath, 'utf8') : null);
+  if (!html) return { items: [], htmlBaseDir: htmlPath && typeof htmlPath === 'string' ? path.dirname(htmlPath) : '' };
   $ = cheerio.load(html);
   const items = [];
-  const dir = htmlPath ? path.dirname(htmlPath) : '';
-  $('article.dioceses-name, article.parishes-name, article.parish-item').each((_, article) => {
-    const art = $(article);
-    const wrap = art.find('.content-wrap').length ? art.find('.content-wrap') : art;
-    const h3 = wrap.find('h3').first();
-    const name = text(h3) || text(wrap.find('h3 a').first());
+  const dir = htmlPath && typeof htmlPath === 'string' ? path.dirname(htmlPath) : '';
+
+  function pushChurch(art, wrap, name, address, location, dioceseName) {
     if (!name) return;
-    const address = extractAddress(wrap);
-    const location = address || text(wrap.find('p').first());
-    let imgSrc = art.find('img.wp-post-image').attr('src') || art.find('figure img').attr('src');
-    if (imgSrc && (imgSrc.includes('default-image') || imgSrc.includes('parish.jpg'))) imgSrc = null;
+    let imgSrc = getArticleImageSrc(art);
+    if (imgSrc && (imgSrc.includes('default-image') || imgSrc.includes('parish.jpg'))) imgSrc = undefined;
     items.push({
       name,
       slug: slugify(name),
       location: (location && location.length < 200) ? location : undefined,
       address: address && location !== address ? address : undefined,
-      dioceseName: dioceseNameFromId || undefined,
-      imagePath: imgSrc || undefined,
+      dioceseName: dioceseName || undefined,
+      imagePath: imgSrc,
     });
+  }
+
+  $('article.dioceses-name, article.parishes-name, article.parish-item').each((_, article) => {
+    const art = $(article);
+    const wrap = art.find('.content-wrap').length ? art.find('.content-wrap') : art;
+    const name = text(wrap.find('h3').first()) || text(wrap.find('h3 a').first());
+    const address = extractAddress(wrap);
+    const location = address || text(wrap.find('p').first());
+    pushChurch(art, wrap, name, address, location, dioceseNameFromId);
   });
+
+  if (items.length === 0) {
+    $('article').each((_, article) => {
+      const art = $(article);
+      const wrap = art.find('.content-wrap').length ? art.find('.content-wrap') : art;
+      const name = text(wrap.find('h3').first()) || text(wrap.find('h3 a').first());
+      if (!name) return;
+      const address = extractAddress(wrap);
+      const location = address || text(wrap.find('p').first());
+      pushChurch(art, wrap, name, address, location, dioceseNameFromId);
+    });
+  }
+
   return { items, htmlBaseDir: dir || '' };
 }
 
@@ -478,11 +545,11 @@ function extractDioceseNameFromContent($wrap) {
 }
 
 function parsePriestListPage(htmlPath, dioceseNameFromIdOrPage, htmlOverride) {
-  const html = htmlOverride || (htmlPath && fs.existsSync(htmlPath) ? fs.readFileSync(htmlPath, 'utf8') : null);
-  if (!html) return { items: [], htmlBaseDir: path.join(htmlPath ? path.dirname(htmlPath) : '', '') };
+  const html = htmlOverride || (htmlPath && typeof htmlPath === 'string' && fs.existsSync(htmlPath) ? fs.readFileSync(htmlPath, 'utf8') : null);
+  if (!html) return { items: [], htmlBaseDir: htmlPath && typeof htmlPath === 'string' ? path.dirname(htmlPath) : '' };
   $ = cheerio.load(html);
   const items = [];
-  const dir = htmlPath ? path.dirname(htmlPath) : null;
+  const dir = htmlPath && typeof htmlPath === 'string' ? path.dirname(htmlPath) : '';
 
   function pushPriest(name, wrap, dioceseName, img) {
     if (!name || !name.trim()) return;
@@ -506,7 +573,7 @@ function parsePriestListPage(htmlPath, dioceseNameFromIdOrPage, htmlOverride) {
     const wrap = art.find('.content-wrap');
     const name = text(wrap.find('h3').first());
     const dioceseName = extractDioceseNameFromContent(wrap) || dioceseNameFromIdOrPage;
-    const img = art.find('figure img').attr('src') || art.find('img.wp-post-image').attr('src');
+    const img = getArticleImageSrc(art);
     pushPriest(name, wrap, dioceseName, img);
   });
 
@@ -518,7 +585,7 @@ function parsePriestListPage(htmlPath, dioceseNameFromIdOrPage, htmlOverride) {
       const name = text(h3);
       if (!name || !/Fr\.|Rev\.|Very\.?\s*Rev\.|Dn\./i.test(name)) return;
       const dioceseName = extractDioceseNameFromContent(wrap) || dioceseNameFromIdOrPage;
-      const img = art.find('figure img').attr('src') || art.find('img').attr('src');
+      const img = getArticleImageSrc(art);
       pushPriest(name, wrap, dioceseName, img);
     });
   }
@@ -530,7 +597,7 @@ function parsePriestListPage(htmlPath, dioceseNameFromIdOrPage, htmlOverride) {
       const parent = $(el).closest('article, .entry, .content-wrap, div[class]');
       const wrap = parent.find('.content-wrap').length ? parent.find('.content-wrap') : parent;
       const dioceseName = extractDioceseNameFromContent(wrap) || dioceseNameFromIdOrPage;
-      const img = parent.find('img').first().attr('src');
+      const img = getArticleImageSrc(parent);
       pushPriest(name, wrap.length ? wrap : $(el).parent(), dioceseName, img);
     });
   }
@@ -610,20 +677,65 @@ async function uploadImageFromUrl(strapi, imageUrl) {
 }
 
 /**
+ * Upload image from a local file path (relative to htmlBaseDir) in the clone directory.
+ * Used when the source HTML is from the local clone and img src is a relative path.
+ * Returns null if file missing or upload fails. Never throws.
+ */
+async function uploadImageFromClone(strapi, cloneDir, htmlBaseDir, imagePath) {
+  if (!imagePath || typeof imagePath !== 'string') return null;
+  const base = typeof htmlBaseDir === 'string' && htmlBaseDir ? htmlBaseDir : cloneDir;
+  const fullPath = path.resolve(String(base), String(imagePath));
+  if (typeof fullPath !== 'string' || !fullPath) return null;
+  try {
+    if (!fs.existsSync(fullPath)) return null;
+  } catch (_) {
+    return null;
+  }
+  try {
+    const stats = fs.statSync(fullPath);
+    if (!stats.isFile()) return null;
+    const ext = path.extname(fullPath).slice(1) || 'jpg';
+    const mimetype = mime.lookup(ext) || 'image/jpeg';
+    const name = path.basename(fullPath, path.extname(fullPath));
+    const [uploaded] = await strapi.plugin('upload').service('upload').upload({
+      data: { fileInfo: { name, alternativeText: name, caption: name } },
+      files: { filepath: fullPath, originalFileName: path.basename(fullPath), size: stats.size, mimetype },
+    });
+    const documentId = await getUploadFileDocumentId(strapi, uploaded);
+    return documentId != null ? { documentId } : null;
+  } catch (e) {
+    console.warn('  Upload image from clone failed:', fullPath.slice(-60), e.message);
+    return null;
+  }
+}
+
+/**
  * Resolve and upload image for an entity: from local clone path or from full URL (e.g. when page was fetched from live site).
- * Ensures every entity type that has an image field can get its image when the source HTML provides one.
+ * When local path is missing, tries remote LIVE_BASE URL only for relative paths (never double-prefix http(s) URLs).
+ * Never throws – returns null on any error so entity creation is not skipped.
  */
 async function resolveAndUploadImage(strapi, cloneDir, htmlBaseDir, imagePath) {
   if (!imagePath || typeof imagePath !== 'string') return null;
-  const trimmed = imagePath.trim();
-  if (/^https:\/\//i.test(trimmed)) {
-    return uploadImageFromUrl(strapi, trimmed);
+  const trimmed = String(imagePath).trim();
+  if (!trimmed) return null;
+  try {
+    // Absolute URLs: use as-is (avoid double-prefixing e.g. https://directory.mosc.in/http://...)
+    if (/^https?:\/\//i.test(trimmed)) {
+      const url = trimmed.replace(/^http:\/\//i, 'https://');
+      return await uploadImageFromUrl(strapi, url);
+    }
+    if (trimmed.startsWith('/')) {
+      return await uploadImageFromUrl(strapi, LIVE_BASE + trimmed);
+    }
+    // Local relative path: try clone first, then remote fallback (only build LIVE_BASE + path for relative paths)
+    let result = await uploadImageFromClone(strapi, cloneDir, htmlBaseDir, trimmed);
+    if (result) return result;
+    const remoteUrl = LIVE_BASE + '/' + trimmed.replace(/^\/+/, '');
+    return await uploadImageFromUrl(strapi, remoteUrl);
+  } catch (e) {
+    console.warn('  Resolve image failed:', trimmed.slice(0, 50), e.message);
+    return null;
   }
-  if (trimmed.startsWith('/')) {
-    return uploadImageFromUrl(strapi, LIVE_BASE + trimmed);
-  }
-  // Local relative path: must call uploadImageFromClone only (no recursion)
-  return uploadImageFromClone(strapi, cloneDir, htmlBaseDir, trimmed);
 }
 
 async function getOrCreateTenant(strapi, tenantId) {
@@ -737,8 +849,8 @@ async function runImport(strapi, cloneDir, tenantDoc) {
   console.log('Backfilling tenant on existing directory records (if any)...');
   await backfillTenantOnExistingRecords(strapi, tenantConnectId);
 
-  console.log('Parsing dioceses...');
-  const dioceses = parseDioceses(cloneDir);
+  console.log('Parsing dioceses (local + remote when FETCH_MISSING_PAGES=1)...');
+  const dioceses = await getDioceses(cloneDir);
   console.log('Parsing bishops (local + remote when FETCH_MISSING_PAGES=1)...');
   const bishops = await getBishops(cloneDir);
   console.log('Parsing directory entries (local + remote when FETCH_MISSING_PAGES=1)...');
@@ -808,13 +920,15 @@ async function runImport(strapi, cloneDir, tenantDoc) {
   const diocesesBaseDir = path.join(cloneDir, 'dioceses');
   const bishopsBaseDir = path.join(cloneDir, 'bishops');
   const directoriesBaseDir = path.join(cloneDir, 'directories');
+  const testBishopUploadOnly = process.env.TEST_BISHOP_UPLOAD_ONLY === '1' || process.env.TEST_BISHOP_UPLOAD_ONLY === 'true';
 
   async function createWithImageFallback(apiUid, data, imageConnect, logName) {
     if (imageConnect) data.image = imageConnect;
     try {
       return await strapi.documents(apiUid).create({ data });
     } catch (e) {
-      if (imageConnect && isUploadFileRelationError(e)) {
+      // If create failed and we had an image, retry without image so we don't skip the entity (e.g. "2 errors" or upload relation issue)
+      if (imageConnect) {
         delete data.image;
         try {
           return await strapi.documents(apiUid).create({ data });
@@ -826,27 +940,72 @@ async function runImport(strapi, cloneDir, tenantDoc) {
     }
   }
 
-  for (const d of dioceses) {
+  /**
+   * Link a media file to a document via DB (files_related_mph). Use when Document Service
+   * rejects media relation with "Invalid relations". Works for any content type with an image field.
+   */
+  async function setMediaRelationViaDb(strapi, contentTypeUid, entityDocumentId, fileDocumentId, fieldName = 'image') {
+    if (!entityDocumentId || !fileDocumentId) return false;
+    const entityRow = await strapi.db.query(contentTypeUid).findOne({
+      where: { documentId: entityDocumentId },
+      select: ['id'],
+    });
+    const fileRow = await strapi.db.query('plugin::upload.file').findOne({
+      where: { documentId: fileDocumentId },
+      select: ['id'],
+    });
+    if (!entityRow?.id || !fileRow?.id) return false;
+    const db = strapi.db.connection;
+    const morphTable = 'files_related_mph';
     try {
-      let imageConnect = null;
-      if (d.imagePath) {
-        const uploaded = await resolveAndUploadImage(strapi, cloneDir, diocesesBaseDir, d.imagePath);
-        if (uploaded) imageConnect = { connect: [uploaded.documentId] };
+      await db(morphTable).where({ related_id: entityRow.id, related_type: contentTypeUid, field: fieldName }).del();
+      await db(morphTable).insert({
+        file_id: fileRow.id,
+        related_id: entityRow.id,
+        related_type: contentTypeUid,
+        field: fieldName,
+        order: 1,
+      });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /** Bishop-specific alias for test path (update existing). */
+  async function setBishopImageViaDb(strapi, bishopDocumentId, uploadFileDocumentId) {
+    return setMediaRelationViaDb(strapi, 'api::bishop.bishop', bishopDocumentId, uploadFileDocumentId, 'image');
+  }
+
+  if (!testBishopUploadOnly) {
+    for (const d of dioceses) {
+      try {
+        let imageConnect = null;
+        if (d.imagePath) {
+          try {
+            const uploaded = await resolveAndUploadImage(strapi, cloneDir, diocesesBaseDir, d.imagePath);
+            if (uploaded) imageConnect = { connect: [{ documentId: uploaded.documentId }] };
+          } catch (_) { /* proceed without image */ }
+        }
+        const data = {
+          name: d.name,
+          slug: d.slug,
+          address: d.address,
+          email: d.email,
+          phones: d.phones,
+          website: d.website,
+          tenant: connectTenant,
+        };
+        const created = await createWithImageFallback('api::diocese.diocese', data, imageConnect, d.name);
+        dioceseBySlug[d.slug] = created.documentId ?? created.id;
+        if (imageConnect && created) {
+          const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+          if (fileDocId) await setMediaRelationViaDb(strapi, 'api::diocese.diocese', created.documentId ?? created.id, fileDocId, 'image');
+        }
+        console.log('  Created diocese:', d.name);
+      } catch (e) {
+        console.warn('  Skip diocese', d.name, e.message);
       }
-      const data = {
-        name: d.name,
-        slug: d.slug,
-        address: d.address,
-        email: d.email,
-        phones: d.phones,
-        website: d.website,
-        tenant: connectTenant,
-      };
-      const created = await createWithImageFallback('api::diocese.diocese', data, imageConnect, d.name);
-      dioceseBySlug[d.slug] = created.documentId ?? created.id;
-      console.log('  Created diocese:', d.name);
-    } catch (e) {
-      console.warn('  Skip diocese', d.name, e.message);
     }
   }
 
@@ -855,12 +1014,28 @@ async function runImport(strapi, cloneDir, tenantDoc) {
     diocesan: 'api::diocesan-bishop.diocesan-bishop',
     retired: 'api::retired-bishop.retired-bishop',
   };
-  for (const b of bishops) {
+  const bishopsToProcess = testBishopUploadOnly ? bishops.filter((b) => b.imagePath).slice(0, 5) : bishops;
+  if (testBishopUploadOnly) {
+    console.log('[TEST_BISHOP_UPLOAD_ONLY] Processing', bishopsToProcess.length, 'bishops with imagePath (upload + verify).');
+  }
+
+  for (const b of bishopsToProcess) {
     try {
       let imageConnect = null;
       if (b.imagePath) {
-        const uploaded = await resolveAndUploadImage(strapi, cloneDir, bishopsBaseDir, b.imagePath);
-        if (uploaded) imageConnect = { connect: [uploaded.documentId] };
+        if (testBishopUploadOnly) console.log('  [TEST] Bishop:', b.name, '| imagePath:', b.imagePath);
+        try {
+          const uploaded = await resolveAndUploadImage(strapi, cloneDir, bishopsBaseDir, b.imagePath);
+          if (uploaded) {
+            imageConnect = { connect: [{ documentId: uploaded.documentId }] };
+            if (testBishopUploadOnly) console.log('  [TEST] Upload OK -> documentId:', uploaded.documentId);
+          } else {
+            if (testBishopUploadOnly) console.log('  [TEST] Upload returned null (file missing or upload failed).');
+          }
+        } catch (err) {
+          if (testBishopUploadOnly) console.warn('  [TEST] Upload error:', err.message);
+          /* proceed without image */
+        }
       }
       const data = {
         name: b.name,
@@ -872,8 +1047,64 @@ async function runImport(strapi, cloneDir, tenantDoc) {
         order: b.order,
         tenant: connectTenant,
       };
-      await createWithImageFallback('api::bishop.bishop', data, imageConnect, b.name);
-      console.log('  Created bishop:', b.name);
+      let createdDocId = null;
+      try {
+        const created = await createWithImageFallback('api::bishop.bishop', data, imageConnect, b.name);
+        createdDocId = created?.documentId ?? created?.id;
+        if (created && imageConnect) {
+          const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+          if (fileDocId) await setMediaRelationViaDb(strapi, 'api::bishop.bishop', createdDocId, fileDocId, 'image');
+        }
+      } catch (createErr) {
+        if (testBishopUploadOnly && imageConnect && /unique|already exists/i.test(createErr.message)) {
+          const existing = await strapi.documents('api::bishop.bishop').findFirst({
+            filters: { slug: b.slug },
+            fields: ['documentId'],
+          });
+          if (existing?.documentId) {
+            createdDocId = existing.documentId;
+            const docId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+            let updated = false;
+            try {
+              await strapi.documents('api::bishop.bishop').update({
+                documentId: existing.documentId,
+                data: { image: docId },
+              });
+              updated = true;
+              console.log('  [TEST] Bishop already exists; updated image (scalar documentId) on documentId:', createdDocId);
+            } catch (e1) {
+              try {
+                await strapi.documents('api::bishop.bishop').update({
+                  documentId: existing.documentId,
+                  data: { image: { set: docId ? [docId] : [] } },
+                });
+                updated = true;
+                console.log('  [TEST] Bishop already exists; updated image (set) on documentId:', createdDocId);
+              } catch (e2) {
+                if (docId && setBishopImageViaDb(strapi, existing.documentId, docId)) {
+                  updated = true;
+                  console.log('  [TEST] Bishop already exists; linked image via DB on documentId:', createdDocId);
+                } else {
+                  console.warn('  [TEST] Update image failed:', e1.message, '| fallback:', e2.message);
+                }
+              }
+            }
+          } else {
+            console.warn('  Skip bishop', b.name, createErr.message);
+          }
+        } else {
+          throw createErr;
+        }
+      }
+      if (testBishopUploadOnly && createdDocId) {
+        const withImage = await strapi.documents('api::bishop.bishop').findOne({
+          documentId: createdDocId,
+          populate: ['image'],
+        });
+        const hasImage = withImage?.image != null;
+        console.log('  [TEST] Bishop documentId:', createdDocId, '| image linked:', hasImage, hasImage ? `| image.documentId: ${withImage.image?.documentId ?? withImage.image?.id}` : '');
+      }
+      if (!testBishopUploadOnly && createdDocId) console.log('  Created bishop:', b.name);
       const subUid = BISHOP_TYPE_TO_UID[b.bishopType];
       if (subUid) {
         const subData = {
@@ -886,8 +1117,12 @@ async function runImport(strapi, cloneDir, tenantDoc) {
           tenant: connectTenant,
         };
         try {
-          await createWithImageFallback(subUid, subData, imageConnect, b.name);
-          console.log('  Created bishop subcategory:', b.name, b.bishopType);
+          const subCreated = await createWithImageFallback(subUid, subData, imageConnect, b.name);
+          if (subCreated && imageConnect) {
+            const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+            if (fileDocId) await setMediaRelationViaDb(strapi, subUid, subCreated.documentId ?? subCreated.id, fileDocId, 'image');
+          }
+          if (!testBishopUploadOnly) console.log('  Created bishop subcategory:', b.name, b.bishopType);
         } catch (subErr) {
           console.warn('  Skip bishop subcategory', b.name, subErr.message);
         }
@@ -895,6 +1130,11 @@ async function runImport(strapi, cloneDir, tenantDoc) {
     } catch (e) {
       console.warn('  Skip bishop', b.name, e.message);
     }
+  }
+
+  if (testBishopUploadOnly) {
+    console.log('[TEST_BISHOP_UPLOAD_ONLY] Done. Check lines above: Upload OK -> documentId and image linked: true mean success.');
+    return;
   }
 
   const DIRECTORY_TYPE_TO_UID = {
@@ -910,8 +1150,10 @@ async function runImport(strapi, cloneDir, tenantDoc) {
     try {
       let imageConnect = null;
       if (e.imagePath) {
-        const uploaded = await resolveAndUploadImage(strapi, cloneDir, directoriesBaseDir, e.imagePath);
-        if (uploaded) imageConnect = { connect: [uploaded.documentId] };
+        try {
+          const uploaded = await resolveAndUploadImage(strapi, cloneDir, directoriesBaseDir, e.imagePath);
+          if (uploaded) imageConnect = { connect: [{ documentId: uploaded.documentId }] };
+        } catch (_) { /* proceed without image */ }
       }
       const data = {
         name: e.name,
@@ -924,7 +1166,11 @@ async function runImport(strapi, cloneDir, tenantDoc) {
         order: e.order,
         tenant: connectTenant,
       };
-      await createWithImageFallback('api::directory-entry.directory-entry', data, imageConnect, e.name);
+      const createdEntry = await createWithImageFallback('api::directory-entry.directory-entry', data, imageConnect, e.name);
+      if (createdEntry && imageConnect) {
+        const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+        if (fileDocId) await setMediaRelationViaDb(strapi, 'api::directory-entry.directory-entry', createdEntry.documentId ?? createdEntry.id, fileDocId, 'image');
+      }
       console.log('  Created directory entry:', e.name, `(${e.directoryType})`);
       const sectionUid = DIRECTORY_TYPE_TO_UID[e.directoryType];
       if (sectionUid) {
@@ -939,7 +1185,11 @@ async function runImport(strapi, cloneDir, tenantDoc) {
           tenant: connectTenant,
         };
         try {
-          await createWithImageFallback(sectionUid, sectionData, imageConnect, e.name);
+          const sectionCreated = await createWithImageFallback(sectionUid, sectionData, imageConnect, e.name);
+          if (sectionCreated && imageConnect) {
+            const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+            if (fileDocId) await setMediaRelationViaDb(strapi, sectionUid, sectionCreated.documentId ?? sectionCreated.id, fileDocId, 'image');
+          }
           console.log('  Created directory section:', e.name, e.directoryType);
         } catch (sectionErr) {
           console.warn('  Skip directory section', e.name, sectionErr.message);
@@ -960,8 +1210,10 @@ async function runImport(strapi, cloneDir, tenantDoc) {
       }
       let imageConnect = null;
       if (p.imagePath) {
-        const uploaded = await resolveAndUploadImage(strapi, cloneDir, p.htmlBaseDir, p.imagePath);
-        if (uploaded) imageConnect = { connect: [uploaded.documentId] };
+        try {
+          const uploaded = await resolveAndUploadImage(strapi, cloneDir, p.htmlBaseDir, p.imagePath);
+          if (uploaded) imageConnect = { connect: [{ documentId: uploaded.documentId }] };
+        } catch (_) { /* proceed without image */ }
       }
       const data = {
         name: p.name,
@@ -975,6 +1227,10 @@ async function runImport(strapi, cloneDir, tenantDoc) {
       };
       const created = await createWithImageFallback('api::priest.priest', data, imageConnect, p.name);
       const docId = created?.documentId ?? created?.id;
+      if (created && imageConnect) {
+        const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+        if (fileDocId) await setMediaRelationViaDb(strapi, 'api::priest.priest', docId, fileDocId, 'image');
+      }
       if (docId && dioceseSlug) {
         if (!priestsByDioceseSlug[dioceseSlug]) priestsByDioceseSlug[dioceseSlug] = [];
         priestsByDioceseSlug[dioceseSlug].push(docId);
@@ -997,8 +1253,10 @@ async function runImport(strapi, cloneDir, tenantDoc) {
       }
       let imageConnect = null;
       if (c.imagePath) {
-        const uploaded = await resolveAndUploadImage(strapi, cloneDir, c.htmlBaseDir, c.imagePath);
-        if (uploaded) imageConnect = { connect: [uploaded.documentId] };
+        try {
+          const uploaded = await resolveAndUploadImage(strapi, cloneDir, c.htmlBaseDir, c.imagePath);
+          if (uploaded) imageConnect = { connect: [{ documentId: uploaded.documentId }] };
+        } catch (_) { /* proceed without image */ }
       }
       const data = {
         name: c.name,
@@ -1010,6 +1268,10 @@ async function runImport(strapi, cloneDir, tenantDoc) {
       };
       const created = await createWithImageFallback('api::church.church', data, imageConnect, c.name);
       const churchDocId = created?.documentId ?? created?.id;
+      if (created && imageConnect) {
+        const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+        if (fileDocId) await setMediaRelationViaDb(strapi, 'api::church.church', churchDocId, fileDocId, 'image');
+      }
       if (!churchDocId) continue;
       const unassigned = (priestsByDioceseSlug[dioceseSlug] || []).filter((id) => !assignedPriestIds.has(id));
       const pick = shuffle(unassigned).slice(0, 2);

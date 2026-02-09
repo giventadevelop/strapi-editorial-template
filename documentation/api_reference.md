@@ -269,6 +269,8 @@ Never expose the token in client-side JavaScript (e.g. `NEXT_PUBLIC_*`) if it ha
 
 For detailed frontend examples, see `documentation/catholicatenews_strapi_content_mapping.md`.
 
+For **directory-related APIs** (Directory Home, Bishops, Dioceses, Parishes, Churches, Priests, Directory Entries) with full field definitions and examples, see `documentation/directory_api_reference.md`.
+
 ---
 
 ## 5. Encryption key (viewing tokens in Admin)

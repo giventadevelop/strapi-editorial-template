@@ -434,7 +434,7 @@ export interface ApiAboutAbout extends Struct.SingleTypeSchema {
   collectionName: 'abouts';
   info: {
     description: 'Write about yourself and the content you create';
-    displayName: 'About';
+    displayName: 'Editorial \u2013 About';
     pluralName: 'abouts';
     singularName: 'about';
   };
@@ -464,7 +464,7 @@ export interface ApiAdvertisementSlotAdvertisementSlot
   collectionName: 'advertisement_slots';
   info: {
     description: 'Ad placements with position, media and date range';
-    displayName: 'Advertisement Slot';
+    displayName: 'Editorial \u2013 Advertisement Slot';
     pluralName: 'advertisement-slots';
     singularName: 'advertisement-slot';
   };
@@ -506,7 +506,7 @@ export interface ApiArticleArticle extends Struct.CollectionTypeSchema {
   collectionName: 'articles';
   info: {
     description: 'Create your blog content';
-    displayName: 'Article';
+    displayName: 'Editorial \u2013 Article';
     pluralName: 'articles';
     singularName: 'article';
   };
@@ -567,7 +567,7 @@ export interface ApiAuthorAuthor extends Struct.CollectionTypeSchema {
   collectionName: 'authors';
   info: {
     description: 'Create authors for your content';
-    displayName: 'Author';
+    displayName: 'Editorial \u2013 Author';
     pluralName: 'authors';
     singularName: 'author';
   };
@@ -645,7 +645,7 @@ export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
   collectionName: 'categories';
   info: {
     description: 'Organize your content into categories';
-    displayName: 'Category';
+    displayName: 'Editorial \u2013 Category';
     pluralName: 'categories';
     singularName: 'category';
   };
@@ -1030,7 +1030,7 @@ export interface ApiFlashNewsItemFlashNewsItem
   collectionName: 'flash_news_items';
   info: {
     description: 'Scrolling flash news carousel items; link to article or external URL';
-    displayName: 'Flash News Item';
+    displayName: 'Editorial \u2013 Flash News Item';
     pluralName: 'flash-news-items';
     singularName: 'flash-news-item';
   };
@@ -1078,7 +1078,7 @@ export interface ApiGlobalGlobal extends Struct.SingleTypeSchema {
   collectionName: 'globals';
   info: {
     description: 'Define global settings';
-    displayName: 'Global';
+    displayName: 'Editorial \u2013 Global';
     pluralName: 'globals';
     singularName: 'global';
   };
@@ -1110,7 +1110,7 @@ export interface ApiHomepageHomepage extends Struct.SingleTypeSchema {
   collectionName: 'homepages';
   info: {
     description: 'Homepage hero, most-read section and banners';
-    displayName: 'Homepage Layout';
+    displayName: 'Editorial \u2013 Homepage Layout';
     pluralName: 'homepages';
     singularName: 'homepage';
   };
@@ -1458,7 +1458,7 @@ export interface ApiSidebarPromotionalBlockSidebarPromotionalBlock
   collectionName: 'sidebar_promotional_blocks';
   info: {
     description: 'Video, social or banner block for sidebar';
-    displayName: 'Sidebar Promotional Block';
+    displayName: 'Editorial \u2013 Sidebar Promotional Block';
     pluralName: 'sidebar-promotional-blocks';
     singularName: 'sidebar-promotional-block';
   };
