@@ -1286,15 +1286,19 @@ async function runImport(strapi, cloneDir, tenantDoc) {
       }
       try {
         const parishSlug = c.slug + '-' + dioceseSlug;
-        await strapi.documents('api::parish.parish').create({
-          data: {
-            name: c.name,
-            slug: parishSlug,
-            diocese: { connect: [dioceseDocId] },
-            address: c.address || c.location,
-            tenant: connectTenant,
-          },
-        });
+        const parishData = {
+          name: c.name,
+          slug: parishSlug,
+          diocese: { connect: [dioceseDocId] },
+          address: c.address || c.location,
+          tenant: connectTenant,
+        };
+        const parishCreated = await createWithImageFallback('api::parish.parish', parishData, imageConnect, c.name + ' (parish)');
+        if (parishCreated && imageConnect) {
+          const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
+          const parishDocId = parishCreated?.documentId ?? parishCreated?.id;
+          if (fileDocId && parishDocId) await setMediaRelationViaDb(strapi, 'api::parish.parish', parishDocId, fileDocId, 'image');
+        }
       } catch (parishErr) {
         console.warn('  Skip parish', c.name, parishErr.message);
       }

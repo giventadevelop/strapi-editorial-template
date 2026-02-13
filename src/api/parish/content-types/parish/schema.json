@@ -7,20 +7,11 @@
     "displayName": "Directory – Parishes",
     "description": "Parish: name, diocese, optional vicar, contact"
   },
-  "options": {
-    "draftAndPublish": false
-  },
+  "options": { "draftAndPublish": false },
   "pluginOptions": {},
   "attributes": {
-    "name": {
-      "type": "string",
-      "required": true
-    },
-    "slug": {
-      "type": "uid",
-      "targetField": "name",
-      "required": true
-    },
+    "name": { "type": "string", "required": true },
+    "slug": { "type": "uid", "targetField": "name", "required": true },
     "diocese": {
       "type": "relation",
       "relation": "manyToOne",
@@ -35,36 +26,23 @@
       "inversedBy": "parish",
       "description": "Current vicar (priest) for this parish"
     },
-    "address": {
-      "type": "text"
-    },
-    "email": {
-      "type": "string"
-    },
-    "phones": {
-      "type": "text",
-      "description": "Phone number(s), comma-separated if multiple"
-    },
-    "phoneSecondary": {
-      "type": "string",
-      "description": "Second phone number"
-    },
+    "address": { "type": "text" },
+    "email": { "type": "string" },
+    "phones": { "type": "text", "description": "Phone number(s), comma-separated if multiple" },
+    "phoneSecondary": { "type": "string", "description": "Second phone number" },
     "addressLine1": { "type": "string" },
     "addressLine2": { "type": "string" },
     "city": { "type": "string" },
     "state": { "type": "string" },
     "postalCode": { "type": "string" },
     "country": { "type": "string" },
+    "image": { "type": "media", "multiple": false, "required": false, "allowedTypes": ["images"] },
     "tenant": {
       "type": "relation",
       "relation": "manyToOne",
       "target": "api::tenant.tenant",
       "description": "Auto-assigned from editor's tenant. Do not edit.",
-      "pluginOptions": {
-        "content-manager": {
-          "visible": false
-        }
-      }
+      "pluginOptions": { "content-manager": { "visible": false } }
     }
   }
 }

@@ -1252,6 +1252,7 @@ export interface ApiParishParish extends Struct.CollectionTypeSchema {
     diocese: Schema.Attribute.Relation<'manyToOne', 'api::diocese.diocese'> &
       Schema.Attribute.Required;
     email: Schema.Attribute.String;
+    image: Schema.Attribute.Media<'images'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',

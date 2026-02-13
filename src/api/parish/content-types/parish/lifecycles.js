@@ -31,6 +31,11 @@ async function getTenantForEmail(strapi, email) {
 module.exports = {
   async beforeCreate(event) {
     if (!event.params?.data) return;
+    // Preserve tenant when already set (e.g. by sync script or data import)
+    const existing = event.params.data.tenant;
+    if (existing != null && (typeof existing === 'object' ? existing?.connect != null : true)) {
+      return;
+    }
     const ctx = requestContext.get();
     const user = ctx?.state?.user || ctx?.state?.admin;
     const email = user?.email;

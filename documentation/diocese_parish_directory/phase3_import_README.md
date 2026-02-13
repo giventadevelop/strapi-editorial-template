@@ -88,8 +88,18 @@ where `<id>` is the diocese value from `parishes/index.html` (e.g. `573` for Dio
 3. To show directory data on the frontend, filter by tenant, e.g.
    `GET /api/dioceses?filters[tenant][tenantId][$eq]=directory_mosc_001`.
 4. Optionally create **Directory – Home** section cards manually (or extend the script to parse `index.html` and create the Directory Home single type).
-5. **Directory – Parishes** (administrative unit) is a separate content type and is **not** populated by this script; add parishes manually. **Directory – Churches** is populated from parish/church list pages when present (see Church list pages); if you see 0 churches, add list pages or set `STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1`. **Directory – Priests** is populated from priest list pages when present (see Priest list pages).
+5. **Directory – Parishes** (administrative unit) is a separate content type. To populate it from **Directory – Churches** (same data: name, diocese, address, image, tenant), run **Copy Church to Parish** – see [Sync Church to Parish](sync_church_to_parish.md). **Directory – Churches** is populated from parish/church list pages when present (see Church list pages); if you see 0 churches, add list pages or set `STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1`. **Directory – Priests** is populated from priest list pages when present (see Priest list pages).
 6. **Images:** If bishop/diocese/entry images show as missing in the admin, they were skipped during import (e.g. upload relation issue). You can attach images manually per entry, or re-run after fixing image paths in the clone.
+
+## Copy Church to Parish
+
+To (re)build **Directory – Parishes** from **Directory – Churches** (one parish per church, same data including image and tenant):
+
+```bash
+npm run sync:parishes-from-churches
+```
+
+This **deletes all existing parishes** and creates one parish per church. Run with **Strapi stopped**. See [Sync Church to Parish](sync_church_to_parish.md) for full details and options (e.g. `DRY_RUN=1` to preview).
 
 ## Re-running
 
