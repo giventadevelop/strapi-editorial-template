@@ -1,0 +1,90 @@
+---
+description: Strapi 5 news import — propagate category, tenant, and cover images to ALL article rows (draft + published).
+globs: scripts/data_import_seed_news*.js, scripts/fix_article*.js, documentation/News_Import/**
+alwaysApply: false
+---
+
+# Strapi 5 News Import: Category, Tenant & Images
+
+## Background: Strapi 5 Draft-and-Publish Model
+
+Strapi 5 creates **two rows per article** when using draft-and-publish:
+
+- **Published row** — `published_at` set
+- **Draft row** — `published_at` null
+
+The Content Manager loads the **draft row by default**. If category, tenant, or cover links exist only on the published row, they appear **empty** in the admin UI.
+
+## Tables Involved
+
+| Data       | Table                    | Key Columns                              |
+|-----------|---------------------------|------------------------------------------|
+| Category  | `articles_category_lnk`  | `article_id`, `category_id`, `article_ord` |
+| Tenant    | `articles_tenant_lnk`    | `article_id`, `tenant_id`                |
+| Cover     | `files_related_mph`      | `related_id`, `file_id`, `related_type`, `field`, `order` |
+
+All relations use **article row id** (`articles.id`), not `document_id`. Each draft and published row has its own `id`.
+
+## Required Fixes
+
+### 1. Category and Tenant Propagation
+
+After import (or when fixing existing data), **propagate** category and tenant from any row that has them to **all other rows** for the same `document_id`:
+
+```javascript
+// For each document_id that has category/tenant links:
+// 1. Get category_id and tenant_id from articles_category_lnk and articles_tenant_lnk
+// 2. Find all article rows for that document_id (draft + published)
+// 3. For each row missing links, INSERT into the link tables
+```
+
+Key points:
+
+- Resolve `document_id` from `articles` where `id = article_id` (from link table).
+- Group by `document_id`; collect `category_id` and `tenant_id` from any row.
+- Insert links for **every** article row that lacks them.
+
+### 2. Cover Image Propagation
+
+Same pattern for cover images:
+
+- Use `files_related_mph` where `related_type = 'api::article.article'` and `field = 'cover'`.
+- Map `related_id` (article row id) → `document_id` via `articles`.
+- For each `document_id`, get `file_id` from any row; then ensure **all** article rows for that document have a cover link in the morph table.
+
+### 3. Image Upload Reliability (EBUSY / File Lock)
+
+When uploading images from a local clone (especially on Windows):
+
+1. **Copy to temp before upload** — Avoid EBUSY from the clone directory.
+2. **Retry on EBUSY/EPERM** — Up to 2–3 attempts with short delay.
+3. **Remote URL fallback** — If local file access fails, fetch from live site URL.
+
+```javascript
+// Copy file to os.tmpdir() before strapi.plugin('upload').service('upload').upload()
+// Retry loop: if /EBUSY|EPERM|EACCES|resource busy|locked/i.test(e.message) && attempt < 3
+```
+
+### 4. Cover Linking After Create
+
+Always call `setMediaRelationViaDb` after creating an article with a cover. The Document Service may not reliably link media on create; writing to `files_related_mph` ensures the link exists.
+
+## Import Flow Order
+
+1. Create articles with `category`, `tenant`, and optionally `cover` in the data.
+2. `syncDraftRowsFromPublished` — Copy `title`, `description`, `slug` to draft rows.
+3. `syncCoverToAllArticleRows` — Propagate cover to all article rows.
+4. `syncCategoryAndTenantToAllArticleRows` — Propagate category and tenant to all article rows.
+
+## Standalone Fix Scripts
+
+- `npm run fix:article_covers` — Propagate cover only.
+- `npm run fix:article_category_tenant` — Propagate category and tenant only.
+
+Run with Strapi stopped to avoid locks.
+
+## Reference
+
+- Import script: `scripts/data_import_seed_news_catholicatenews.js`
+- Fix scripts: `scripts/fix_article_covers.js`, `scripts/fix_article_category_tenant.js`
+- Related rule: `strapi-media-relation-image-upload-fix.mdc` for `setMediaRelationViaDb` pattern.

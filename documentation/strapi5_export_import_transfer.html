@@ -239,6 +239,10 @@ npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pr
     <li>For non-interactive use: <code>--force</code> (and <code>-k</code> for encrypted files):
       <pre><code>npm run strapi import -- -f "C:\project_workspace\strapi-editorial-template\my-export.tar.gz.enc" -k "your-secure-encryption-key" --force</code></pre>
     </li>
+    <li><strong>Windows – full command (plain .tar, non-interactive):</strong>
+      <pre><code>npm run strapi import -- -f "E:\project_workspace\strapi-editorial-template\my-export-1.tar" --force</code></pre>
+      Replace the path with your export file location. For encrypted files, add <code>-k "your-encryption-key"</code> before <code>--force</code>.
+    </li>
     <li>Confirm when asked: the import <strong>deletes all existing data</strong> (database and uploads) before importing.</li>
   </ol>
   <div class="caution">

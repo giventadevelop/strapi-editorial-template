@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News Import – Catholicate News workflow</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { color: #1a1a1a; border-bottom: 2px solid #db1111; padding-bottom: 0.5rem; }
+    h2 { color: #2d2d2d; margin-top: 2rem; }
+    ul, ol { margin: 0.5rem 0; }
+    li { margin: 0.25rem 0; }
+    code, pre { background: #f0f0f0; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { padding: 1rem; overflow-x: auto; white-space: pre-wrap; }
+    a { color: #db1111; }
+    .note { background: #fff8e6; border-left: 4px solid #e6b800; padding: 0.75rem 1rem; margin: 1rem 0; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
+    th { background: #f5f5f5; }
+  </style>
+</head>
+<body>
+  <h1>News Import – Catholicate News workflow</h1>
+  <p>This document describes how to run the automated import of news articles from the local clone of <a href="https://catholicatenews.in/">catholicatenews.in</a> into Strapi.</p>
+
+  <h2>Prerequisites</h2>
+  <ol>
+    <li><strong>Local clone</strong> of catholicatenews.in (set <code>STRAPI_NEWS_CLONE_DIR</code> in <code>.env</code>, default: <code>E:\project_workspace\catholicatenews-in-temp</code>).</li>
+    <li><strong>Strapi</strong> project with Article and Category content types and multi-tenant setup.</li>
+    <li><strong>cheerio</strong>, <strong>dotenv</strong>, <strong>mime-types</strong>: run <code>npm install</code> in the project root.</li>
+  </ol>
+
+  <h2>What the scripts do</h2>
+  <table>
+    <thead>
+      <tr><th>Script</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Export</strong></td><td>Exports articles and categories for tenant <code>tenant_demo_002</code> to JSON for backup/testing.</td></tr>
+      <tr><td><strong>Delete</strong></td><td>Deletes all Article entries. Categories are not deleted (they may be shared).</td></tr>
+      <tr><td><strong>Seed</strong></td><td>Parses category pages (main-news, featured-news, press-release, most-read) from the clone, imports up to 30 articles per category, assigns tenant and categories.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Config from .env</h2>
+  <p>Set these in your project root <code>.env</code> file:</p>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>STRAPI_NEWS_CLONE_DIR</code></td><td><code>E:\project_workspace\catholicatenews-in-temp</code></td><td>Path to the catholicatenews.in clone.</td></tr>
+      <tr><td><code>TENANT_ID</code></td><td><code>tenant_demo_002</code></td><td>Editorial tenant for imported articles.</td></tr>
+      <tr><td><code>STRAPI_NEWS_FETCH_MISSING</code></td><td>—</td><td>Set to <code>1</code> to fetch missing category pages from <code>https://catholicatenews.in/</code>.</td></tr>
+      <tr><td><code>EXPORT_OUTPUT_PATH</code></td><td><code>exports/news_tenant_demo_002_YYYYMMDD.json</code></td><td>Output path for export script (export only).</td></tr>
+    </tbody>
+  </table>
+
+  <h2>How to run</h2>
+  <p class="note"><strong>Important:</strong> Stop Strapi before running delete and seed. Restart Strapi after the seed so the admin UI picks up the new articles.</p>
+  <h3>1. Export (backup before delete)</h3>
+  <pre><code>npm run export:news_tenant_demo</code></pre>
+  <p>Writes articles and categories for <code>tenant_demo_002</code> to <code>exports/news_tenant_demo_002_YYYYMMDD.json</code>.</p>
+
+  <h3>2. Delete all articles</h3>
+  <pre><code>npm run delete:articles</code></pre>
+  <p>To only see counts without deleting:</p>
+  <pre><code>DRY_RUN=1 npm run delete:articles</code></pre>
+  <p>Run with Strapi stopped or from another terminal.</p>
+
+  <h3>3. Seed from legacy clone</h3>
+  <pre><code>npm run seed:news_catholicatenews</code></pre>
+  <p>Or with env overrides:</p>
+  <pre><code># Windows (PowerShell)
+$env:STRAPI_NEWS_CLONE_DIR = "E:\project_workspace\catholicatenews-in-temp"
+$env:TENANT_ID = "tenant_demo_002"
+node scripts/data_import_seed_news_catholicatenews.js
+
+# Linux / macOS
+STRAPI_NEWS_CLONE_DIR=/path/to/clone TENANT_ID=tenant_demo_002 node scripts/data_import_seed_news_catholicatenews.js</code></pre>
+
+  <h2>Category pages and traversal</h2>
+  <p>The seed script reads from:</p>
+  <ul>
+    <li><code>category/main-news/page/1/index.html</code>, <code>page/2/index.html</code>, …</li>
+    <li><code>category/featured-news/page/1/index.html</code>, …</li>
+    <li><code>category/press-release/page/1/index.html</code>, …</li>
+    <li><code>category/most-read/page/1/index.html</code>, …</li>
+  </ul>
+  <p>It collects up to <strong>30 articles per category</strong> (hard limit). Duplicate articles across categories are assigned to the first category encountered. If a page is missing and <code>STRAPI_NEWS_FETCH_MISSING=1</code> is set, the script fetches it from <code>https://catholicatenews.in/</code>.</p>
+
+  <h2>Image resolution (local vs online)</h2>
+  <p>Images are resolved in this order:</p>
+  <ol>
+    <li><strong>Local:</strong> Path from <code>img</code> src (e.g. <code>uploads/2026/01/...)</code>) relative to the HTML file’s directory.</li>
+    <li><strong>Fallback:</strong> If the file is missing locally, the script tries <code>https://catholicatenews.in/{path}</code>.</li>
+  </ol>
+
+  <h2>Tenant assignment and Editor Tenant</h2>
+  <p>Imported articles are assigned to <code>tenant_demo_002</code>. If an editor is mapped to that tenant via <strong>Editor Tenant Assignment</strong>, the import runs in that user’s request context so lifecycles can set the tenant. Otherwise, the tenant is backfilled at the end of the import.</p>
+  <p>Ensure a tenant with <code>tenantId</code> <code>tenant_demo_002</code> exists and that an editor is assigned to it for the best experience.</p>
+
+  <h2>Required categories</h2>
+  <p>The script creates these categories if missing:</p>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Slug</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Main News</td><td>main-news</td></tr>
+      <tr><td>Press Release</td><td>press-release</td></tr>
+      <tr><td>Featured News</td><td>featured-news</td></tr>
+      <tr><td>Most Read</td><td>most-read</td></tr>
+    </tbody>
+  </table>
+
+  <h2>After import</h2>
+  <ol>
+    <li>Open Strapi Admin and check <strong>Content Manager → Article</strong>.</li>
+    <li>Filter by tenant (or log in as an editor assigned to <code>tenant_demo_002</code>).</li>
+    <li>Verify categories and cover images. Missing images may be due to local paths not resolving; you can attach them manually.</li>
+  </ol>
+
+  <h2>Bulk publish imported articles</h2>
+  <p>If imported articles appear as drafts, run:</p>
+  <pre><code>npm run bulk_publish:articles</code></pre>
+  <p>To limit to a specific tenant:</p>
+  <pre><code>TENANT_ID=tenant_demo_002 node scripts/bulk_publish_articles.js</code></pre>
+  <p>To only see how many would be published:</p>
+  <pre><code>DRY_RUN=1 npm run bulk_publish:articles</code></pre>
+
+  <h2>Re-running</h2>
+  <div class="note">
+    The import script does not check for existing articles. Re-running will create duplicates. To re-import cleanly: run <code>npm run delete:articles</code>, then <code>npm run seed:news_catholicatenews</code> again.
+  </div>
+</body>
+</html>
