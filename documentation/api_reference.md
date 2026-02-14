@@ -356,3 +356,62 @@ If ads return 0 items, the filter may not match your data. The frontend filters 
 ### Homepage and sidebar-promotional-block 404
 
 These single types need public find permission. Restart Strapi after the bootstrap runs — it now grants public `find` for `homepage`, `sidebar-promotional-block`, and `advertisement-slot`.
+
+---
+
+## 8. Article Cover Images Not Showing on Frontend
+
+If article cover images appear correctly in the Strapi admin panel but **do not show on the frontend** after import or in production, check the following.
+
+### 1. Populate the cover relation
+
+The `cover` field is a media relation. By default, Strapi does **not** include relations in the response. You must explicitly populate it:
+
+```http
+GET /api/articles?...&populate[0]=cover&populate[1]=category&populate[2]=author
+```
+
+Or using the shorthand:
+
+```http
+GET /api/articles?...&populate=cover,category,author
+```
+
+Without `populate=cover`, the response will have `cover: null` or an empty object, so no image can be displayed.
+
+### 2. Use the full image URL
+
+Strapi returns image URLs as **relative paths** (e.g. `/uploads/asmara_2_1024x543_abc123.jpg`). The frontend must prepend the Strapi base URL to build a working image URL.
+
+```javascript
+const STRAPI_URL = process.env.STRAPI_URL || 'http://localhost:1337';
+
+// After fetching article with populate=cover
+const cover = article.cover;
+let imageUrl = null;
+if (cover?.url) {
+  // Prepend Strapi base URL if url is relative
+  imageUrl = cover.url.startsWith('http')
+    ? cover.url
+    : `${STRAPI_URL}${cover.url.startsWith('/') ? '' : '/'}${cover.url}`;
+}
+
+// Use imageUrl in <img src={imageUrl} alt={article.title} />
+```
+
+### 3. Verify the cover in the API response
+
+Call the API directly and inspect the response:
+
+```http
+GET http://localhost:1337/api/articles?populate=cover&pagination[limit]=1
+```
+
+Check that `data[0].cover` is an object with `url`, `alternativeText`, etc. If `cover` is null, the article has no cover assigned, or the relation was not populated.
+
+### Summary
+
+| Cause | Fix |
+|-------|-----|
+| Cover not populated | Add `populate=cover` (or `populate[0]=cover`) to the articles API request |
+| Relative URL not resolved | Prepend `STRAPI_URL` (e.g. `http://localhost:1337`) to `cover.url` when rendering images |

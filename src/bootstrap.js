@@ -715,6 +715,58 @@ async function ensureFlashNewsItemTitleFirst() {
   }
 }
 
+/**
+ * Ensure createdAt and publishedAt are visible in Article edit layout.
+ * Super Admin can see these timestamps; the gear-icon Configure view may not persist layout
+ * changes, so we add them programmatically.
+ */
+async function ensureArticleDateFieldsInEditLayout() {
+  const uid = 'api::article.article';
+  const dateFields = ['createdAt', 'publishedAt'];
+  try {
+    const store = strapi.store({ type: 'plugin', name: 'content-manager' });
+    const config = (await store.get({ key: 'configuration' })) || {};
+    const contentTypesConfig = config.content_types || {};
+    let ct = contentTypesConfig[uid];
+    if (!ct) {
+      contentTypesConfig[uid] = ct = {};
+    }
+    if (!ct.edit) ct.edit = {};
+    const edit = ct.edit;
+    const layouts = edit.layouts || edit.layout;
+    const rows = Array.isArray(layouts) ? layouts : [];
+
+    const hasField = (name) => {
+      for (const row of rows) {
+        if (!Array.isArray(row)) continue;
+        if (row.some((c) => (c?.name ?? c?.field) === name)) return true;
+      }
+      return false;
+    };
+
+    const toAdd = dateFields.filter((f) => !hasField(f));
+    if (toAdd.length === 0) return;
+
+    const newCells = toAdd.map((name) => ({ name }));
+    if (rows.length > 0) {
+      rows.push(newCells);
+    } else {
+      rows.push(newCells);
+    }
+    edit.layouts = rows;
+
+    await store.set({ key: 'configuration', value: config });
+    strapi.log.info(
+      `Content Manager: added ${toAdd.join(', ')} to Article edit layout`
+    );
+  } catch (err) {
+    strapi.log.warn(
+      'Could not add date fields to Article edit layout:',
+      err.message
+    );
+  }
+}
+
 module.exports = async () => {
   await seedExampleApp();
   await ensureContentApiPublicPermissions();
@@ -722,5 +774,6 @@ module.exports = async () => {
   await ensureEditorTenantScopedPermissions();
   await hideTenantFieldInContentManagerLayout();
   await ensureFlashNewsItemTitleFirst();
+  await ensureArticleDateFieldsInEditLayout();
   await registerTenantDocumentMiddleware();
 };

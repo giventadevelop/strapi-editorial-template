@@ -21,6 +21,7 @@
     "content": {
       "type": "text",
       "required": true,
+      "maxLength": 600,
       "description": "Sentence or two shown in the ticker"
     },
     "article": {

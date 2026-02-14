@@ -74,6 +74,7 @@
                         <li><a href="#troubleshoot-create-error">— FOREIGN KEY when creating Article/Ad Slot</a></li>
                         <li><a href="#troubleshoot-403-after-save">— 403 after save (open entry)</a></li>
                         <li><a href="#troubleshoot-empty-list">— Published items show no data</a></li>
+                        <li><a href="#troubleshoot-created-at">— Created at / Published at not showing</a></li>
                     </ul>
                 </li>
                 <li><a href="#switch-user">0C. Switch from Super Admin to New User (Logout / Login)</a></li>
@@ -255,6 +256,11 @@
                 <li class="step"><span class="step-num">Step 3.</span> In <strong>Content Manager</strong> → Article → <strong>Configure the view</strong> → list view <strong>View</strong>, ensure the columns you want (e.g. TITLE, DESCRIPTION, SLUG) are added to the view and saved.</li>
             </ol>
             <p>If the problem continues, restart Strapi and clear the browser cache; then log in again as the Editor and open the Article list.</p>
+
+            <h3 id="troubleshoot-created-at">Troubleshooting: Created at / Published at not showing in Article details</h3>
+            <p>If you want to see <strong>createdAt</strong> and <strong>publishedAt</strong> in the Article edit view but they do not appear after using <strong>Configure the view</strong> (gear icon), this project's bootstrap now adds them automatically.</p>
+            <p><strong>Fix:</strong> Restart Strapi. On startup, the bootstrap adds <code>createdAt</code> and <code>publishedAt</code> to the Article edit layout. Open any Article and scroll down — you should see these fields at the bottom.</p>
+            <p><strong>If using Configure the view manually:</strong> The gear icon opens configuration for either the <strong>list view</strong> (columns in the table) or the <strong>edit view</strong> (fields in the form). To add createdAt to the edit form, switch to the <strong>Edit view</strong> tab, add the field from the available list, then click <strong>Save</strong> <em>inside the configuration panel</em> before closing it. If you close the panel without clicking Save, changes are not persisted.</p>
         </section>
 
         <!-- ========== 0C. SWITCH FROM SUPER ADMIN TO NEW USER ========== -->

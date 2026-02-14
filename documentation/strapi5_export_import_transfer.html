@@ -117,6 +117,34 @@ npm run develop</code></pre>
   </table>
   <p>Summary: for a minimal run you need <code>APP_KEYS</code>, <code>API_TOKEN_SALT</code>, <code>ENCRYPTION_KEY</code>, <code>ADMIN_JWT_SECRET</code>, and <code>JWT_SECRET</code> (if using API users). For transfer, add <code>TRANSFER_TOKEN_SALT</code>. For Postgres, set <code>DATABASE_CLIENT=postgres</code> and <code>DATABASE_URL</code> (or individual <code>DATABASE_*</code>). For SQLite, default <code>DATABASE_FILENAME</code> is usually enough.</p>
 
+  <h3>3.1 API token you copy (View/Copy in admin) – where does it go?</h3>
+  <p>The token you copy from <strong>Settings → API Tokens → Create (or View)</strong> is <strong>not</strong> stored in Strapi’s <code>.env</code>. It is the value your <strong>application</strong> (e.g. frontend, mobile app, Postman) uses when calling the Strapi API (e.g. <code>Authorization: Bearer &lt;token&gt;</code>).</p>
+  <ul>
+    <li>Put it in your <strong>app’s</strong> <code>.env</code>, for example: <code>STRAPI_API_TOKEN=&lt;paste the token here&gt;</code>, or <code>NEXT_PUBLIC_STRAPI_API_TOKEN=…</code> if the frontend needs it.</li>
+    <li>Strapi’s own <code>.env</code> has <strong>no property</strong> for that token string. The server uses <code>API_TOKEN_SALT</code> (a secret used to hash and verify tokens), not the token value itself.</li>
+  </ul>
+
+  <h3>3.2 Where to get values for .env and reusing from this project</h3>
+  <p>On a <strong>new machine</strong> you can either generate new secrets or reuse values from the existing project.</p>
+  <table>
+    <thead>
+      <tr><th>Property</th><th>Where to get it / reuse?</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>APP_KEYS</code></td><td>Generate new, or copy from this project. Need at least one key; often two comma-separated: <code>key1,key2</code>.</td></tr>
+      <tr><td><code>API_TOKEN_SALT</code></td><td>Generate new, or copy from this project.</td></tr>
+      <tr><td><code>ENCRYPTION_KEY</code></td><td>Generate new, or copy from this project.</td></tr>
+      <tr><td><code>ADMIN_JWT_SECRET</code></td><td>Generate new, or copy from this project.</td></tr>
+      <tr><td><code>JWT_SECRET</code></td><td>Generate new, or copy from this project (only if you use Users &amp; Permissions API).</td></tr>
+      <tr><td><code>TRANSFER_TOKEN_SALT</code></td><td>Generate new, or copy from this project (only if you use Transfer).</td></tr>
+      <tr><td><code>HOST</code>, <code>PORT</code></td><td>Optional; e.g. <code>0.0.0.0</code> and <code>1337</code>. Reuse or leave default.</td></tr>
+      <tr><td><code>DATABASE_*</code></td><td>For SQLite: often just <code>DATABASE_FILENAME</code>. For Postgres: <code>DATABASE_CLIENT=postgres</code> and <code>DATABASE_URL</code> (or host/port/name/user/password). Reuse from this project if the new machine uses the same DB; otherwise set new values for the new DB.</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Reusing from this project:</strong> You can copy the <strong>entire</strong> <code>.env</code> from this project to the new machine. Then only adjust <code>DATABASE_*</code> if the new machine uses a different database (e.g. new Postgres URL or a different SQLite path).</p>
+  <p><strong>Generating new values</strong> (if you do not reuse): run the following once per secret; for <code>APP_KEYS</code> run it twice and set <code>APP_KEYS=first,second</code>:</p>
+  <pre><code>node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"</code></pre>
+
   <h2>4. API tokens and encryption key – reuse across installations?</h2>
   <ul>
     <li><strong>API tokens (admin-created) / JWT</strong> – <strong>No.</strong> Export and transfer do <strong>not</strong> include API tokens or admin users. You cannot copy the same API token from this installation and use it on another. Each installation has its own tokens (and salts). After import or transfer, create new API tokens (and admin users) on the destination. The token value you see in the admin is only shown once; it is hashed with <code>API_TOKEN_SALT</code> in the database, so even with the same DB copy, the salt on the other machine would differ unless you deliberately copy <code>API_TOKEN_SALT</code> and the DB – still not recommended; create new tokens on the new instance.</li>
@@ -203,13 +231,13 @@ npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pr
   <h3>7.2 Import on the destination machine</h3>
   <ol>
     <li>On the <strong>destination</strong>, use the <strong>same project code</strong> (same schema). Place the export file in the project root or note its path.</li>
-    <li>Run:
-      <pre><code>npm run strapi import -- -f ./my-export.tar.gz.enc</code></pre>
+    <li>Run (on Windows use a full path in double quotes):
+      <pre><code>npm run strapi import -- -f "C:\project_workspace\strapi-editorial-template\my-export.tar.gz"</code></pre>
       If the file is encrypted, you will be prompted for the key, or pass it:
-      <pre><code>npm run strapi import -- -f ./my-export.tar.gz.enc -k "your-secure-encryption-key"</code></pre>
+      <pre><code>npm run strapi import -- -f "C:\project_workspace\strapi-editorial-template\my-export.tar.gz.enc" -k "your-secure-encryption-key"</code></pre>
     </li>
     <li>For non-interactive use: <code>--force</code> (and <code>-k</code> for encrypted files):
-      <pre><code>npm run strapi import -- -f ./my-export.tar.gz.enc -k "your-secure-encryption-key" --force</code></pre>
+      <pre><code>npm run strapi import -- -f "C:\project_workspace\strapi-editorial-template\my-export.tar.gz.enc" -k "your-secure-encryption-key" --force</code></pre>
     </li>
     <li>Confirm when asked: the import <strong>deletes all existing data</strong> (database and uploads) before importing.</li>
   </ol>
@@ -271,7 +299,7 @@ npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pr
       <tr><td>Push data to another server</td><td>On source: <code>npm run strapi transfer -- --to https://destination/admin</code> (use destination’s transfer token)</td></tr>
       <tr><td>Pull data from another server</td><td>On destination: <code>npm run strapi transfer -- --from https://source/admin</code> (use source’s transfer token)</td></tr>
       <tr><td>Export to file</td><td><code>npm run strapi export -- -f my-export</code> (add <code>-k KEY</code> or <code>--no-encrypt</code> as needed)</td></tr>
-      <tr><td>Import from file</td><td><code>npm run strapi import -- -f ./my-export.tar.gz.enc</code> (add <code>-k KEY</code>, <code>--force</code> as needed)</td></tr>
+      <tr><td>Import from file</td><td><code>npm run strapi import -- -f "C:\…\my-export.tar.gz"</code> (Windows: use full path in quotes; add <code>-k KEY</code>, <code>--force</code> as needed)</td></tr>
       <tr><td>Deploy to Strapi Cloud</td><td><code>npx strapi login</code> then <code>npx strapi deploy</code></td></tr>
       <tr><td>Transfer into Strapi Cloud</td><td>Create Push token in Cloud admin; on self-hosted: <code>strapi transfer --to https://your-project.strapiapp.com/admin</code></td></tr>
     </tbody>
