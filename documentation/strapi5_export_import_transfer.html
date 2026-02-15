@@ -249,6 +249,90 @@ npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pr
     Import <strong>replaces</strong> the destination database and uploads. Admin users are not in the export; recreate them on the destination after import.
   </div>
 
+  <h3>7.2.1 Preserving publishedAt dates (Editorial Articles)</h3>
+  <p>Strapi import can reset <code>publishedAt</code> to the import date instead of keeping the original publication date from the source. To restore the correct dates <strong>after import</strong>:</p>
+  <ol>
+    <li>Stop Strapi on the destination machine.</li>
+    <li>Run the restore script, passing the path to the export file:
+      <pre><code>npm run restore:article_dates_from_export -- "E:\project_workspace\strapi-editorial-template\my-export-1.tar"</code></pre>
+      Or set the path via environment variable:
+      <pre><code>EXPORT_TAR=my-export-1.tar npm run restore:article_dates_from_export</code></pre>
+    </li>
+    <li>Restart Strapi. Editorial Articles should now show the original <code>publishedAt</code> dates.</li>
+  </ol>
+  <p>The script reads <code>entities/*.jsonl</code> from the export file and updates the <code>articles</code> table for any Editorial Article whose <code>publishedAt</code> differs from the export. Articles are matched by <code>documentId</code> or <code>slug</code>.</p>
+
+  <h2>7.3 Import performance – why it is slow and how to speed it up</h2>
+  <p><code>strapi import</code> is often very slow for large exports (especially those with many assets). A 373 MB export can take <strong>several hours</strong> instead of minutes.</p>
+
+  <h3>Why import is slow</h3>
+  <ul>
+    <li><strong>Known issue</strong> – Reported import speeds of ~20–45 KB/s even for local, unencrypted files.</li>
+    <li><strong>Asset bottleneck</strong> – The import processes each asset file by repeatedly scanning the archive for matching metadata (O(n²) behavior). With thousands of images, this becomes extremely slow.</li>
+    <li><strong>SQLite</strong> – Writes and indexing add overhead, but the main bottleneck is the import implementation, not the database.</li>
+  </ul>
+
+  <h3>What helps today</h3>
+  <table>
+    <thead>
+      <tr><th>Action</th><th>Effect</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Use plain <code>.tar</code> (no compression)</td><td>Faster than <code>.tar.gz</code>; skip decompression during import.</td></tr>
+      <tr><td>Avoid encryption</td><td>Export with <code>--no-encrypt</code>; decryption adds overhead.</td></tr>
+      <tr><td>Try <strong>Transfer</strong> instead</td><td>Stream directly between running instances; may be faster in some setups.</td></tr>
+      <tr><td>Manual copy (advanced)</td><td>Copy the SQLite DB file and <code>public/uploads</code> folder; faster but only when schemas match exactly.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Strapi Cloud and database change</h3>
+  <ul>
+    <li><strong>Strapi Cloud</strong> uses PostgreSQL. Import speed is still limited by the same bottleneck; expect similar runtimes until the fix is merged.</li>
+    <li><strong>Switching to PostgreSQL</strong> locally can improve general DB performance but does <strong>not</strong> fix the slow asset import. The bottleneck is in the import logic, not the database.</li>
+  </ul>
+
+  <h3>PR #25268 – “fix: implement asset metadata cache”</h3>
+  <p>An open community PR addresses the main cause of slow imports by caching asset metadata up front (O(n) instead of O(n²)).</p>
+  <ul>
+    <li><strong>PR:</strong> <a href="https://github.com/strapi/strapi/pull/25268" target="_blank" rel="noopener">https://github.com/strapi/strapi/pull/25268</a></li>
+    <li><strong>Result for one user:</strong> ~25k assets (~3 GB): 18 KB/s → ~118 MB/s; import time from hours to ~27 seconds.</li>
+    <li><strong>Status:</strong> Open (as of early 2026); not yet merged into Strapi.</li>
+  </ul>
+
+  <h3>Applying PR #25268 locally (advanced)</h3>
+  <p>If you are comfortable building from source, you can apply the PR to your Strapi installation. This requires Node.js, Yarn, and Git.</p>
+  <ol>
+    <li><strong>Clone the Strapi monorepo</strong> (use a sibling directory to your project):
+      <pre><code>cd E:\project_workspace
+git clone https://github.com/strapi/strapi.git strapi-source
+cd strapi-source</code></pre>
+    </li>
+    <li><strong>Fetch and checkout the PR branch</strong>:
+      <pre><code>git fetch origin pull/25268/head:fix/slow-assets-import
+git checkout fix/slow-assets-import</code></pre>
+    </li>
+    <li><strong>Install dependencies and build</strong> (this can take several minutes):
+      <pre><code>yarn install
+yarn build</code></pre>
+      If <code>yarn build</code> fails or is slow, try building only the data-transfer package:
+      <pre><code>cd packages/core/data-transfer
+yarn build
+cd ../../..</code></pre>
+    </li>
+    <li><strong>Link the patched package into your Strapi project</strong>:
+      <pre><code>cd packages/core/data-transfer
+yarn link
+cd E:\project_workspace\strapi-editorial-template
+yarn link @strapi/data-transfer</code></pre>
+    </li>
+    <li><strong>Run the import</strong> in your project:
+      <pre><code>npm run strapi import -- -f "E:\project_workspace\strapi-editorial-template\my-export-1.tar" --force</code></pre>
+    </li>
+  </ol>
+  <div class="warn">
+    <strong>Caveats:</strong> The linked package may not match your Strapi version exactly. If you see errors, revert with <code>yarn unlink @strapi/data-transfer</code> and <code>yarn install</code>. Re-apply the link after every <code>npm install</code> or <code>yarn install</code> in your project. Check the PR page for updates and whether it has been merged.
+  </div>
+
   <h2>8. What is included / excluded</h2>
   <table>
     <thead>
@@ -304,6 +388,7 @@ npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pr
       <tr><td>Pull data from another server</td><td>On destination: <code>npm run strapi transfer -- --from https://source/admin</code> (use source’s transfer token)</td></tr>
       <tr><td>Export to file</td><td><code>npm run strapi export -- -f my-export</code> (add <code>-k KEY</code> or <code>--no-encrypt</code> as needed)</td></tr>
       <tr><td>Import from file</td><td><code>npm run strapi import -- -f "C:\…\my-export.tar.gz"</code> (Windows: use full path in quotes; add <code>-k KEY</code>, <code>--force</code> as needed)</td></tr>
+      <tr><td>Restore publishedAt after import</td><td><code>npm run restore:article_dates_from_export</code> (set <code>EXPORT_TAR=path\to\export.tar</code> or pass path as arg)</td></tr>
       <tr><td>Deploy to Strapi Cloud</td><td><code>npx strapi login</code> then <code>npx strapi deploy</code></td></tr>
       <tr><td>Transfer into Strapi Cloud</td><td>Create Push token in Cloud admin; on self-hosted: <code>strapi transfer --to https://your-project.strapiapp.com/admin</code></td></tr>
     </tbody>
@@ -316,6 +401,7 @@ npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pr
     <li><a href="https://docs.strapi.io/cms/data-management/import" target="_blank" rel="noopener">Data import (Strapi 5)</a></li>
     <li><a href="https://docs.strapi.io/cms/features/data-management" target="_blank" rel="noopener">Data Management feature (transfer tokens)</a></li>
     <li><a href="https://docs.strapi.io/cloud/getting-started/deployment-cli" target="_blank" rel="noopener">Strapi Cloud – Deployment with CLI</a></li>
+    <li><a href="https://github.com/strapi/strapi/pull/25268" target="_blank" rel="noopener">PR #25268 – Import performance fix (asset metadata cache)</a></li>
   </ul>
 </body>
 </html>
