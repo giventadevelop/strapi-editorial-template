@@ -415,3 +415,28 @@ Check that `data[0].cover` is an object with `url`, `alternativeText`, etc. If `
 |-------|-----|
 | Cover not populated | Add `populate=cover` (or `populate[0]=cover`) to the articles API request |
 | Relative URL not resolved | Prepend `STRAPI_URL` (e.g. `http://localhost:1337`) to `cover.url` when rendering images |
+
+---
+
+## 9. Rendering Article Description (Rich Text Blocks)
+
+The article `description` field is **Rich Text (Blocks)**. The API returns it as an **array of blocks**, not a string. If the frontend renders it as plain text, everything will appear as one line and images will show as raw links.
+
+### Use a block renderer (React)
+
+Install the official renderer and pass `article.description` as `content`:
+
+```bash
+npm install @strapi/blocks-react-renderer react react-dom
+```
+
+```jsx
+import { BlocksRenderer, type BlocksContent } from '@strapi/blocks-react-renderer';
+
+// article.description is blocks or null
+const content: BlocksContent = article?.description ?? [];
+
+<BlocksRenderer content={content} />
+```
+
+This renders paragraphs, headings, lists, **images**, and links correctly. For full editor and frontend guidance (including why Markdown image syntax does not render as images), see **[documentation/rich_text_description_guide.md](rich_text_description_guide.md)**.

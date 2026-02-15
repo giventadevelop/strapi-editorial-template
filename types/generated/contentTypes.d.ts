@@ -524,10 +524,7 @@ export interface ApiArticleArticle extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    description: Schema.Attribute.Text &
-      Schema.Attribute.SetMinMaxLength<{
-        maxLength: 2048;
-      }>;
+    description: Schema.Attribute.RichText;
     isFeatured: Schema.Attribute.Boolean &
       Schema.Attribute.SetPluginOptions<{
         'content-manager': {

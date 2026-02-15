@@ -391,7 +391,7 @@
                     <table>
                         <tr><th>Field</th><th>Required</th><th>Description</th></tr>
                         <tr><td>title</td><td>Yes</td><td>Article headline</td></tr>
-                        <tr><td>description</td><td>No</td><td>Short excerpt (max 80 chars)</td></tr>
+                        <tr><td>description</td><td>No</td><td>Rich text: paragraphs, bold, lists, images. Use the toolbar <strong>Insert image</strong> for images (do not paste Markdown like <code>![...](url)</code> or it will show as text).</td></tr>
                         <tr><td>slug</td><td>Auto</td><td>Click refresh icon to generate from title</td></tr>
                         <tr><td>cover</td><td>No</td><td>Upload cover image</td></tr>
                         <tr><td>author</td><td>No</td><td>Select an Author</td></tr>
@@ -400,6 +400,7 @@
                         <tr><td>isFeatured</td><td>No</td><td>Leave unchecked for regular main news</td></tr>
                         <tr><td>blocks</td><td>No</td><td>Add rich content (text, images, quotes, etc.)</td></tr>
                     </table>
+                    <p class="note"><strong>Description (rich text):</strong> Use the toolbar to format text. In Strapi 5, <strong>Insert image</strong> (asset dialog) inserts a link to the image, not an embedded image — you will see the link text in the editor. To have images display as actual images, use <strong>blocks</strong> below: click "+ Add a component to blocks" and add a <strong>Media</strong> component for each image. Use Enter for new paragraphs so they render correctly on the frontend. See <a href="../rich_text_description_guide.md">Rich text description guide</a> for details.</p>
                 </li>
                 <li class="step"><span class="step-num">Step 4.</span> In the right panel, click <strong>Publish</strong> to make the article live. Until published, it will not appear on the frontend.</li>
             </ol>
