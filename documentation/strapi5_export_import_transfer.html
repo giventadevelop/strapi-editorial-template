@@ -249,8 +249,8 @@ npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pr
     Import <strong>replaces</strong> the destination database and uploads. Admin users are not in the export; recreate them on the destination after import.
   </div>
 
-  <h3>7.2.1 Preserving publishedAt dates (Editorial Articles)</h3>
-  <p>Strapi import can reset <code>publishedAt</code> to the import date instead of keeping the original publication date from the source. To restore the correct dates <strong>after import</strong>:</p>
+  <h3>7.2.1 Preserving publishedAt dates (Editorial Articles / news)</h3>
+  <p>Strapi import can reset <code>publishedAt</code> to the import date instead of keeping the original publication date from the source. To restore the correct dates for articles/news <strong>after import</strong>:</p>
   <ol>
     <li>Stop Strapi on the destination machine.</li>
     <li>Run the restore script, passing the path to the export file:
@@ -258,9 +258,9 @@ npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pr
       Or set the path via environment variable:
       <pre><code>EXPORT_TAR=my-export-1.tar npm run restore:article_dates_from_export</code></pre>
     </li>
-    <li>Restart Strapi. Editorial Articles should now show the original <code>publishedAt</code> dates.</li>
+    <li>Restart Strapi. Editorial Articles (news) should now show the original <code>publishedAt</code> dates.</li>
   </ol>
-  <p>The script reads <code>entities/*.jsonl</code> from the export file and updates the <code>articles</code> table for any Editorial Article whose <code>publishedAt</code> differs from the export. Articles are matched by <code>documentId</code> or <code>slug</code>.</p>
+  <p>The script reads <code>entities/*.jsonl</code> from the export file and updates the <code>articles</code> table for any Editorial Article (news) whose <code>publishedAt</code> differs from the export. Articles/news are matched by <code>documentId</code> or <code>slug</code>.</p>
 
   <h2>7.3 Import performance – why it is slow and how to speed it up</h2>
   <p><code>strapi import</code> is often very slow for large exports (especially those with many assets). A 373 MB export can take <strong>several hours</strong> instead of minutes.</p>
@@ -388,7 +388,7 @@ yarn link @strapi/data-transfer</code></pre>
       <tr><td>Pull data from another server</td><td>On destination: <code>npm run strapi transfer -- --from https://source/admin</code> (use source’s transfer token)</td></tr>
       <tr><td>Export to file</td><td><code>npm run strapi export -- -f my-export</code> (add <code>-k KEY</code> or <code>--no-encrypt</code> as needed)</td></tr>
       <tr><td>Import from file</td><td><code>npm run strapi import -- -f "C:\…\my-export.tar.gz"</code> (Windows: use full path in quotes; add <code>-k KEY</code>, <code>--force</code> as needed)</td></tr>
-      <tr><td>Restore publishedAt after import</td><td><code>npm run restore:article_dates_from_export</code> (set <code>EXPORT_TAR=path\to\export.tar</code> or pass path as arg)</td></tr>
+      <tr><td>Restore publishedAt after import (articles/news)</td><td><code>npm run restore:article_dates_from_export</code> (set <code>EXPORT_TAR=path\to\export.tar</code> or pass path as arg)</td></tr>
       <tr><td>Deploy to Strapi Cloud</td><td><code>npx strapi login</code> then <code>npx strapi deploy</code></td></tr>
       <tr><td>Transfer into Strapi Cloud</td><td>Create Push token in Cloud admin; on self-hosted: <code>strapi transfer --to https://your-project.strapiapp.com/admin</code></td></tr>
     </tbody>
