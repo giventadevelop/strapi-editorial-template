@@ -21,7 +21,7 @@ Four scripts support the workflow:
 
 ## Prerequisites
 
-- Local clone of catholicatenews.in at `E:\project_workspace\catholicatenews-in-temp` (or set `STRAPI_NEWS_CLONE_DIR`)
+- Local clone of catholicatenews.in at `E:\project_workspace\catholicatenews-in-temp` (pass as CLI arg or set `STRAPI_NEWS_CLONE_DIR`)
 - Strapi project with Article and Category content types
 - npm dependencies: `cheerio`, `dotenv`, `mime-types`
 
@@ -35,7 +35,7 @@ The import extracts the published date from the source HTML (`<time class="entry
 
 If you previously imported and all articles show today's date on the frontend, delete articles and re-run the seed:
 1. `npm run delete:articles`
-2. `npm run seed:news_catholicatenews`
+2. `npm run seed:news_catholicatenews -- "E:\path\to\catholicatenews-in-temp"`
 
 ## Post-Import: Frontend Cover Images
 

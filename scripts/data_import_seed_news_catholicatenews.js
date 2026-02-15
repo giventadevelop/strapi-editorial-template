@@ -5,9 +5,12 @@
  * Parses articles from category pages (main-news, featured-news, press-release, most-read).
  * Max 30 articles per category. Tenant: tenant_demo_002 (editorial).
  *
- * Config from .env: STRAPI_NEWS_CLONE_DIR (default E:\project_workspace\catholicatenews-in-temp), TENANT_ID
+ * Source directory: first CLI arg, or STRAPI_NEWS_CLONE_DIR env, or default below.
+ * Config from .env: TENANT_ID
  * Optional: STRAPI_NEWS_FETCH_MISSING=1 to fetch missing category pages from https://catholicatenews.in/
- * Run: npm run seed:news_catholicatenews
+ *
+ * Run: npm run seed:news_catholicatenews -- "E:\path\to\catholicatenews-in-temp"
+ *   or: STRAPI_NEWS_CLONE_DIR=/path/to/clone npm run seed:news_catholicatenews
  */
 
 try {
@@ -814,12 +817,15 @@ async function runImport(strapi, cloneDir, tenantDoc) {
 }
 
 async function main() {
-  const cloneDir = path.resolve(process.env.STRAPI_NEWS_CLONE_DIR || DEFAULT_CLONE_DIR);
+  const cloneDir = path.resolve(
+    process.argv[2] || process.env.STRAPI_NEWS_CLONE_DIR || DEFAULT_CLONE_DIR
+  );
   const tenantId = process.env.TENANT_ID || DEFAULT_TENANT_ID;
 
   if (!fs.existsSync(cloneDir)) {
     console.error('Clone directory not found:', cloneDir);
-    console.error('Set STRAPI_NEWS_CLONE_DIR in .env (e.g. E:\\project_workspace\\catholicatenews-in-temp)');
+    console.error('Usage: npm run seed:news_catholicatenews -- "E:\\path\\to\\catholicatenews-in-temp"');
+    console.error('   or: STRAPI_NEWS_CLONE_DIR=/path/to/clone npm run seed:news_catholicatenews');
     process.exit(1);
   }
 

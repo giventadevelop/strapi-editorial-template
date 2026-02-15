@@ -7,6 +7,9 @@
  * Directory – Bishops, Dioceses, Entries, Churches, Priests, Parishes, etc.
  * Admin auth may run after global middlewares, so we resolve user from ctx.state
  * or from the Bearer token when state is not set.
+ *
+ * Also patches the configuration response for Article so the list view always
+ * receives "publishedAt" in layouts.list (Published at column).
  */
 
 const requestContext = require('../../utils/request-context');
@@ -86,7 +89,107 @@ function addFiltersClause(params, filtersClause) {
   params.filters.$and.push(filtersClause);
 }
 
+const ARTICLE_UID = 'api::article.article';
+
+/**
+ * Ensure Article list API response includes publishedAt for each document
+ * (sanitizeOutput or list field selection may omit it).
+ * Strapi 5 DB uses document_id and published_at; query engine may expose camelCase.
+ */
+async function ensureArticleListPublishedAt(results) {
+  if (!Array.isArray(results) || results.length === 0) return;
+  const documentIds = [...new Set(results.map((r) => r.documentId).filter((id) => id != null))];
+  if (documentIds.length === 0) return;
+
+  const byDocId = new Map();
+  let rows = await strapi.db.query(ARTICLE_UID).findMany({
+    where: { documentId: { $in: documentIds } },
+    select: ['documentId', 'publishedAt'],
+  });
+  if (!rows?.length) {
+    rows = await strapi.db.query(ARTICLE_UID).findMany({
+      where: { document_id: { $in: documentIds } },
+      select: ['document_id', 'published_at'],
+    }) || [];
+  }
+  rows.forEach((r) => {
+    const id = r.documentId ?? r.document_id;
+    const at = r.publishedAt ?? r.published_at;
+    if (id == null) return;
+    const existing = byDocId.get(id);
+    if (at != null || existing === undefined) byDocId.set(id, at);
+  });
+
+  let setCount = 0;
+  results.forEach((doc) => {
+    if (doc.documentId == null) return;
+    const val = byDocId.get(doc.documentId);
+    if (val !== undefined) {
+      doc.publishedAt = val;
+      setCount += 1;
+    }
+  });
+  if (setCount > 0) {
+    strapi.log.info(`Article list: injected publishedAt for ${setCount}/${results.length} documents`);
+  }
+}
+
+function sortArticleResultsByPublishedAt(results, sortOrder) {
+  if (!Array.isArray(results) || results.length === 0) return;
+  const desc = /^publishedAt:DESC$/i.test(sortOrder);
+  results.sort((a, b) => {
+    const ta = a.publishedAt != null ? new Date(a.publishedAt).getTime() : null;
+    const tb = b.publishedAt != null ? new Date(b.publishedAt).getTime() : null;
+    if (ta == null && tb == null) return 0;
+    if (ta == null) return desc ? -1 : 1;
+    if (tb == null) return desc ? 1 : -1;
+    return desc ? tb - ta : ta - tb;
+  });
+}
+
 module.exports = (plugin) => {
+  // ----- Article list: ensure find() response includes publishedAt and correct sort -----
+  const collectionTypesController = plugin.controllers && plugin.controllers['collection-types'];
+  if (collectionTypesController && typeof collectionTypesController.find === 'function') {
+    const originalFind = collectionTypesController.find.bind(collectionTypesController);
+    collectionTypesController.find = async (ctx) => {
+      await originalFind(ctx);
+      if (ctx.params?.model !== ARTICLE_UID || !ctx.body?.results) return;
+      await ensureArticleListPublishedAt(ctx.body.results);
+      const sortParam = ctx.request?.query?.sort;
+      if (typeof sortParam === 'string' && /^publishedAt:(ASC|DESC|asc|desc)$/i.test(sortParam)) {
+        sortArticleResultsByPublishedAt(ctx.body.results, sortParam);
+      }
+    };
+  }
+
+  // ----- Article list view: always return publishedAt in configuration so "Published at" column appears -----
+  const contentTypesController = plugin.controllers && plugin.controllers['content-types'];
+  if (contentTypesController && typeof contentTypesController.findContentTypeConfiguration === 'function') {
+    const original = contentTypesController.findContentTypeConfiguration.bind(contentTypesController);
+    contentTypesController.findContentTypeConfiguration = async (ctx) => {
+      await original(ctx);
+      const ct = ctx.body && ctx.body.data && ctx.body.data.contentType;
+      if (ct && ct.uid === 'api::article.article' && ct.layouts) {
+        const list = Array.isArray(ct.layouts.list) ? ct.layouts.list : [];
+        if (!list.includes('publishedAt')) {
+          ct.layouts.list = [...list, 'publishedAt'];
+          ct.metadatas = ct.metadatas || {};
+          ct.metadatas.publishedAt = {
+            ...ct.metadatas.publishedAt,
+            list: {
+              label: 'publishedAt',
+              searchable: false,
+              sortable: true,
+              ...(ct.metadatas.publishedAt && ct.metadatas.publishedAt.list),
+            },
+          };
+          strapi.log.info('Article list config: injected publishedAt into layouts.list (extension)');
+        }
+      }
+    };
+  }
+
   const originalPermissionChecker = plugin.services['permission-checker'];
   if (typeof originalPermissionChecker !== 'function') {
     console.warn('content-manager-tenant: permission-checker service not a function, skipping extension');
@@ -106,6 +209,10 @@ module.exports = (plugin) => {
       const originalRead = checker.sanitizedQuery.read.bind(checker.sanitizedQuery);
       checker.sanitizedQuery.read = async (query) => {
         const permissionQuery = await originalRead(query);
+
+        if (opts.model === ARTICLE_UID && typeof query?.sort === 'string' && /^publishedAt:(ASC|DESC|asc|desc)$/i.test(query.sort)) {
+          permissionQuery.sort = query.sort;
+        }
 
         const userId = await getAdminUserIdFromContext();
         const tenant = await resolveEditorTenantFromUser(userId);

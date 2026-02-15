@@ -25,7 +25,7 @@
 
   <h2>Prerequisites</h2>
   <ol>
-    <li><strong>Local clone</strong> of catholicatenews.in (set <code>STRAPI_NEWS_CLONE_DIR</code> in <code>.env</code>, default: <code>E:\project_workspace\catholicatenews-in-temp</code>).</li>
+    <li><strong>Local clone</strong> of catholicatenews.in (pass as CLI arg, or <code>STRAPI_NEWS_CLONE_DIR</code> env, or default: <code>E:\project_workspace\catholicatenews-in-temp</code>).</li>
     <li><strong>Strapi</strong> project with Article and Category content types and multi-tenant setup.</li>
     <li><strong>cheerio</strong>, <strong>dotenv</strong>, <strong>mime-types</strong>: run <code>npm install</code> in the project root.</li>
   </ol>
@@ -49,7 +49,7 @@
       <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>STRAPI_NEWS_CLONE_DIR</code></td><td><code>E:\project_workspace\catholicatenews-in-temp</code></td><td>Path to the catholicatenews.in clone.</td></tr>
+      <tr><td>CLI arg or <code>STRAPI_NEWS_CLONE_DIR</code></td><td><code>E:\project_workspace\catholicatenews-in-temp</code></td><td>Path to the catholicatenews.in clone.</td></tr>
       <tr><td><code>TENANT_ID</code></td><td><code>tenant_demo_002</code></td><td>Editorial tenant for imported articles.</td></tr>
       <tr><td><code>STRAPI_NEWS_FETCH_MISSING</code></td><td>—</td><td>Set to <code>1</code> to fetch missing category pages from <code>https://catholicatenews.in/</code>.</td></tr>
       <tr><td><code>EXPORT_OUTPUT_PATH</code></td><td><code>exports/news_tenant_demo_002_YYYYMMDD.json</code></td><td>Output path for export script (export only).</td></tr>
@@ -69,15 +69,12 @@
   <p>Run with Strapi stopped or from another terminal.</p>
 
   <h3>3. Seed from legacy clone</h3>
-  <pre><code>npm run seed:news_catholicatenews</code></pre>
-  <p>Or with env overrides:</p>
-  <pre><code># Windows (PowerShell)
-$env:STRAPI_NEWS_CLONE_DIR = "E:\project_workspace\catholicatenews-in-temp"
-$env:TENANT_ID = "tenant_demo_002"
-node scripts/data_import_seed_news_catholicatenews.js
+  <pre><code># Pass clone path as CLI arg (recommended)
+npm run seed:news_catholicatenews -- "E:\project_workspace\catholicatenews-in-temp"
 
-# Linux / macOS
-STRAPI_NEWS_CLONE_DIR=/path/to/clone TENANT_ID=tenant_demo_002 node scripts/data_import_seed_news_catholicatenews.js</code></pre>
+# Or use env
+STRAPI_NEWS_CLONE_DIR=E:\project_workspace\catholicatenews-in-temp npm run seed:news_catholicatenews</code></pre>
+  <p>Optional: <code>TENANT_ID=tenant_demo_002</code> (default) to override tenant.</p>
 
   <h2>Category pages and traversal</h2>
   <p>The seed script reads from:</p>

@@ -57,7 +57,9 @@
       "type": "integer",
       "default": 0,
       "pluginOptions": {
-        "content-manager": { "visible": false }
+        "content-manager": {
+          "visible": false
+        }
       }
     },
     "isFeatured": {
@@ -65,12 +67,23 @@
       "default": false,
       "description": "Show in Featured News section",
       "pluginOptions": {
-        "content-manager": { "visible": false }
+        "content-manager": {
+          "visible": false
+        }
       }
     },
     "blocks": {
       "type": "dynamiczone",
       "components": ["shared.media", "shared.quote", "shared.rich-text", "shared.slider"]
+    },
+    "publishedAt": {
+      "type": "datetime",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": true
+        }
+      },
+      "description": "Date when the article was published"
     }
   }
 }

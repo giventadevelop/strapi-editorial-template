@@ -45,16 +45,20 @@ async function extractArticleDatesFromExport(tarPath) {
         for (const line of content.split('\n').filter(Boolean)) {
           try {
             const e = JSON.parse(line);
-            if (e && e.type === ARTICLE_UID && e.data) {
-              const { documentId, slug, publishedAt, createdAt } = e.data;
-              if (documentId && publishedAt) {
-                articles.push({
-                  documentId,
-                  slug: slug || null,
-                  publishedAt: typeof publishedAt === 'string' ? publishedAt : null,
-                  createdAt: typeof createdAt === 'string' ? createdAt : null,
-                });
-              }
+            const uid = e?.ref ?? e?.type;
+            if (!e || uid !== ARTICLE_UID) continue;
+            const data = e.data ?? e.attributes ?? e;
+            const documentId = data.documentId ?? data.document_id;
+            const slug = data.slug ?? null;
+            const publishedAt = data.publishedAt ?? data.published_at;
+            const createdAt = data.createdAt ?? data.created_at;
+            if (documentId && publishedAt) {
+              articles.push({
+                documentId: String(documentId),
+                slug: slug ? String(slug) : null,
+                publishedAt: typeof publishedAt === 'string' ? publishedAt : (publishedAt ? new Date(publishedAt).toISOString() : null),
+                createdAt: typeof createdAt === 'string' ? createdAt : (createdAt ? new Date(createdAt).toISOString() : null),
+              });
             }
           } catch (_) {}
         }
@@ -73,14 +77,25 @@ async function restoreDates(strapi, articles) {
   if (!articles.length) return 0;
   const db = strapi.db.connection;
 
-  // Build map: documentId -> article
+  // Build map: documentId -> article. When export has duplicates (draft+published),
+  // prefer the earliest publishedAt (original date; later is often the import date).
   const byDocId = new Map();
-  for (const a of articles) byDocId.set(a.documentId, a);
+  for (const a of articles) {
+    const existing = byDocId.get(a.documentId);
+    if (!existing || (a.publishedAt && existing.publishedAt && a.publishedAt < existing.publishedAt)) {
+      byDocId.set(a.documentId, a);
+    }
+  }
 
   // Fallback map: slug -> article (if documentIds don't match after import)
   const bySlug = new Map();
   for (const a of articles) {
-    if (a.slug) bySlug.set(a.slug, a);
+    if (a.slug) {
+      const existing = bySlug.get(a.slug);
+      if (!existing || (a.publishedAt && existing.publishedAt && a.publishedAt < existing.publishedAt)) {
+        bySlug.set(a.slug, a);
+      }
+    }
   }
 
   // Get all article rows from DB (published rows have published_at)
@@ -88,6 +103,8 @@ async function restoreDates(strapi, articles) {
   let updated = 0;
 
   for (const row of rows || []) {
+    // Only update published rows (draft rows have published_at null)
+    if (row.published_at == null) continue;
     const docId = row.document_id;
     const slug = row.slug;
     const source = byDocId.get(docId) || (slug ? bySlug.get(slug) : null);

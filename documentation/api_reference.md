@@ -440,3 +440,20 @@ const content: BlocksContent = article?.description ?? [];
 ```
 
 This renders paragraphs, headings, lists, **images**, and links correctly. For full editor and frontend guidance (including why Markdown image syntax does not render as images), see **[documentation/rich_text_description_guide.md](rich_text_description_guide.md)**.
+
+---
+
+## 10. Admin panel – Article published date (list and edit view)
+
+The **published date** (`publishedAt`) is shown in the Content Manager for Articles; it is **not** controlled by "Configure the view" or the settings dialog.
+
+- **List view** (`/admin/content-manager/collection-types/api::article.article`): a **Published at** column is injected so you see the date in the table.
+- **Edit view** (draft/published page): a **Published at** panel appears in the right sidebar next to the draft/published status.
+
+**Server:** The configuration API response for Article is mutated so the list layout includes `publishedAt`:
+- **`src/middlewares/content-manager-article-published-at.js`** – runs after the route and injects `publishedAt` into the response of `GET .../content-types/api::article.article/configuration`.
+- **`src/extensions/content-manager/strapi-server.js`** – also patches the controller as a fallback.
+
+**Admin:** **`src/admin/app.js`** uses the `Admin/CM/pages/ListView/inject-column-in-table` hook (adds the list column) and `addEditViewSidePanel` (adds the edit sidebar panel).
+
+**To see the column:** (1) Restart Strapi so the new middleware loads. (2) Run **`npm run build`** so the admin bundle includes `src/admin/app.js`; then hard-refresh the Article list in the browser. If you only restart and do not rebuild, the list column will not appear.

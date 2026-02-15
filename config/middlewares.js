@@ -19,6 +19,7 @@ module.exports = [
   'global::request-context', // store request ctx for tenant injection in lifecycles
   'global::content-manager-article-relation', // Editor: request more articles in list/relation picker
   'global::content-manager-hide-tenant', // hide tenant/views/isFeatured for Editor UI
+  'global::content-manager-article-published-at', // inject publishedAt into Article list configuration response
   'strapi::session',
   'strapi::favicon',
   'strapi::public',

@@ -716,55 +716,105 @@ async function ensureFlashNewsItemTitleFirst() {
 }
 
 /**
- * Ensure createdAt and publishedAt are visible in Article edit layout.
- * Super Admin can see these timestamps; the gear-icon Configure view may not persist layout
- * changes, so we add them programmatically.
+ * Ensure Article list view shows publishedAt column and is sorted by publishedAt (newest first).
+ * Writes to the same store/key the content-manager server uses so the configuration API
+ * returns the list layout with publishedAt (key: configuration_content_types::api::article.article).
  */
-async function ensureArticleDateFieldsInEditLayout() {
+async function ensureArticleListSortAndColumns() {
   const uid = 'api::article.article';
-  const dateFields = ['createdAt', 'publishedAt'];
+  const storeKey = `content_types::${uid}`;
+  const configKey = `configuration_${storeKey}`;
   try {
-    const store = strapi.store({ type: 'plugin', name: 'content-manager' });
-    const config = (await store.get({ key: 'configuration' })) || {};
-    const contentTypesConfig = config.content_types || {};
-    let ct = contentTypesConfig[uid];
-    if (!ct) {
-      contentTypesConfig[uid] = ct = {};
+    const store = strapi.store({ type: 'plugin', name: 'content_manager' });
+    const config = (await store.get({ key: configKey })) || {};
+
+    let updated = false;
+
+    // List layout: array of attribute names (strings). Add publishedAt if missing.
+    const listLayout = config.layouts?.list ?? [];
+    const listCols = Array.isArray(listLayout) ? listLayout : [];
+    if (!listCols.includes('publishedAt')) {
+      config.layouts = config.layouts || { list: [], edit: [] };
+      config.layouts.list = [...listCols, 'publishedAt'];
+      updated = true;
     }
-    if (!ct.edit) ct.edit = {};
-    const edit = ct.edit;
-    const layouts = edit.layouts || edit.layout;
-    const rows = Array.isArray(layouts) ? layouts : [];
 
-    const hasField = (name) => {
-      for (const row of rows) {
-        if (!Array.isArray(row)) continue;
-        if (row.some((c) => (c?.name ?? c?.field) === name)) return true;
-      }
-      return false;
-    };
-
-    const toAdd = dateFields.filter((f) => !hasField(f));
-    if (toAdd.length === 0) return;
-
-    const newCells = toAdd.map((name) => ({ name }));
-    if (rows.length > 0) {
-      rows.push(newCells);
-    } else {
-      rows.push(newCells);
+    // Settings: defaultSortBy and defaultSortOrder
+    config.settings = config.settings || {};
+    if (config.settings.defaultSortBy !== 'publishedAt' || config.settings.defaultSortOrder !== 'DESC') {
+      config.settings.defaultSortBy = 'publishedAt';
+      config.settings.defaultSortOrder = 'DESC';
+      updated = true;
     }
-    edit.layouts = rows;
 
-    await store.set({ key: 'configuration', value: config });
-    strapi.log.info(
-      `Content Manager: added ${toAdd.join(', ')} to Article edit layout`
-    );
+    // Ensure publishedAt has metadata so list view can render the column
+    config.metadatas = config.metadatas || {};
+    config.metadatas.publishedAt = config.metadatas.publishedAt || {};
+    config.metadatas.publishedAt.list = config.metadatas.publishedAt.list || {};
+    if (config.metadatas.publishedAt.list.label !== 'publishedAt') {
+      config.metadatas.publishedAt.list = {
+        label: 'publishedAt',
+        searchable: false,
+        sortable: true,
+        ...config.metadatas.publishedAt.list,
+      };
+      config.metadatas.publishedAt.edit = config.metadatas.publishedAt.edit || {};
+      config.metadatas.publishedAt.edit.visible = true;
+      updated = true;
+    }
+
+    if (updated) {
+      await store.set({ key: configKey, value: config });
+      strapi.log.info(
+        'Content Manager: Article list sort=publishedAt:desc, publishedAt column and edit visible'
+      );
+    }
   } catch (err) {
     strapi.log.warn(
-      'Could not add date fields to Article edit layout:',
+      'Could not set Article list sort/columns:',
       err.message
     );
   }
+}
+
+/**
+ * Note: publishedAt for Article list view is injected in the content-manager
+ * extension (strapi-server.js) by patching findContentTypeConfiguration.
+ */
+
+/**
+ * When re-publishing, refresh published_at to NOW so the item stays in "Last Published Entries".
+ * Runs in the background so the publish response returns immediately (fixes spinning button).
+ * Set DISABLE_PUBLISH_DATE_REFRESH=1 in .env to turn off if it causes frontend 404s.
+ */
+function registerPublishDateRefreshMiddleware() {
+  if (process.env.DISABLE_PUBLISH_DATE_REFRESH === '1' || process.env.DISABLE_PUBLISH_DATE_REFRESH === 'true') {
+    return;
+  }
+  strapi.documents.use(async (context, next) => {
+    const doc = await next();
+    if (context.action !== 'publish' || !doc?.documentId) return doc;
+    const uid = context.uid;
+    const documentId = doc.documentId;
+    setImmediate(() => {
+      (async () => {
+        try {
+          const ct = strapi.contentType(uid);
+          if (ct?.options?.draftAndPublish && ct?.collectionName) {
+            const now = new Date().toISOString();
+            const db = strapi.db.connection;
+            await db(ct.collectionName)
+              .where({ document_id: documentId })
+              .whereNotNull('published_at')
+              .update({ published_at: now });
+          }
+        } catch (e) {
+          strapi.log.warn('Could not refresh published_at on publish:', e.message);
+        }
+      })();
+    });
+    return doc;
+  });
 }
 
 module.exports = async () => {
@@ -774,6 +824,7 @@ module.exports = async () => {
   await ensureEditorTenantScopedPermissions();
   await hideTenantFieldInContentManagerLayout();
   await ensureFlashNewsItemTitleFirst();
-  await ensureArticleDateFieldsInEditLayout();
+  await ensureArticleListSortAndColumns();
+  registerPublishDateRefreshMiddleware();
   await registerTenantDocumentMiddleware();
 };
