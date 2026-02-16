@@ -3,29 +3,56 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Strapi 5 installation, export, import, and transfer guide for Windows. Environment variables, upload plugin config, and data migration.">
   <title>Strapi 5 – Install (Windows), Export, Import, Transfer &amp; .env</title>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
-    h1 { color: #1a1a1a; border-bottom: 2px solid #4945ff; padding-bottom: 0.5rem; }
-    h2 { color: #2d2d2d; margin-top: 2rem; }
-    h3 { color: #3d3d3d; margin-top: 1.5rem; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { font-size: 2.5em; color: #1a1a1a; border-bottom: 3px solid #0066cc; padding-bottom: 0.5rem; }
+    h2 { font-size: 1.8em; color: #2d2d2d; margin-top: 2rem; border-left: 4px solid #0066cc; padding-left: 15px; }
+    h3 { font-size: 1.4em; color: #333; margin-top: 1.5rem; }
+    h4 { font-size: 1.2em; color: #555; }
     ul, ol { margin: 0.5rem 0; }
     li { margin: 0.25rem 0; }
-    code, pre { background: #f5f5f5; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
-    pre { padding: 1rem; overflow-x: auto; white-space: pre-wrap; border: 1px solid #e0e0e0; }
-    a { color: #4945ff; }
-    .note { background: #f0f4ff; border-left: 4px solid #4945ff; padding: 0.75rem 1rem; margin: 1rem 0; }
-    .warn { background: #fff8e6; border-left: 4px solid #e6b800; padding: 0.75rem 1rem; margin: 1rem 0; }
-    .caution { background: #ffebee; border-left: 4px solid #d32f2f; padding: 0.75rem 1rem; margin: 1rem 0; }
-    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-    th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; }
-    th { background: #f5f5f5; }
+    code { background-color: #e8f4f8 !important; color: #0d3b66 !important; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; border: 1px solid #b8d4e3; }
+    pre, pre code,
+    .command-wrap pre, .command-wrap pre code,
+    ol pre, ol pre code, ul pre, ul pre code, li pre, li pre code, div pre, div pre code {
+      background-color: #e8f4f8 !important; color: #0d3b66 !important; border-color: #b8d4e3;
+    }
+    pre { padding: 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 4px; margin: 15px 0; position: relative; border: 1px solid #b8d4e3; }
+    pre code { background-color: transparent !important; color: #0d3b66 !important; padding: 0; }
+    .command-wrap { position: relative; margin: 15px 0; }
+    .command-wrap .copy-btn {
+      position: absolute; top: 8px; right: 8px; z-index: 1;
+      background-color: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px;
+      cursor: pointer; font-size: 0.85em; font-weight: bold; transition: all 0.3s ease;
+    }
+    .command-wrap .copy-btn:hover { background-color: #0052a3; }
+    .command-wrap .copy-btn.copied { background-color: #28a745; }
+    a { color: #0066cc; }
+    .note, .info { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .caution { background: #f8d7da; border-left: 4px solid #dc3545; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .note code, .note .code-highlight, .info code, .info .code-highlight,
+    .warn code, .warn .code-highlight, .caution code, .caution .code-highlight {
+      background-color: #e8f4f8; color: #0d3b66; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; border: 1px solid #b8d4e3;
+    }
+    table { border-collapse: collapse; width: 100%; margin: 15px 0; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: bold; text-transform: uppercase; font-size: 0.9em; letter-spacing: 0.5px; }
+    tr:nth-child(even) { background-color: #f8f9fa; }
+    tr:hover { background-color: #e3f2fd; transition: background-color 0.2s ease; }
+    td code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; font-family: 'Courier New', monospace; border: 1px solid #b8d4e3; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1); }
+    .section-intro code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; border: 1px solid #b8d4e3; }
+    @media (max-width: 768px) { body { padding: 10px; } }
   </style>
 </head>
 <body>
   <h1>Strapi 5 – Install (Windows), Export, Import &amp; Transfer</h1>
-  <p>This document covers:</p>
-  <ul>
+  <div class="section-intro">
+    <p>This document covers:</p>
+    <ul>
     <li><strong>Installing Strapi 5 on Windows</strong> – prerequisites and setup.</li>
     <li><strong>Configuring the upload (image) plugin</strong> – same setup as this project (local provider, security, body limits).</li>
     <li><strong>Environment variables (.env)</strong> – which properties you need (no credentials shown).</li>
@@ -33,13 +60,32 @@
     <li><strong>Transfer</strong> – stream data from one running Strapi instance to another (same schema).</li>
     <li><strong>Export / Import</strong> – export to a file, copy the file, then import on the destination.</li>
     <li><strong>Strapi Cloud</strong> – deploy and optionally import or transfer data into Cloud.</li>
-  </ul>
-
-  <div class="caution">
-    <strong>Admin users and API tokens are never transferred or exported.</strong> You must recreate admin users (and API tokens) on the destination after any migration. The <code>createdBy</code> and <code>updatedBy</code> fields in content will be empty after import/transfer.
+    </ul>
   </div>
 
-  <h2>1. Installing Strapi 5 on Windows</h2>
+  <nav class="section-intro toc" aria-label="Table of contents">
+    <h3 id="toc">Table of Contents</h3>
+    <ol>
+      <li><a href="#install">Installing Strapi 5 on Windows</a></li>
+      <li><a href="#upload">Configuring the upload plugin</a></li>
+      <li><a href="#env">Environment variables</a></li>
+      <li><a href="#tokens">API tokens and encryption key</a></li>
+      <li><a href="#prereq">Prerequisites</a></li>
+      <li><a href="#transfer">Option A – Transfer</a></li>
+      <li><a href="#export-import">Option B – Export then Import</a></li>
+      <li><a href="#included">What is included / excluded</a></li>
+      <li><a href="#cloud">Strapi Cloud</a></li>
+      <li><a href="#cloud-troubleshoot">Strapi Cloud – Post-transfer troubleshooting</a></li>
+      <li><a href="#quickref">Quick reference</a></li>
+      <li><a href="#docs">Official documentation</a></li>
+    </ol>
+  </nav>
+
+  <div class="caution">
+    <strong>Admin users and API tokens are never transferred or exported.</strong> You must recreate admin users (and API tokens) on the destination after any migration. The <code class="code-highlight">createdBy</code> and <code class="code-highlight">updatedBy</code> fields in content will be empty after import/transfer.
+  </div>
+
+  <h2 id="install">1. Installing Strapi 5 on Windows</h2>
   <ol>
     <li><strong>Node.js</strong> – Install Node.js LTS (e.g. 20.x or 22.x) from <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>. Use the Windows installer. Restart the terminal (or IDE) after installation.</li>
     <li><strong>npm</strong> – Comes with Node.js. Verify: <code>node -v</code> and <code>npm -v</code>.</li>
@@ -59,7 +105,7 @@ npm run develop</code></pre>
   </ol>
   <p>If you see permission or path-length issues on Windows, run the terminal as Administrator or enable long paths (e.g. <code>git config core.longpaths true</code> in the repo).</p>
 
-  <h2>2. Configuring the upload (image) plugin</h2>
+  <h2 id="upload">2. Configuring the upload (image) plugin</h2>
   <p>This project configures the built-in upload plugin so dashboard image uploads work and do not hang (Strapi 5 requires an explicit upload security configuration). Apply the same on the other machine (or in Strapi Cloud if you deploy this code).</p>
   <h3>2.1 Upload plugin – <code>config/plugins.js</code></h3>
   <p>Create or merge this in <code>config/plugins.js</code>:</p>
@@ -91,7 +137,7 @@ npm run develop</code></pre>
 },</code></pre>
   <p>Keep other middlewares (e.g. <code>strapi::logger</code>, <code>strapi::security</code>, <code>strapi::cors</code>, etc.) as in the default or this project. Restart Strapi after changing <code>plugins.js</code> or <code>middlewares.js</code>.</p>
 
-  <h2>3. Environment variables (.env)</h2>
+  <h2 id="env">3. Environment variables (.env)</h2>
   <p>Only <strong>property names</strong> are listed below. Set values in <code>.env</code>; never commit real credentials. Use <code>.env.example</code> as a template and copy it to <code>.env</code> then fill in.</p>
   <table>
     <thead>
@@ -113,6 +159,7 @@ npm run develop</code></pre>
       <tr><td><code>DATABASE_SSL</code>, <code>DATABASE_SSL_*</code></td><td>Optional</td><td>SSL options for database (e.g. <code>DATABASE_SSL_KEY</code>, <code>DATABASE_SSL_CERT</code>).</td></tr>
       <tr><td><code>DATABASE_SCHEMA</code></td><td>Optional (Postgres)</td><td>Schema name (default <code>public</code>).</td></tr>
       <tr><td><code>STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR</code>, <code>TENANT_ID</code></td><td>Optional</td><td>Used by this project’s directory import script only; not required for a plain Strapi run.</td></tr>
+      <tr><td><code>DATABASE_CONNECTION_TIMEOUT</code></td><td>Optional</td><td>Knex connection acquire timeout (ms). Default <code>60000</code>. Set <code>600000</code> (10 min) or higher in <code>.env</code> before running <code>strapi import</code> to reduce <code>KnexTimeoutError</code> risk with SQLite (see §7.3.1).</td></tr>
     </tbody>
   </table>
   <p>Summary: for a minimal run you need <code>APP_KEYS</code>, <code>API_TOKEN_SALT</code>, <code>ENCRYPTION_KEY</code>, <code>ADMIN_JWT_SECRET</code>, and <code>JWT_SECRET</code> (if using API users). For transfer, add <code>TRANSFER_TOKEN_SALT</code>. For Postgres, set <code>DATABASE_CLIENT=postgres</code> and <code>DATABASE_URL</code> (or individual <code>DATABASE_*</code>). For SQLite, default <code>DATABASE_FILENAME</code> is usually enough.</p>
@@ -145,13 +192,13 @@ npm run develop</code></pre>
   <p><strong>Generating new values</strong> (if you do not reuse): run the following once per secret; for <code>APP_KEYS</code> run it twice and set <code>APP_KEYS=first,second</code>:</p>
   <pre><code>node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"</code></pre>
 
-  <h2>4. API tokens and encryption key – reuse across installations?</h2>
+  <h2 id="tokens">4. API tokens and encryption key – reuse across installations?</h2>
   <ul>
     <li><strong>API tokens (admin-created) / JWT</strong> – <strong>No.</strong> Export and transfer do <strong>not</strong> include API tokens or admin users. You cannot copy the same API token from this installation and use it on another. Each installation has its own tokens (and salts). After import or transfer, create new API tokens (and admin users) on the destination. The token value you see in the admin is only shown once; it is hashed with <code>API_TOKEN_SALT</code> in the database, so even with the same DB copy, the salt on the other machine would differ unless you deliberately copy <code>API_TOKEN_SALT</code> and the DB – still not recommended; create new tokens on the new instance.</li>
     <li><strong>Export file encryption key (<code>-k</code>)</strong> – <strong>Yes.</strong> The key you use with <code>strapi export -k "…"</code> and <code>strapi import -k "…"</code> is only for encrypting/decrypting the export file. You can use the same key on the source (for export) and on the destination (for import), or any secure key you prefer on the destination. It does not affect API tokens or JWT.</li>
   </ul>
 
-  <h2>5. Prerequisites (transfer and export/import)</h2>
+  <h2 id="prereq">5. Prerequisites (transfer and export/import)</h2>
   <ul>
     <li><strong>Identical schema</strong> – Source and destination must have the same content types (same project code or a copy). Content type names, attributes, and relations must match.</li>
     <li><strong>Strapi 5</strong> – Commands and behavior described here are for Strapi 5.</li>
@@ -159,7 +206,7 @@ npm run develop</code></pre>
     <li>For <strong>export/import</strong>: you need the export file and (if encrypted) the encryption key on the destination.</li>
   </ul>
 
-  <h2>6. Option A – Transfer (stream to another machine)</h2>
+  <h2 id="transfer">6. Option A – Transfer (stream to another machine)</h2>
   <p>Use this when you can run both Strapi instances and want to push or pull data over the network. Data is streamed; no intermediate file.</p>
 
   <h3>6.1 Enable transfer tokens (destination)</h3>
@@ -205,7 +252,7 @@ npm run develop</code></pre>
     <strong>Limitations:</strong> If the destination uses SQLite, other DB connections are blocked during transfer. If you use WebSockets or Socket.io, temporarily disable them or use a different port/route, or transfer may fail.
   </div>
 
-  <h2>7. Option B – Export then Import (file-based)</h2>
+  <h2 id="export-import">7. Option B – Export then Import (file-based)</h2>
   <p>Use this when you cannot run both instances at once, or you want a backup file to copy to another machine (or to Strapi Cloud).</p>
 
   <h3>7.1 Export on the source machine</h3>
@@ -330,10 +377,20 @@ yarn link @strapi/data-transfer</code></pre>
     </li>
   </ol>
   <div class="warn">
-    <strong>Caveats:</strong> The linked package may not match your Strapi version exactly. If you see errors, revert with <code>yarn unlink @strapi/data-transfer</code> and <code>yarn install</code>. Re-apply the link after every <code>npm install</code> or <code>yarn install</code> in your project. Check the PR page for updates and whether it has been merged.
+    <strong>Caveats:</strong> The linked package may not match your Strapi version exactly. If you see errors, revert with <code class="code-highlight">yarn unlink @strapi/data-transfer</code> and <code class="code-highlight">yarn install</code>. Re-apply the link after every <code class="code-highlight">npm install</code> or <code class="code-highlight">yarn install</code> in your project. Check the PR page for updates and whether it has been merged.
   </div>
 
-  <h2>8. What is included / excluded</h2>
+  <h3>7.3.1 KnexTimeoutError during import (SQLite)</h3>
+  <p>During long imports (many assets), you may see:</p>
+  <pre><code>KnexTimeoutError: Knex: Timeout acquiring a connection. The pool is probably full.
+at ... weekly-metrics.js</code></pre>
+  <p>This happens when the upload plugin’s scheduled metrics job tries to use the database while the import is holding the SQLite connection. SQLite allows only one writer at a time.</p>
+  <p><strong>Workaround:</strong> Before running import, set a higher connection timeout in <code>.env</code>:</p>
+  <pre><code>DATABASE_CONNECTION_TIMEOUT=600000</code></pre>
+  <p>This sets 10 minutes (600000 ms). For very large imports, you can use <code>900000</code> (15 min) or <code>1800000</code> (30 min). The metrics job will wait longer before timing out; if the import finishes or briefly releases the connection, the job may succeed.</p>
+  <p><strong>Better fix:</strong> Apply <a href="https://github.com/strapi/strapi/pull/25268" target="_blank" rel="noopener">PR #25268</a> (see §7.3) to speed up asset import (hours → minutes), which reduces the window for this error. Alternatively, use PostgreSQL instead of SQLite for large datasets; it handles concurrent connections better.</p>
+
+  <h2 id="included">8. What is included / excluded</h2>
   <table>
     <thead>
       <tr><th>Data</th><th>Transfer</th><th>Export/Import</th></tr>
@@ -349,7 +406,7 @@ yarn link @strapi/data-transfer</code></pre>
     </tbody>
   </table>
 
-  <h2>9. Strapi Cloud</h2>
+  <h2 id="cloud">9. Strapi Cloud</h2>
   <p>You can run the same Strapi project on Strapi Cloud and optionally move your data there.</p>
 
   <h3>9.1 Deploy the project to Strapi Cloud (first time)</h3>
@@ -378,7 +435,61 @@ yarn link @strapi/data-transfer</code></pre>
   <pre><code>npx strapi link</code></pre>
   <p>Follow the prompts to select the Cloud project. Then you can deploy with <code>npx strapi deploy</code> or use transfer/import as above.</p>
 
-  <h2>10. Quick reference</h2>
+  <h2 id="cloud-troubleshoot">10. Strapi Cloud – Post-transfer troubleshooting</h2>
+  <p>This section summarizes what appears in Strapi Cloud logs after a data transfer (push with token), why uploads return 404, and the recommended fix. It ties together bootstrap fixes, media 404s, and S3 feasibility.</p>
+
+  <h3>10.1 What the logs show</h3>
+  <p><strong>Bootstrap (addressed in this project):</strong> The following are fixed via <code>src/bootstrap.js</code>:</p>
+  <ul>
+    <li><strong>Homepage crash</strong> – <code>Cannot read properties of undefined (reading 'settings')</code> in <code>getContentTypesMeta</code>. Fix: <code>ensureContentManagerConfigurations()</code> so every content type has a configuration in core-store (including <code>mainField</code> and <code>settings</code>).</li>
+    <li><strong>Bishop list 400</strong> – <code>sort=undefined:undefined</code>. Fix: <code>ensureCollectionTypesHaveDefaultSort()</code> so all API collection types have <code>defaultSortBy</code> and <code>defaultSortOrder</code> (using mainField or documentId as fallback).</li>
+  </ul>
+  <p><strong>After transfer on Cloud you may still see:</strong></p>
+  <ul>
+    <li><strong>Upload 404s</strong> – e.g. <code>GET /uploads/mar_chrisostomos_1520bbb7f7.jpeg</code> → 404. File <em>records</em> exist in the database (from the transfer), but the <em>actual files</em> are not on the Cloud server’s filesystem.</li>
+    <li><strong>Data transfer behavior</strong> – Strapi Data Transfer (push with token) moves database content and can stream assets; on Strapi Cloud the runtime filesystem is ephemeral or not populated with your local <code>public/uploads</code>, so media files often do not exist where the app serves them → 404.</li>
+  </ul>
+
+  <h3>10.2 Why images 404 after push/import to Strapi Cloud</h3>
+  <p>Transfer creates or updates <strong>media entries</strong> in the database (admin shows files and URLs). The <strong>binary files</strong> either are not included in what gets deployed to Cloud, or are stored in a different/transient filesystem that does not match the app’s <code>/uploads</code> serving. So when the app or admin requests <code>/uploads/...</code>, the file is not there → <strong>404</strong>.</p>
+
+  <h3>10.3 Best fix for 404s: external object storage (e.g. S3)</h3>
+  <p>Use <strong>one external object store</strong> (e.g. S3 or S3-compatible) and point <strong>both</strong> local and Strapi Cloud to it. Then:</p>
+  <ul>
+    <li>Media lives in one place; no dependency on Cloud’s local disk.</li>
+    <li>Transfer only moves DB; URLs already point to the same bucket → no 404s for those assets.</li>
+    <li>Uploads from local or Cloud both read/write the same files.</li>
+  </ul>
+  <p><strong>Do you need S3 on both local and remote?</strong> Yes – configure the <strong>same</strong> bucket in both environments. Local can use the provider so uploads go to the bucket (optional for dev; you can keep local disk for dev only). Strapi Cloud <strong>must</strong> use the provider so it serves from the bucket and does not rely on its own filesystem for uploads. One bucket, two configs (local + Cloud) pointing to that bucket is the standard setup.</p>
+  <p><strong>Feasibility:</strong> Straightforward. Add the Strapi upload provider (e.g. S3), set env vars (key, secret, bucket, region, endpoint if needed), and redeploy. New uploads go to S3; for existing records you either re-upload those files or do a one-time copy of <code>public/uploads</code> into the bucket and keep URLs consistent. See <a href="STRAPI_MEDIA_STORAGE_S3_CLOUD_PRD.html">STRAPI_MEDIA_STORAGE_S3_CLOUD_PRD.html</a> for full S3/Cloud refactoring.</p>
+
+  <h3>10.4 Alternatives to S3 (and efficiency)</h3>
+  <ul>
+    <li><strong>Cloudinary / other image APIs</strong> – Same idea: one external store, configure on both envs. Often more “image-centric” (transformations, CDN). Efficiency is good; cost and API differ from S3.</li>
+    <li><strong>Store “a lot of images” in the database (BLOBs)</strong> – Not recommended. Strapi does not ship with “store file bytes in DB” as the default; you would be fighting the design, hurting DB size and backups, and still not solving the “Cloud has no files” problem. Least efficient and not the right tool.</li>
+    <li><strong>Manual copy of <code>public/uploads</code> to Cloud</strong> – Theoretically possible (e.g. copy into Cloud’s filesystem or a volume), but Strapi Cloud’s runtime is often ephemeral, so this is fragile and not the intended pattern. Not recommended as the long-term fix.</li>
+    <li><strong>S3 (or S3-compatible, e.g. R2, MinIO)</strong> – Most efficient and robust for “lots of images” and transfer workflow: one bucket, CDN optional, no DB bloat, works the same locally and on Cloud.</li>
+  </ul>
+
+  <h3>10.5 Quick reference: your questions answered</h3>
+  <table>
+    <thead>
+      <tr><th>Question</th><th>Answer</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Why 404 when we upload/import data to Strapi Cloud?</td><td>Transfer updates the DB (media entries); the actual files are not on Cloud’s disk, so <code>/uploads/...</code> 404.</td></tr>
+      <tr><td>Best fix?</td><td>Use one external object store (e.g. S3) and configure Strapi to use it <strong>on Cloud</strong> (and ideally locally too).</td></tr>
+      <tr><td>S3 feasible?</td><td>Yes. One bucket, env-based config; add provider and redeploy.</td></tr>
+      <tr><td>S3 on both local and remote?</td><td>Yes – configure the <strong>same</strong> bucket in both environments so both use the same media store.</td></tr>
+      <tr><td>Better way without S3?</td><td>Another provider (e.g. Cloudinary) is fine; “store in DB” is not efficient or recommended.</td></tr>
+      <tr><td>Most efficient way for lots of images?</td><td>External object storage (S3 or S3-compatible) with one bucket for both envs; optional CDN in front.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.6 Bootstrap vs media</h3>
+  <p><strong>Bootstrap</strong> fixes the homepage and bishop list errors; once that version is deployed to Cloud, those issues should stop. <strong>Media 404s</strong> are independent of bootstrap. They are fixed by <strong>where files are stored</strong> (external storage + same URLs), not by bootstrap. So: deploy the fixed bootstrap for admin/list behavior; add S3 (or equivalent) for media so transfer no longer leaves you with missing files and 404s.</p>
+
+  <h2 id="quickref">11. Quick reference</h2>
   <table>
     <thead>
       <tr><th>Goal</th><th>Command / step</th></tr>
@@ -389,12 +500,13 @@ yarn link @strapi/data-transfer</code></pre>
       <tr><td>Export to file</td><td><code>npm run strapi export -- -f my-export</code> (add <code>-k KEY</code> or <code>--no-encrypt</code> as needed)</td></tr>
       <tr><td>Import from file</td><td><code>npm run strapi import -- -f "C:\…\my-export.tar.gz"</code> (Windows: use full path in quotes; add <code>-k KEY</code>, <code>--force</code> as needed)</td></tr>
       <tr><td>Restore publishedAt after import (articles/news)</td><td><code>npm run restore:article_dates_from_export</code> (set <code>EXPORT_TAR=path\to\export.tar</code> or pass path as arg)</td></tr>
+      <tr><td>Avoid KnexTimeoutError during import (SQLite)</td><td>Add <code>DATABASE_CONNECTION_TIMEOUT=600000</code> to <code>.env</code> before import (see §7.3.1)</td></tr>
       <tr><td>Deploy to Strapi Cloud</td><td><code>npx strapi login</code> then <code>npx strapi deploy</code></td></tr>
       <tr><td>Transfer into Strapi Cloud</td><td>Create Push token in Cloud admin; on self-hosted: <code>strapi transfer --to https://your-project.strapiapp.com/admin</code></td></tr>
     </tbody>
   </table>
 
-  <h2>11. Official documentation</h2>
+  <h2 id="docs">12. Official documentation</h2>
   <ul>
     <li><a href="https://docs.strapi.io/cms/data-management/transfer" target="_blank" rel="noopener">Data transfer (Strapi 5)</a></li>
     <li><a href="https://docs.strapi.io/cms/data-management/export" target="_blank" rel="noopener">Data export (Strapi 5)</a></li>
@@ -403,5 +515,58 @@ yarn link @strapi/data-transfer</code></pre>
     <li><a href="https://docs.strapi.io/cloud/getting-started/deployment-cli" target="_blank" rel="noopener">Strapi Cloud – Deployment with CLI</a></li>
     <li><a href="https://github.com/strapi/strapi/pull/25268" target="_blank" rel="noopener">PR #25268 – Import performance fix (asset metadata cache)</a></li>
   </ul>
+
+  <script>
+    (function() {
+      document.querySelectorAll('pre').forEach(function(pre) {
+        var wrap = document.createElement('div');
+        wrap.className = 'command-wrap';
+        var btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.type = 'button';
+        btn.textContent = '📋 Copy';
+        btn.title = 'Copy to clipboard';
+        btn.setAttribute('aria-label', 'Copy command to clipboard');
+        btn.onclick = function() {
+          var text = pre.textContent.trim();
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() {
+              btn.textContent = '✓ Copied!';
+              btn.classList.add('copied');
+              setTimeout(function() {
+                btn.textContent = '📋 Copy';
+                btn.classList.remove('copied');
+              }, 2000);
+            }).catch(function() {
+              fallbackCopy(text, btn);
+            });
+          } else {
+            fallbackCopy(text, btn);
+          }
+        };
+        pre.parentNode.insertBefore(wrap, pre);
+        wrap.appendChild(btn);
+        wrap.appendChild(pre);
+      });
+      function fallbackCopy(text, btn) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          btn.textContent = '✓ Copied!';
+          btn.classList.add('copied');
+          setTimeout(function() {
+            btn.textContent = '📋 Copy';
+            btn.classList.remove('copied');
+          }, 2000);
+        } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    })();
+  </script>
 </body>
 </html>

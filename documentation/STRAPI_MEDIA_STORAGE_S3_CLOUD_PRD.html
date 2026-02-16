@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PRD: Media storage refactoring for Strapi 5 – S3 vs local, transfer/export to Strapi Cloud, SQLite slowness, schema and code changes.">
+  <title>Strapi Media Storage &amp; Strapi Cloud Sync – PRD</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { font-size: 2.5em; color: #1a1a1a; border-bottom: 3px solid #0066cc; padding-bottom: 0.5rem; }
+    h2 { font-size: 1.8em; color: #2d2d2d; margin-top: 2rem; border-left: 4px solid #0066cc; padding-left: 15px; }
+    h3 { font-size: 1.4em; color: #333; margin-top: 1.5rem; }
+    h4 { font-size: 1.2em; color: #555; }
+    ul, ol { margin: 0.5rem 0; }
+    li { margin: 0.25rem 0; }
+    code { background-color: #e8f4f8 !important; color: #0d3b66 !important; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; border: 1px solid #b8d4e3; }
+    pre, pre code,
+    .command-wrap pre, .command-wrap pre code,
+    ol pre, ol pre code, ul pre, ul pre code, li pre, li pre code, div pre, div pre code {
+      background-color: #e8f4f8 !important; color: #0d3b66 !important; border-color: #b8d4e3;
+    }
+    pre { padding: 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 4px; margin: 15px 0; position: relative; border: 1px solid #b8d4e3; }
+    pre code { background-color: transparent !important; color: #0d3b66 !important; padding: 0; }
+    .command-wrap { position: relative; margin: 15px 0; }
+    .command-wrap .copy-btn {
+      position: absolute; top: 8px; right: 8px; z-index: 1;
+      background-color: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px;
+      cursor: pointer; font-size: 0.85em; font-weight: bold; transition: all 0.3s ease;
+    }
+    .command-wrap .copy-btn:hover { background-color: #0052a3; }
+    .command-wrap .copy-btn.copied { background-color: #28a745; }
+    a { color: #0066cc; }
+    .note, .info { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .caution { background: #f8d7da; border-left: 4px solid #dc3545; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .note code, .note .code-highlight, .info code, .info .code-highlight,
+    .warn code, .warn .code-highlight, .caution code, .caution .code-highlight {
+      background-color: #e8f4f8; color: #0d3b66; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; border: 1px solid #b8d4e3;
+    }
+    table { border-collapse: collapse; width: 100%; margin: 15px 0; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: bold; text-transform: uppercase; font-size: 0.9em; letter-spacing: 0.5px; }
+    tr:nth-child(even) { background-color: #f8f9fa; }
+    tr:hover { background-color: #e3f2fd; transition: background-color 0.2s ease; }
+    td code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; font-family: 'Courier New', monospace; border: 1px solid #b8d4e3; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1); }
+    .section-intro code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; border: 1px solid #b8d4e3; }
+    @media (max-width: 768px) { body { padding: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>PRD: Media Storage Refactoring for Strapi Cloud Sync</h1>
+  <div class="section-intro">
+    <p><strong>Product Requirements Document</strong> – Defines refactoring needed to use AWS S3 (or S3-compatible) storage for media, enable smooth transfer/export to Strapi Cloud, and clarify SQLite vs S3 behavior.</p>
+  </div>
+
+  <nav class="section-intro toc" aria-label="Table of contents">
+    <h3 id="toc">Table of Contents</h3>
+    <ol>
+      <li><a href="#context">Context &amp; Problem Statement</a></li>
+      <li><a href="#transfer-log-summary">Transfer to Strapi Cloud: Log Analysis &amp; 404 Summary</a></li>
+      <li><a href="#cursor-rule">Cursor Rule: strapi-media-relation-image-upload-fix</a></li>
+      <li><a href="#transfer-limitation">Transfer/Export Limitation with S3</a></li>
+      <li><a href="#sqlite-myth">SQLite Slowness: Myth vs Reality</a></li>
+      <li><a href="#best-options">Best Options for Media Storage</a></li>
+      <li><a href="#recommended">Recommended: Local + S3 Hybrid for Cloud Sync</a></li>
+      <li><a href="#refactoring">Refactoring Plan</a></li>
+      <li><a href="#schema">Schema Impact</a></li>
+      <li><a href="#implementation">Implementation Details</a></li>
+      <li><a href="#s3-step-by-step">Step-by-step: S3 for local and Strapi Cloud (including existing data)</a></li>
+      <li><a href="#alternatives">Alternatives &amp; Trade-offs</a></li>
+      <li><a href="#references">References</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="context">1. Context &amp; Problem Statement</h2>
+  <p>This project uses Strapi 5 with the <strong>local upload provider</strong> (files in <code>public/uploads/</code>). When transferring or exporting data to <strong>Strapi Cloud</strong>, media handling can fail or behave unexpectedly because:</p>
+  <ul>
+    <li>Strapi Cloud expects configurable storage; it supports both local and third-party providers (S3, Cloudinary).</li>
+    <li>Export and transfer <strong>do not include media file bytes</strong> when the source uses S3/Cloudinary – only metadata (URLs) is transferred.</li>
+    <li>When the source uses <strong>local</strong> storage, transfer and export <strong>do</strong> include the file bytes, and they are stored on the destination.</li>
+    <li>SQLite import slowness is sometimes attributed to "media in the database" – in reality, media is never stored in the database; only metadata is. The slowness comes from the import implementation and SQLite's single-writer limitation.</li>
+  </ul>
+
+  <h2 id="transfer-log-summary">2. Transfer to Strapi Cloud: Log Analysis &amp; 404 Summary</h2>
+  <p>This section summarizes what appears in Strapi Cloud logs after a data transfer (push with token), why uploads return 404, and the recommended fix. It ties together bootstrap fixes, media 404s, and S3 feasibility.</p>
+
+  <h3>2.1 What the Logs Show</h3>
+  <p><strong>Bootstrap (already addressed in this project):</strong> The following are fixed via <code>src/bootstrap.js</code>:</p>
+  <ul>
+    <li><strong>Homepage crash</strong> – <code>Cannot read properties of undefined (reading 'settings')</code> in <code>getContentTypesMeta</code>. Fix: <code>ensureContentManagerConfigurations()</code> so every content type has a configuration in core-store (including <code>mainField</code> and <code>settings</code>).</li>
+    <li><strong>Bishop list 400</strong> – <code>sort=undefined:undefined</code>. Fix: <code>ensureCollectionTypesHaveDefaultSort()</code> so all API collection types have <code>defaultSortBy</code> and <code>defaultSortOrder</code> (using mainField or documentId as fallback).</li>
+  </ul>
+  <p><strong>After transfer on Cloud you may still see:</strong></p>
+  <ul>
+    <li><strong>Upload 404s</strong> – e.g. <code>GET /uploads/mar_chrisostomos_1520bbb7f7.jpeg</code> → 404. File <em>records</em> exist in the database (from the transfer), but the <em>actual files</em> are not on the Cloud server’s filesystem.</li>
+    <li><strong>Data transfer behavior</strong> – Strapi Data Transfer (push with token) moves database content and can stream assets; on Strapi Cloud the runtime filesystem is ephemeral or not populated with your local <code>public/uploads</code>, so media files often do not exist where the app serves them → 404.</li>
+  </ul>
+
+  <h3>2.2 Why Images 404 After Push/Import to Strapi Cloud</h3>
+  <p>Transfer creates or updates <strong>media entries</strong> in the database (admin shows files and URLs). The <strong>binary files</strong> either are not included in what gets deployed to Cloud, or are stored in a different/transient filesystem that does not match the app’s <code>/uploads</code> serving. So when the app or admin requests <code>/uploads/...</code>, the file is not there → <strong>404</strong>.</p>
+
+  <h3>2.3 Best Fix for 404s: External Object Storage (e.g. S3)</h3>
+  <p>Use <strong>one external object store</strong> (e.g. S3 or S3-compatible) and point <strong>both</strong> local and Strapi Cloud to it. Then:</p>
+  <ul>
+    <li>Media lives in one place; no dependency on Cloud’s local disk.</li>
+    <li>Transfer only moves DB; URLs already point to the same bucket → no 404s for those assets.</li>
+    <li>Uploads from local or Cloud both read/write the same files.</li>
+  </ul>
+  <p><strong>Do you need S3 on both local and remote?</strong> Yes – configure the <strong>same</strong> bucket in both environments. Local can use the provider so uploads go to the bucket (optional for dev; you can keep local disk for dev only). Strapi Cloud <strong>must</strong> use the provider so it serves from the bucket and does not rely on its own filesystem for uploads. One bucket, two configs (local + Cloud) pointing to that bucket is the standard setup.</p>
+  <p><strong>Feasibility:</strong> Straightforward. Add the Strapi upload provider (e.g. S3), set env vars (key, secret, bucket, region, endpoint if needed), and redeploy. New uploads go to S3; for existing records you either re-upload those files or do a one-time copy of <code>public/uploads</code> into the bucket and keep URLs consistent.</p>
+
+  <h3>2.4 Alternatives to S3 (and Efficiency)</h3>
+  <ul>
+    <li><strong>Cloudinary / other image APIs</strong> – Same idea: one external store, configure on both envs. Often more “image-centric” (transformations, CDN). Efficiency is good; cost and API differ from S3.</li>
+    <li><strong>Store “a lot of images” in the database (BLOBs)</strong> – Not recommended. Strapi does not ship with “store file bytes in DB” as the default; you would be fighting the design, hurting DB size and backups, and still not solving the “Cloud has no files” problem. Least efficient and not the right tool.</li>
+    <li><strong>Manual copy of <code>public/uploads</code> to Cloud</strong> – Theoretically possible (e.g. copy into Cloud’s filesystem or a volume), but Strapi Cloud’s runtime is often ephemeral, so this is fragile and not the intended pattern. Not recommended as the long-term fix.</li>
+    <li><strong>S3 (or S3-compatible, e.g. R2, MinIO)</strong> – Most efficient and robust for “lots of images” and transfer workflow: one bucket, CDN optional, no DB bloat, works the same locally and on Cloud.</li>
+  </ul>
+
+  <h3>2.5 Quick Reference: Your Questions Answered</h3>
+  <table>
+    <thead>
+      <tr><th>Question</th><th>Answer</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Why 404 when we upload/import data to Strapi Cloud?</td><td>Transfer updates the DB (media entries); the actual files are not on Cloud’s disk, so <code>/uploads/...</code> 404.</td></tr>
+      <tr><td>Best fix?</td><td>Use one external object store (e.g. S3) and configure Strapi to use it <strong>on Cloud</strong> (and ideally locally too).</td></tr>
+      <tr><td>S3 feasible?</td><td>Yes. One bucket, env-based config; add provider and redeploy.</td></tr>
+      <tr><td>S3 on both local and remote?</td><td>Yes – configure the <strong>same</strong> bucket in both environments so both use the same media store.</td></tr>
+      <tr><td>Better way without S3?</td><td>Another provider (e.g. Cloudinary) is fine; “store in DB” is not efficient or recommended.</td></tr>
+      <tr><td>Most efficient way for lots of images?</td><td>External object storage (S3 or S3-compatible) with one bucket for both envs; optional CDN in front.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.6 Bootstrap vs Media</h3>
+  <p><strong>Bootstrap</strong> fixes the homepage and bishop list errors; once that version is deployed to Cloud, those issues should stop. <strong>Media 404s</strong> are independent of bootstrap. They are fixed by <strong>where files are stored</strong> (external storage + same URLs), not by bootstrap. So: deploy the fixed bootstrap for admin/list behavior; add S3 (or equivalent) for media so transfer no longer leaves you with missing files and 404s.</p>
+
+  <h2 id="cursor-rule">3. Cursor Rule: strapi-media-relation-image-upload-fix</h2>
+  <p>The rule <code>.cursor/rules/strapi-media-relation-image-upload-fix.mdc</code> does <strong>not</strong> address:</p>
+  <ul>
+    <li>Strapi Cloud deployment or media storage providers</li>
+    <li>S3 or Cloudinary configuration</li>
+    <li>Transfer/export issues with media</li>
+  </ul>
+  <p>It focuses solely on the <strong>Document Service rejection</strong> when linking media to content: Strapi 5 rejects <code>connect</code> / <code>set</code> for <code>plugin::upload.file</code>. The fix uses the <code>files_related_mph</code> morph table to link media after create/update. Import scripts (e.g. <code>data_import_seed_directory_mosc_in.js</code>, <code>data_import_seed_news_catholicatenews.js</code>) implement this pattern.</p>
+
+  <h2 id="transfer-limitation">4. Transfer/Export Limitation with S3</h2>
+  <table>
+    <thead>
+      <tr><th>Source Storage</th><th>Transfer</th><th>Export/Import</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Local (<code>public/uploads/</code>)</td><td>Yes – file bytes streamed</td><td>Yes – file bytes included in export</td></tr>
+      <tr><td>S3 / Cloudinary</td><td>No file bytes – only metadata (URLs)</td><td>No file bytes – only metadata</td></tr>
+    </tbody>
+  </table>
+  <div class="caution">
+    <strong>Key limitation:</strong> Media from third-party providers (S3, Cloudinary) is <strong>not</strong> bundled in export or transfer. Only database metadata (relations, file URLs) is transferred. The actual files remain in the provider's bucket.
+  </div>
+  <p><strong>Implication for Strapi Cloud:</strong> If you transfer from a <strong>local</strong> source, files are streamed and stored on Strapi Cloud (which uses local storage by default). If you transfer from an <strong>S3</strong> source, only metadata is transferred; Strapi Cloud would have media entries pointing to your S3 URLs. Images would work only if the S3 bucket is publicly accessible (or you configure Strapi Cloud to use the same S3 bucket).</p>
+
+  <h2 id="sqlite-myth">5. SQLite Slowness: Myth vs Reality</h2>
+  <p><strong>Myth:</strong> SQLite is slow because media files are stored in the database.</p>
+  <p><strong>Reality:</strong></p>
+  <ul>
+    <li>Media files are <strong>never</strong> stored in the database. With the local provider, they live in <code>public/uploads/</code>. With S3, they live in the bucket.</li>
+    <li>The database stores only metadata: <code>url</code>, <code>path</code>, <code>provider</code>, <code>provider_metadata</code>, etc. (table <code>files</code> / <code>plugin::upload.file</code>).</li>
+    <li>Import slowness is caused by:
+      <ul>
+        <li><strong>Asset metadata bottleneck</strong> – O(n²) scanning of the export archive for each asset (see <a href="https://github.com/strapi/strapi/pull/25268" target="_blank" rel="noopener">PR #25268</a>).</li>
+        <li><strong>SQLite single-writer</strong> – Only one write at a time; the upload plugin's metrics job can conflict with import, causing <code>KnexTimeoutError</code>.</li>
+      </ul>
+    </li>
+  </ul>
+  <p>Using S3 for media does <strong>not</strong> fix import slowness. The import still processes asset metadata from the export file. S3 only changes where files are stored after import.</p>
+
+  <h2 id="best-options">6. Best Options for Media Storage</h2>
+  <table>
+    <thead>
+      <tr><th>Option</th><th>Pros</th><th>Cons</th><th>Transfer to Strapi Cloud</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Local only</strong></td>
+        <td>Simple; export/transfer includes files</td>
+        <td>Not scalable; files tied to server</td>
+        <td>Works – files streamed to Cloud</td>
+      </tr>
+      <tr>
+        <td><strong>S3 only</strong></td>
+        <td>Scalable; recommended for production</td>
+        <td>Export/transfer excludes file bytes; needs S3 config on Cloud</td>
+        <td>Only metadata; Cloud must use same S3 or public bucket</td>
+      </tr>
+      <tr>
+        <td><strong>Local dev + S3 prod/Cloud</strong></td>
+        <td>Easy local dev; S3 for production and Cloud</td>
+        <td>Provider switch between envs; transfer from local includes files</td>
+        <td>Transfer from local → Cloud: files included. Cloud can then use S3.</td>
+      </tr>
+      <tr>
+        <td><strong>Same S3 bucket (local + Cloud)</strong></td>
+        <td>No file migration; both point to same storage</td>
+        <td>Requires S3 from day one; config complexity</td>
+        <td>Transfer only metadata; media already in S3; both instances share it</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="recommended">7. Recommended: Local + S3 Hybrid for Cloud Sync</h2>
+  <p><strong>Goal:</strong> Local setup uses local storage for development; production and Strapi Cloud use AWS S3. Transfer from local to Strapi Cloud includes file bytes and works out of the box. Optionally, configure Strapi Cloud to use S3 so new uploads go there.</p>
+  <p><strong>Flow:</strong></p>
+  <ol>
+    <li><strong>Local (development):</strong> Keep <code>provider: 'local'</code>. Media in <code>public/uploads/</code>.</li>
+    <li><strong>Production / Strapi Cloud:</strong> Use <code>provider: 'aws-s3'</code> with env vars.</li>
+    <li><strong>Transfer to Strapi Cloud:</strong> Run <code>strapi transfer --to https://your-project.strapiapp.com/admin</code> from your <strong>local</strong> instance. Files are streamed; no S3 needed on source.</li>
+    <li><strong>Post-transfer:</strong> Strapi Cloud stores received files in its default local storage. To use S3 on Cloud, add <code>config/env/production/plugins.js</code> with S3 config and set env vars in Cloud project settings.</li>
+  </ol>
+  <p>For a <strong>single shared S3 bucket</strong> used by both local and Strapi Cloud, including migrating <strong>existing</strong> data so all file records point to S3 (no re-import), see <a href="#s3-step-by-step">§11 Step-by-step: S3 for local and Strapi Cloud (including existing data)</a>.</p>
+
+  <h2 id="refactoring">8. Refactoring Plan</h2>
+  <h3>8.1 Phase 1: Environment-Based Upload Provider (No Schema Change)</h3>
+  <ul>
+    <li>Create <code>config/env/production/plugins.js</code> with S3 provider config.</li>
+    <li>Keep <code>config/plugins.js</code> (or <code>config/env/development/plugins.js</code>) with local provider for development.</li>
+    <li>Install <code>@strapi/provider-upload-aws-s3</code>.</li>
+    <li>Add AWS env vars (e.g. <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_REGION</code>, <code>AWS_S3_BUCKET_NAME</code>) for production.</li>
+  </ul>
+  <h3>8.2 Phase 2: Security Middleware for S3</h3>
+  <ul>
+    <li>Update <code>config/middlewares.js</code> – <code>strapi::security</code> <code>contentSecurityPolicy</code> to allow S3 bucket domain in <code>img-src</code> and <code>media-src</code> for thumbnail previews in Media Library.</li>
+  </ul>
+  <h3>8.3 Phase 3: Strapi Cloud Variables</h3>
+  <ul>
+    <li>In Strapi Cloud project → Settings → Variables, add <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_REGION</code>, <code>AWS_S3_BUCKET_NAME</code> (and optionally <code>AWS_ACL</code>, <code>CDN_URL</code>).</li>
+  </ul>
+
+  <h2 id="schema">9. Schema Impact</h2>
+  <p><strong>No content-type schema changes are required.</strong> The upload plugin stores provider and URL in <code>plugin::upload.file</code>; switching providers does not change the schema. Media relations (e.g. Article <code>cover</code>, <code>shared.media</code>) remain unchanged.</p>
+  <p>Only <strong>configuration</strong> changes (plugins, middlewares, env) are needed.</p>
+
+  <h2 id="implementation">10. Implementation Details</h2>
+  <h3>10.1 Install S3 Provider</h3>
+  <pre><code>yarn add @strapi/provider-upload-aws-s3</code></pre>
+
+  <h3>10.2 Production Plugins Config</h3>
+  <p>Create <code>config/env/production/plugins.js</code>:</p>
+  <pre><code>module.exports = ({ env }) => ({
+  upload: {
+    config: {
+      provider: 'aws-s3',
+      providerOptions: {
+        s3Options: {
+          credentials: {
+            accessKeyId: env('AWS_ACCESS_KEY_ID'),
+            secretAccessKey: env('AWS_SECRET_ACCESS_KEY'),
+          },
+          region: env('AWS_REGION'),
+          params: {
+            ACL: env('AWS_ACL', 'public-read'),
+            Bucket: env('AWS_S3_BUCKET_NAME'),
+          },
+        },
+      },
+      actionOptions: {
+        upload: {},
+        uploadStream: {},
+        delete: {},
+      },
+      security: {
+        allowedTypes: ['image/*', 'video/*', 'audio/*', 'application/pdf', 'application/*'],
+        deniedTypes: ['application/x-sh', 'application/x-executable', 'application/x-dosexec'],
+      },
+      sizeLimit: 250 * 1024 * 1024,
+    },
+  },
+});</code></pre>
+
+  <h3>10.3 Development Plugins Config (Optional)</h3>
+  <p>Keep local provider. Either keep root <code>config/plugins.js</code> for all envs, or create <code>config/env/development/plugins.js</code> with <code>provider: 'local'</code>.</p>
+
+  <h3>10.4 Security Middleware for S3</h3>
+  <p>In <code>config/middlewares.js</code>, replace <code>'strapi::security'</code> string with:</p>
+  <pre><code>{
+  name: 'strapi::security',
+  config: {
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        'connect-src': ["'self'", 'https:'],
+        'img-src': [
+          "'self'", 'data:', 'blob:', 'market-assets.strapi.io',
+          '*.s3.*.amazonaws.com', '*.s3.amazonaws.com'
+        ],
+        'media-src': [
+          "'self'", 'data:', 'blob:', 'market-assets.strapi.io',
+          '*.s3.*.amazonaws.com', '*.s3.amazonaws.com'
+        ],
+        upgradeInsecureRequests: null,
+      },
+    },
+  },
+},</code></pre>
+  <p>Adjust domain patterns to match your bucket (e.g. <code>your-bucket.s3.us-east-1.amazonaws.com</code>).</p>
+
+  <h3>10.5 Environment Variables</h3>
+  <table>
+    <thead>
+      <tr><th>Variable</th><th>Required</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>AWS_ACCESS_KEY_ID</code></td><td>Yes (prod)</td><td>AWS access key</td></tr>
+      <tr><td><code>AWS_SECRET_ACCESS_KEY</code></td><td>Yes (prod)</td><td>AWS secret key</td></tr>
+      <tr><td><code>AWS_REGION</code></td><td>Yes (prod)</td><td>e.g. <code>us-east-1</code></td></tr>
+      <tr><td><code>AWS_S3_BUCKET_NAME</code></td><td>Yes (prod)</td><td>S3 bucket name</td></tr>
+      <tr><td><code>AWS_ACL</code></td><td>Optional</td><td>Default <code>public-read</code>; use <code>private</code> for signed URLs</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="s3-step-by-step">11. Step-by-step: S3 for local and Strapi Cloud (including existing data)</h2>
+  <p>This section gives a concrete order of operations so that <strong>both local and Strapi Cloud</strong> use the <strong>same S3 bucket</strong>, and existing media (already in the database and in <code>public/uploads/</code>) is uploaded to S3 and continues to point to the correct records (documentId, relations). No re-import of content is required if you migrate existing files to S3 and update file records as below.</p>
+
+  <h3>11.1 How this aligns with export/import and transfer</h3>
+  <ul>
+    <li><strong>Transfer</strong> and <strong>export/import</strong> move <strong>database content + (when source is local) file bytes</strong>. When the source uses S3, only <strong>metadata</strong> (file records, URLs) is transferred; the actual files stay in the bucket.</li>
+    <li><strong>Goal:</strong> Have one S3 bucket. Local and Strapi Cloud both use it. All media records in the DB point to S3 URLs (same <code>documentId</code>, same relations). Then any future transfer or export/import only syncs metadata; Cloud already serves from the same bucket → no 404s.</li>
+    <li><strong>Existing data:</strong> You do <strong>not</strong> need to re-run <code>strapi import</code> or re-transfer content from scratch. You (1) upload existing files from <code>public/uploads/</code> to S3, (2) update the upload plugin’s file records so <code>url</code> / <code>path</code> / <code>provider</code> point to S3, (3) then transfer or export/import as usual. Relations and documentIds stay intact.</li>
+  </ul>
+
+  <h3>11.2 Phase 1: Create one S3 bucket (shared by local and Cloud)</h3>
+  <ol>
+    <li>Create a bucket in AWS S3 (or S3-compatible provider). Note: <strong>bucket name</strong>, <strong>region</strong>, and (if needed) <strong>endpoint</strong>.</li>
+    <li>Configure bucket for public read (if you want public URLs): bucket policy or ACL so objects are readable. If you use CloudFront or a CDN, configure that separately.</li>
+    <li>Create an IAM user (or use existing) with <code>s3:PutObject</code>, <code>s3:GetObject</code>, <code>s3:DeleteObject</code>, <code>s3:ListBucket</code> on this bucket. Store <strong>Access Key ID</strong> and <strong>Secret Access Key</strong> securely.</li>
+  </ol>
+
+  <h4>11.2.1 Replicating an existing bucket (same IAM, new bucket name)</h4>
+  <p>If you already have an S3 bucket (e.g. <code>eventapp-media-bucket</code> in <code>us-east-2</code>) with the right permissions and IAM, you can create a <strong>new</strong> bucket that reuses the same setup and the <strong>same Access Key ID and Secret</strong>.</p>
+  <ol>
+    <li><strong>Inspect the existing bucket</strong> – In AWS Console → S3 → your bucket (e.g. <a href="https://us-east-2.console.aws.amazon.com/s3/buckets/eventapp-media-bucket?region=us-east-2&tab=objects" target="_blank" rel="noopener">eventapp-media-bucket</a>), note:
+      <ul>
+        <li><strong>Region</strong> (e.g. <code>us-east-2</code>).</li>
+        <li><strong>Permissions</strong> tab: Block Public Access settings (if “Block all public access” is off, you allowed public read).</li>
+        <li><strong>Permissions</strong> → Bucket policy: copy the JSON (you’ll adapt it for the new bucket name).</li>
+        <li><strong>Permissions</strong> → CORS (if any): copy the CORS configuration.</li>
+        <li><strong>Object Ownership</strong>: ACLs enabled or disabled (affects whether you use <code>--acl public-read</code> when syncing).</li>
+      </ul>
+    </li>
+    <li><strong>Create the new bucket</strong> – S3 → Create bucket. Choose a new name (e.g. <code>strapi-editorial-media-bucket</code>), same region as the existing bucket (e.g. <code>us-east-2</code>). Apply the same Block Public Access settings as the existing bucket.</li>
+    <li><strong>Apply the same bucket policy</strong> – Permissions → Bucket policy → Edit. Paste the policy from the existing bucket and replace the old bucket name (or ARN) with the new bucket name/ARN. Example (public read for objects):
+      <pre><code>{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PublicReadGetObject",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::YOUR-NEW-BUCKET-NAME/*"
+    }
+  ]
+}</code></pre>
+      Replace <code>YOUR-NEW-BUCKET-NAME</code> with your new bucket name.</li>
+    <li><strong>Apply CORS (if the existing bucket has it)</strong> – Permissions → CORS → Edit and paste the same CORS config (optionally adjust origins).</li>
+    <li><strong>Reuse the same IAM user and keys</strong> – No new IAM user needed. The IAM user that can access <code>eventapp-media-bucket</code> must also be allowed to access the new bucket. In IAM → Users → your user → Permissions:
+      <ul>
+        <li>If the policy uses a <strong>single-bucket</strong> resource (e.g. <code>arn:aws:s3:::eventapp-media-bucket</code> and <code>arn:aws:s3:::eventapp-media-bucket/*</code>), add the new bucket: duplicate those two resources and replace the bucket name with the new one, or add a second statement for the new bucket.</li>
+        <li>If the policy already allows <code>arn:aws:s3:::*</code> (all buckets in the account), the same Access Key ID and Secret work for the new bucket with no change.</li>
+      </ul>
+      Ensure the policy includes <code>s3:PutObject</code>, <code>s3:GetObject</code>, <code>s3:DeleteObject</code>, <code>s3:ListBucket</code> for the new bucket. Then use the <strong>same</strong> <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> in Strapi for the new bucket.</li>
+    <li><strong>Note for Strapi</strong> – In <code>.env</code> and Strapi Cloud variables set <code>AWS_S3_BUCKET_NAME=your-new-bucket-name</code> and <code>AWS_REGION=us-east-2</code> (or your region). Keep <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> unchanged.</li>
+  </ol>
+
+  <h4>11.2.2 Using an existing bucket with a separate folder (prefix)</h4>
+  <p>Yes. You can use your existing bucket (e.g. <code>eventapp-media-bucket</code>) and put all Strapi media under a <strong>folder prefix</strong> (S3 key prefix), e.g. <code>strapi-editorial/</code>, so Strapi’s objects live alongside other app data in the same bucket.</p>
+  <ul>
+    <li><strong>IAM</strong> – The same IAM user and keys can be used; ensure the policy allows <code>s3:PutObject</code>, <code>s3:GetObject</code>, <code>s3:DeleteObject</code>, <code>s3:ListBucket</code> on that bucket (and <code>s3:PutObjectAcl</code> if using ACLs). No new bucket or new credentials needed.</li>
+    <li><strong>Official provider (<code>@strapi/provider-upload-aws-s3</code>)</strong> – Use <code>rootPath</code> in <code>providerOptions</code> so uploads and saved URLs use a prefix. Example (same bucket, folder <code>strapi-editorial</code>):
+      <pre><code>providerOptions: {
+  baseUrl: env('CDN_URL'),  // optional, for CDN domain
+  rootPath: 'strapi-editorial',
+  s3Options: { /* credentials, region, params: { Bucket, ACL, ... } */ },
+},</code></pre>
+      Set <code>AWS_S3_BUCKET_NAME=eventapp-media-bucket</code> and <code>AWS_REGION=us-east-2</code>. New uploads will use keys like <code>strapi-editorial/filename_hash.jpeg</code>. If you don’t use a CDN, you can omit <code>baseUrl</code>; Strapi will build URLs from the bucket and <code>rootPath</code>.</li>
+    <li><strong>Migration (Phase 3)</strong> – When uploading existing <code>public/uploads/</code> files to S3, put them under the <strong>same</strong> prefix (e.g. <code>aws s3 sync public/uploads/ s3://eventapp-media-bucket/strapi-editorial/</code> (omit <code>--acl public-read</code> if the bucket does not allow ACLs)). When updating file records in the DB, set <code>path</code> to the prefixed key (e.g. <code>strapi-editorial/filename_hash.jpeg</code>) and <code>url</code> to the full S3 URL including that path.</li>
+    <li><strong>Strapi Cloud</strong> – Use the same <code>AWS_S3_BUCKET_NAME</code>, <code>rootPath</code>, and AWS credentials in Cloud variables so local and Cloud share the same bucket and folder.</li>
+  </ul>
+  <p>Alternative: the community provider <code>strapi-provider-upload-aws-s3-advanced</code> offers an explicit <code>prefix</code> option; see <a href="https://github.com/zoomoid/strapi-provider-upload-aws-s3-advanced" target="_blank" rel="noopener">strapi-provider-upload-aws-s3-advanced</a> if you need more control over the key prefix.</p>
+
+  <h4>11.2.3 Dev and prod folders (strapi-editorial-media/dev and strapi-editorial-media/prod)</h4>
+  <p>To use the same bucket with separate folders per environment:</p>
+  <ul>
+    <li><strong>Bucket:</strong> <code>eventapp-media-bucket</code></li>
+    <li><strong>Development (local):</strong> prefix <code>strapi-editorial-media/dev/</code> – keys like <code>strapi-editorial-media/dev/filename_hash.jpeg</code></li>
+    <li><strong>Production (Strapi Cloud):</strong> prefix <code>strapi-editorial-media/prod/</code> – keys like <code>strapi-editorial-media/prod/filename_hash.jpeg</code></li>
+  </ul>
+  <p>This project uses <strong>environment-specific plugin config</strong>:</p>
+  <ul>
+    <li><code>config/env/development/plugins.js</code> – <code>provider: 'aws-s3'</code>, <code>rootPath: 'strapi-editorial-media/dev'</code>, same bucket and credentials.</li>
+    <li><code>config/env/production/plugins.js</code> – <code>provider: 'aws-s3'</code>, <code>rootPath: 'strapi-editorial-media/prod'</code>, same bucket and credentials.</li>
+  </ul>
+  <p>When you run <code>npm run develop</code> (NODE_ENV=development), Strapi loads the development config → uploads go to <code>strapi-editorial-media/dev/</code>. When Strapi Cloud runs (NODE_ENV=production), it loads the production config → uploads go to <code>strapi-editorial-media/prod/</code>.</p>
+  <p><strong>Environment variables</strong> (same for both envs; only <code>rootPath</code> differs via config file):</p>
+  <pre><code>AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_REGION=us-east-2
+AWS_S3_BUCKET_NAME=eventapp-media-bucket</code></pre>
+  <p>On Strapi Cloud, set the same four variables in the project’s Settings → Variables. No need to set <code>rootPath</code> in env – it’s fixed in each <code>config/env/&lt;env&gt;/plugins.js</code>.</p>
+  <p><strong>Migration (existing files):</strong> For <strong>dev</strong>, sync to the dev prefix: <code>aws s3 sync public/uploads/ s3://eventapp-media-bucket/strapi-editorial-media/dev/</code>. For <strong>prod</strong>, sync to the prod prefix: <code>aws s3 sync public/uploads/ s3://eventapp-media-bucket/strapi-editorial-media/prod/</code>. Omit <code>--acl public-read</code> if the bucket has Object Ownership = “Bucket owner enforced” (ACLs disabled). Update file records’ <code>path</code> and <code>url</code> to include the correct prefix (<code>strapi-editorial-media/dev/...</code> or <code>strapi-editorial-media/prod/...</code>) per environment.</p>
+
+  <h3>11.3 Phase 2: Configure LOCAL for S3</h3>
+  <p>So that local Strapi (development or a staging instance) uses the same bucket. New uploads from local will go to S3; later, existing files will be migrated into that bucket.</p>
+  <ol>
+    <li><strong>Install the provider</strong> (if not already): <code>yarn add @strapi/provider-upload-aws-s3</code></li>
+    <li><strong>Local S3 config.</strong> Either:
+      <ul>
+        <li>Use <strong>one</strong> <code>config/plugins.js</code> and switch by env (e.g. <code>provider: env('NODE_ENV') === 'production' ? 'aws-s3' : 'local'</code>), or</li>
+        <li>Use <code>config/env/development/plugins.js</code> with <code>provider: 'aws-s3'</code> and the same structure as production (see §10.2), so local also uses S3. Recommended if you want local and Cloud to behave identically.</li>
+      </ul>
+      If you keep <code>provider: 'local'</code> for development, only production/Cloud will use S3; then you must run the migration (Phase 4) from an environment that has S3 configured (e.g. a one-off script with <code>NODE_ENV=production</code>), or upload files to S3 manually and update the DB (see Phase 4).
+    </li>
+    <li><strong>Environment variables on local.</strong> In <code>.env</code> (or <code>.env.development</code>) add:
+      <pre><code>AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_REGION=us-east-2
+AWS_S3_BUCKET_NAME=your-bucket-name</code></pre>
+      Use the same values you will use on Strapi Cloud so both point to the <strong>same bucket</strong>.
+    </li>
+    <li><strong>Security middleware.</strong> Ensure <code>config/middlewares.js</code> allows your bucket domain in <code>img-src</code> and <code>media-src</code> (see §10.4).</li>
+    <li><strong>Restart Strapi.</strong> New uploads from the admin (local) should now go to S3. Verify in the bucket and in the Media library (URLs should be S3 URLs).</li>
+  </ol>
+
+  <h3>11.4 Phase 3: Migrate existing local files to S3 (and point records to S3)</h3>
+  <p>You already have files in <code>public/uploads/</code> and corresponding rows in the upload plugin’s <code>files</code> table (with <code>provider: 'local'</code>). Follow these steps so the app and Strapi Cloud use S3 for existing media (bucket <code>eventapp-media-bucket</code>, dev prefix <code>strapi-editorial-media/dev/</code>).</p>
+
+  <h4>Step 3.1 – Upload file bytes to S3 (dev)</h4>
+  <p>Copy every file from <code>public/uploads/</code> into the bucket under <code>strapi-editorial-media/dev/</code>, preserving path structure. From the project root (PowerShell or Command Prompt):</p>
+  <pre><code>aws s3 sync public/uploads/ s3://eventapp-media-bucket/strapi-editorial-media/dev/</code></pre>
+  <p><strong>If your bucket does not allow ACLs</strong> (Object Ownership = “Bucket owner enforced”), omit <code>--acl public-read</code>. Use the command above. Public read is then controlled by the bucket policy only.</p>
+  <p>Requirements:</p>
+  <ul>
+    <li>AWS CLI installed and configured (same credentials as in <code>.env</code>: <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>).</li>
+    <li>Bucket <code>eventapp-media-bucket</code> exists in <code>us-east-2</code> with permissions that allow <code>s3:PutObject</code>. If the bucket uses ACLs, add <code>--acl public-read</code> to the sync command.</li>
+  </ul>
+  <p>After the sync, objects in S3 will look like: <code>strapi-editorial-media/dev/filename_hash.jpeg</code> (and <code>strapi-editorial-media/dev/subfolder/...</code> if you have subfolders in <code>public/uploads/</code>). Verify in the <a href="https://us-east-2.console.aws.amazon.com/s3/buckets/eventapp-media-bucket?region=us-east-2&prefix=strapi-editorial-media/dev/&showversions=false" target="_blank" rel="noopener">S3 console</a>.</p>
+
+  <h4>Step 3.2 – Update file records in the database</h4>
+  <p>Point every existing local upload record to the S3 object (same documentId and relations; only <code>provider</code>, <code>url</code>, and <code>provider_metadata</code> change).</p>
+  <ol>
+    <li><strong>Stop Strapi</strong> (so the DB is not locked).</li>
+    <li>From the project root run:
+      <pre><code>npm run migrate:upload-records-to-s3</code></pre>
+      This script loads Strapi, finds all <code>plugin::upload.file</code> rows with <code>provider: 'local'</code>, and updates each to <code>provider: 'aws-s3'</code>, <code>url</code> = full S3 URL, and <code>provider_metadata</code> (bucket, region, key). It derives the S3 key from the current <code>url</code> (e.g. <code>/uploads/filename_hash.jpeg</code> → <code>strapi-editorial-media/dev/filename_hash.jpeg</code>).
+    </li>
+    <li>Default prefix is <code>strapi-editorial-media/dev</code>. To update records for the <strong>prod</strong> prefix (e.g. after syncing to <code>strapi-editorial-media/prod/</code>), run:
+      <pre><code>set S3_UPLOAD_PREFIX=strapi-editorial-media/prod
+npm run migrate:upload-records-to-s3</code></pre>
+      (On macOS/Linux use <code>export S3_UPLOAD_PREFIX=strapi-editorial-media/prod</code>.)
+    </li>
+  </ol>
+  <p><strong>Do not change</strong> <code>documentId</code>, <code>id</code>, or any relation fields. Content types (Article, Bishop, etc.) keep the same file relations; no re-import is needed.</p>
+
+  <h4>Step 3.3 – Verify and optionally backup</h4>
+  <ol>
+    <li>Start Strapi (<code>npm run develop</code>). Open the Media library and a few entries that use images; confirm URLs are S3 and images load.</li>
+    <li>Optional: back up <code>public/uploads/</code> then delete or archive it locally so new uploads go only to S3.</li>
+  </ol>
+
+  <div class="note">
+    <strong>Re-import is not required.</strong> Export/import and transfer sync <strong>entities and relations</strong>. File records (documentId, id, relations) are part of that. By updating only <code>url</code>/<code>path</code>/<code>provider</code> on existing file records, you keep the same documentIds and relations; transfer or import will then copy these updated records, and Cloud will serve from S3 because it’s configured to use the same bucket.
+  </div>
+
+  <h3>11.5 Phase 4: Configure Strapi Cloud (production) for S3</h3>
+  <p>Strapi Cloud must use the <strong>same</strong> bucket and the same path/URL convention so that transferred metadata points to existing S3 objects.</p>
+  <ol>
+    <li>In the Strapi Cloud dashboard, open your project → <strong>Settings</strong> (or <strong>Variables</strong> / Environment variables).</li>
+    <li>Add the same AWS variables you use locally:
+      <ul>
+        <li><code>AWS_ACCESS_KEY_ID</code></li>
+        <li><code>AWS_SECRET_ACCESS_KEY</code></li>
+        <li><code>AWS_REGION</code></li>
+        <li><code>AWS_S3_BUCKET_NAME</code></li>
+      </ul>
+      Optional: <code>AWS_ACL</code>, <code>CDN_URL</code> if you use a CDN in front of S3.
+    </li>
+    <li>Ensure your project code includes <code>config/env/production/plugins.js</code> with <code>provider: 'aws-s3'</code> (see §10.2). Deploy so Cloud runs with this config.</li>
+    <li>After deploy, Cloud will use S3 for new uploads and will resolve existing file records’ <code>url</code> to the same bucket (no 404s if URLs match).</li>
+  </ol>
+
+  <h3>11.6 Phase 5: Transfer or export/import (after S3 and migration)</h3>
+  <p>Once local DB file records point to S3 and both local and Cloud are configured for the same bucket:</p>
+  <ol>
+    <li><strong>Transfer (recommended):</strong> From your local machine run <code>strapi transfer --to https://your-project.strapiapp.com/admin</code> with a Push token from Cloud. Transfer will sync database content (including the updated file records with S3 URLs). It does not re-upload file bytes because the source is already using S3; Cloud and local both read from the same bucket, so media works.</li>
+    <li><strong>Export then import:</strong> Run <code>strapi export -f my-export</code> locally, then on Strapi Cloud (if the platform supports running <code>strapi import</code>) run <code>strapi import -f my-export.tar.gz -k "…"</code>. Export from an S3 source includes only metadata; import on Cloud will create the same file records pointing to the same S3 URLs. No need to copy file bytes.</li>
+  </ol>
+  <p>If you have not yet run the migration (Phase 3), and you transfer from a <strong>local</strong> source (provider still <code>local</code>), Strapi will stream file bytes to Cloud. Cloud’s filesystem may still be ephemeral, so you can get 404s after deploy. The robust approach is: complete Phase 2 and 3 (local S3 + migrate existing data), then Phase 4 (Cloud S3), then Phase 5 (transfer or import).</p>
+
+  <h3>11.7 Summary: order of operations</h3>
+  <table>
+    <thead>
+      <tr><th>Step</th><th>Action</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1</td><td>Create one S3 bucket; IAM credentials for Strapi.</td></tr>
+      <tr><td>2</td><td>Configure <strong>local</strong> Strapi for S3 (plugins, env, middleware).</td></tr>
+      <tr><td>3</td><td>Upload existing <code>public/uploads/</code> files to S3 (same path structure).</td></tr>
+      <tr><td>4</td><td>Update upload file records in DB: <code>provider</code>, <code>url</code>, <code>path</code> (and optionally <code>provider_metadata</code>). Keep documentId and relations unchanged.</td></tr>
+      <tr><td>5</td><td>Configure <strong>Strapi Cloud</strong> with same AWS env vars and same bucket.</td></tr>
+      <tr><td>6</td><td>Deploy Cloud with <code>config/env/production/plugins.js</code> (S3).</td></tr>
+      <tr><td>7</td><td>Run <strong>transfer</strong> (or export/import) to sync DB; media already in S3, so no 404s.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="alternatives">12. Alternatives &amp; Trade-offs</h2>
+  <ul>
+    <li><strong>Cloudflare R2:</strong> S3-compatible; use <code>@strapi/provider-upload-aws-s3</code> with <code>endpoint</code> and omit ACL (R2 does not support ACLs).</li>
+    <li><strong>MinIO / DigitalOcean Spaces:</strong> S3-compatible; same provider with <code>endpoint</code>.</li>
+    <li><strong>Cloudinary:</strong> Different provider (<code>@strapi/provider-upload-cloudinary</code>); similar transfer limitation (no file bytes).</li>
+    <li><strong>Shared S3 bucket:</strong> Local and Strapi Cloud both point to the same bucket. Transfer only syncs metadata; files already in S3. Best for teams that want a single source of truth.</li>
+  </ul>
+
+  <h2 id="references">13. References</h2>
+  <ul>
+    <li><a href="https://docs.strapi.io/cloud/advanced/upload" target="_blank" rel="noopener">Upload Provider Configuration for Strapi Cloud</a></li>
+    <li><a href="https://docs.strapi.io/cms/configurations/media-library-providers/amazon-s3" target="_blank" rel="noopener">Amazon S3 provider – Strapi 5</a></li>
+    <li><a href="https://docs.strapi.io/cms/data-management/export" target="_blank" rel="noopener">Data export – Strapi 5</a></li>
+    <li><a href="https://docs.strapi.io/cms/data-management/transfer" target="_blank" rel="noopener">Data transfer – Strapi 5</a></li>
+    <li><a href="strapi5_export_import_transfer.html">Strapi 5 Export, Import, Transfer (project doc)</a></li>
+  </ul>
+
+  <script>
+    (function() {
+      document.querySelectorAll('pre').forEach(function(pre) {
+        var wrap = document.createElement('div');
+        wrap.className = 'command-wrap';
+        var btn = document.createElement('button');
+        btn.className = 'copy-btn';
+        btn.type = 'button';
+        btn.textContent = '📋 Copy';
+        btn.title = 'Copy to clipboard';
+        btn.setAttribute('aria-label', 'Copy command to clipboard');
+        btn.onclick = function() {
+          var text = pre.textContent.trim();
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function() {
+              btn.textContent = '✓ Copied!';
+              btn.classList.add('copied');
+              setTimeout(function() {
+                btn.textContent = '📋 Copy';
+                btn.classList.remove('copied');
+              }, 2000);
+            }).catch(function() { fallbackCopy(text, btn); });
+          } else { fallbackCopy(text, btn); }
+        };
+        pre.parentNode.insertBefore(wrap, pre);
+        wrap.appendChild(btn);
+        wrap.appendChild(pre);
+      });
+      function fallbackCopy(text, btn) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          btn.textContent = '✓ Copied!';
+          btn.classList.add('copied');
+          setTimeout(function() {
+            btn.textContent = '📋 Copy';
+            btn.classList.remove('copied');
+          }, 2000);
+        } catch (e) {}
+        document.body.removeChild(ta);
+      }
+    })();
+  </script>
+</body>
+</html>
