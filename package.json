@@ -26,12 +26,14 @@
     "seed:parish-images": "node ./scripts/seed-parish-images.js",
     "sync:parishes-from-churches": "node ./scripts/sync-parishes-from-churches.js",
     "test:bishop_upload": "node ./scripts/test_bishop_upload.js",
+    "migrate:upload-records-to-s3": "node ./scripts/migrate_upload_records_to_s3.js",
     "start": "strapi start",
     "strapi": "strapi"
   },
   "dependencies": {
     "@strapi/plugin-cloud": "^5.9.0",
     "@strapi/plugin-users-permissions": "5.34.0",
+    "@strapi/provider-upload-aws-s3": "^5.36.0",
     "@strapi/strapi": "5.34.0",
     "better-sqlite3": "11.3.0",
     "cheerio": "^1.0.0",

@@ -716,6 +716,24 @@ async function ensureFlashNewsItemTitleFirst() {
 }
 
 /**
+ * Ensure every content type has a Content Manager configuration in the store.
+ * After a data transfer, some content types may have explorer.read permission but no
+ * configuration in core-store, causing "Cannot read properties of undefined (reading 'settings')"
+ * in the homepage service (getContentTypesMeta).
+ */
+async function ensureContentManagerConfigurations() {
+  try {
+    const contentTypesService = strapi.plugin('content-manager')?.service('content-types');
+    if (contentTypesService && typeof contentTypesService.syncConfigurations === 'function') {
+      await contentTypesService.syncConfigurations();
+      strapi.log.info('Content Manager: synced configurations for all content types');
+    }
+  } catch (err) {
+    strapi.log.warn('Could not sync content manager configurations:', err?.message ?? err);
+  }
+}
+
+/**
  * Ensure Article list view shows publishedAt column and is sorted by publishedAt (newest first).
  * Writes to the same store/key the content-manager server uses so the configuration API
  * returns the list layout with publishedAt (key: configuration_content_types::api::article.article).
@@ -783,6 +801,40 @@ async function ensureArticleListSortAndColumns() {
  */
 
 /**
+ * Ensure all collection types have valid defaultSortBy and defaultSortOrder in their
+ * Content Manager configuration. Prevents sort=undefined:undefined in list API (400 errors).
+ */
+async function ensureCollectionTypesHaveDefaultSort() {
+  try {
+    const store = strapi.store({ type: 'plugin', name: 'content_manager' });
+    const contentTypes = Object.values(strapi.contentTypes).filter(
+      (ct) => ct.kind === 'collectionType' && ct.uid?.startsWith('api::')
+    );
+    for (const ct of contentTypes) {
+      const configKey = `configuration_content_types::${ct.uid}`;
+      const config = (await store.get({ key: configKey })) || {};
+      config.settings = config.settings || {};
+      const mainField = config.settings.mainField || 'documentId';
+      const defaultSortBy = config.settings.defaultSortBy ?? mainField;
+      const defaultSortOrder = config.settings.defaultSortOrder ?? 'ASC';
+      if (
+        config.settings.defaultSortBy !== defaultSortBy ||
+        config.settings.defaultSortOrder !== defaultSortOrder
+      ) {
+        config.settings.defaultSortBy = defaultSortBy;
+        config.settings.defaultSortOrder = defaultSortOrder;
+        await store.set({ key: configKey, value: config });
+        strapi.log.info(
+          `Content Manager: ${ct.uid} default sort=${defaultSortBy}:${defaultSortOrder}`
+        );
+      }
+    }
+  } catch (err) {
+    strapi.log.warn('Could not ensure collection types default sort:', err?.message ?? err);
+  }
+}
+
+/**
  * When re-publishing, refresh published_at to NOW so the item stays in "Last Published Entries".
  * Runs in the background so the publish response returns immediately (fixes spinning button).
  * Set DISABLE_PUBLISH_DATE_REFRESH=1 in .env to turn off if it causes frontend 404s.
@@ -824,7 +876,9 @@ module.exports = async () => {
   await ensureEditorTenantScopedPermissions();
   await hideTenantFieldInContentManagerLayout();
   await ensureFlashNewsItemTitleFirst();
+  await ensureContentManagerConfigurations();
   await ensureArticleListSortAndColumns();
+  await ensureCollectionTypesHaveDefaultSort();
   registerPublishDateRefreshMiddleware();
   await registerTenantDocumentMiddleware();
 };

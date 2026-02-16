@@ -1,0 +1,34 @@
+---
+description: Strapi Cloud bootstrap fixes — content-manager config sync and default sort to prevent transfer/post-deploy errors
+globs: src/bootstrap.js, src/extensions/content-manager/**
+alwaysApply: false
+---
+
+# Strapi Cloud Bootstrap Fixes
+
+Critical bootstrap steps in `src/bootstrap.js` that fix errors after data transfer to Strapi Cloud. Do not remove these without understanding the consequences.
+
+## Required Order
+
+1. `ensureContentManagerConfigurations()` — runs content-manager `syncConfigurations()`
+2. `ensureArticleListSortAndColumns()` — Article-specific publishedAt column/sort
+3. `ensureCollectionTypesHaveDefaultSort()` — default sort for all collection types
+
+## Fixes Applied
+
+| Step | Error it fixes |
+|------|----------------|
+| `ensureContentManagerConfigurations` | `TypeError: Cannot read properties of undefined (reading 'settings')` in `getContentTypesMeta` (homepage count-documents, recent-documents). After transfer, some content types have explorer.read permission but no config in core-store. |
+| `ensureCollectionTypesHaveDefaultSort` | `sort=undefined:undefined` in list API → 400 errors. Configs missing `defaultSortBy` / `defaultSortOrder`. |
+
+## Verification
+
+After deploy or transfer, verify:
+
+- Admin homepage loads without 500s on `/content-manager/homepage/count-documents` and `recent-documents`
+- Collection list views (e.g. Bishop) load without 400 on `sort=undefined`
+
+## Related
+
+- Content-manager extension: `src/extensions/content-manager/strapi-server.js` (Article publishedAt injection, tenant filter)
+- Cloud setup: `documentation/strapi_cloud_setup.html`

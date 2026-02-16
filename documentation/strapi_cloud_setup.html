@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strapi Cloud: API Tokens, Data Import & Bulk Delete</title>
+  <style>
+    :root {
+      --bg: #f5f5f7;
+      --text: #1d1d1f;
+      --primary: #4945ff;
+      --primary-hover: #3a36e6;
+      --code-bg: #f0f0f0;
+      --border: #e5e5e7;
+      --success: #328048;
+      --warning: #b76b00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+      padding: 2rem;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 2px solid var(--primary);
+    }
+    h3 { font-size: 1rem; font-weight: 600; margin-top: 1.5rem; }
+    p { margin: 0.5rem 0; }
+    ul, ol {
+      margin: 0.5rem 0;
+      padding-left: 1.5rem;
+    }
+    li { margin: 0.25rem 0; }
+    code {
+      font-family: 'SF Mono', Monaco, monospace;
+      background: var(--code-bg);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    pre {
+      background: var(--code-bg);
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    pre code { padding: 0; background: none; }
+    .note {
+      background: #e8f4fd;
+      border-left: 4px solid var(--primary);
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+    }
+    .warning {
+      background: #fff8e6;
+      border-left: 4px solid var(--warning);
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+    }
+    .success {
+      background: #e6f4ea;
+      border-left: 4px solid var(--success);
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+    .subtitle { color: #666; font-size: 0.95rem; margin-bottom: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>Strapi Cloud: API Tokens & Data Import</h1>
+  <p class="subtitle">Guide for API tokens (frontend access), importing local data into Strapi Cloud, and bulk deleting data.</p>
+
+  <hr>
+
+  <h2>1. API Tokens (for Frontend Access)</h2>
+  <p>API tokens let your frontend application authenticate with your Strapi Cloud REST or GraphQL API. Tokens are created <strong>inside the Strapi admin panel</strong> of your deployed Cloud app, not from the Strapi Cloud dashboard.</p>
+
+  <h3>Step 1: Open Your Strapi Cloud App</h3>
+  <ol>
+    <li>Go to <a href="https://cloud.strapi.io" target="_blank" rel="noopener">Strapi Cloud</a> and select your project.</li>
+    <li>Click <strong>Visit app</strong> or use your production URL (e.g. <code>https://your-project-name.strapiapp.com</code>).</li>
+    <li>Log in to the Strapi admin panel.</li>
+  </ol>
+
+  <h3>Step 2: Go to API Tokens</h3>
+  <ol>
+    <li>In the admin sidebar, click <strong>Settings</strong> (gear icon).</li>
+    <li>Under <strong>Global settings</strong>, click <strong>API Tokens</strong>.</li>
+  </ol>
+
+  <h3>Step 3: Create a New Token</h3>
+  <ol>
+    <li>Click <strong>Create new API Token</strong>.</li>
+    <li>Configure:
+      <ul>
+        <li><strong>Name</strong>: e.g. &quot;Frontend read-only&quot;</li>
+        <li><strong>Description</strong> (optional): e.g. &quot;For frontend app read access&quot;</li>
+        <li><strong>Token duration</strong>: 30 days, 90 days, or Unlimited</li>
+        <li><strong>Token type</strong>: <strong>Read-only</strong> for frontend (recommended), or Custom for specific permissions</li>
+      </ul>
+    </li>
+    <li>Click <strong>Save</strong>.</li>
+  </ol>
+
+  <h3>Step 4: Copy the Token</h3>
+  <p>The token is shown <strong>only once</strong> after creation. Copy it immediately and store it securely (e.g. in your frontend&apos;s environment variables).</p>
+
+  <div class="note">
+    <strong>Tip:</strong> If you configure <code>admin.secrets.encryptionKey</code>, you can regenerate and view tokens again later.
+  </div>
+
+  <h3>Using the Token in Your Frontend</h3>
+  <p>Add it as an HTTP header:</p>
+  <pre><code>Authorization: Bearer YOUR_API_TOKEN</code></pre>
+  <p>Example with fetch:</p>
+  <pre><code>fetch('https://your-project-name.strapiapp.com/api/articles', {
+  headers: {
+    'Authorization': 'Bearer YOUR_API_TOKEN',
+  },
+});</code></pre>
+
+  <div class="warning">
+    <strong>Security:</strong> Use Read-only tokens for public frontend access. Never expose admin or full-access tokens in client-side code. Store tokens in environment variables, not hardcoded.
+  </div>
+
+  <hr>
+
+  <h2>2. Data Import to Strapi Cloud</h2>
+  <p>Strapi Cloud does not run <code>strapi import</code> directly. To get a local <code>.tar</code> export into Strapi Cloud, use this workflow: <strong>Import locally → Transfer to Cloud</strong>.</p>
+
+  <h3>Prerequisites</h3>
+  <ul>
+    <li>Local Strapi project with the same code/schema as your Cloud project</li>
+    <li>A <code>.tar</code> export file (e.g. from <code>strapi export</code>)</li>
+    <li>Strapi Cloud project deployed and running</li>
+  </ul>
+
+  <h3>Step 1: Import the .tar File Locally</h3>
+  <p>In your <strong>local</strong> Strapi project root, run:</p>
+  <pre><code>npm run strapi import -- -f "E:\project_workspace\strapi-editorial-template\my-export-1.tar" --force</code></pre>
+  <p>Or with forward slashes (more portable):</p>
+  <pre><code>npm run strapi import -- -f "E:/project_workspace/strapi-editorial-template/my-export-1.tar" --force</code></pre>
+  <p>This loads the archive into your local database and uploads. Make sure Strapi is <strong>not running</strong> during import.</p>
+
+  <h3>Step 2: Create a Transfer Token in Strapi Cloud</h3>
+  <ol>
+    <li>Open your Strapi Cloud project in the browser and log in to the admin.</li>
+    <li>Go to <strong>Settings</strong> → <strong>Transfer Tokens</strong>.</li>
+    <li>Create a new token:
+      <ul>
+        <li><strong>Type</strong>: Push or Full access</li>
+        <li><strong>Duration</strong>: 7, 30, or 90 days</li>
+      </ul>
+    </li>
+    <li>Copy the token; it is shown only once.</li>
+  </ol>
+
+  <h3>Step 3: Start Your Local Strapi</h3>
+  <pre><code>npm run develop</code></pre>
+  <p>(or <code>npm run start</code>)</p>
+
+  <h3>Step 4: Push Data to Strapi Cloud</h3>
+  <p>In a new terminal, from your local project root:</p>
+  <pre><code>npm run strapi transfer -- --to https://YOUR-CLOUD-PROJECT.admin.strapiapp.com/admin --to-token YOUR_TRANSFER_TOKEN --force</code></pre>
+  <p>Replace:</p>
+  <ul>
+    <li><code>YOUR-CLOUD-PROJECT</code> with your Cloud project name (from the dashboard)</li>
+    <li><code>YOUR_TRANSFER_TOKEN</code> with the token from Step 2</li>
+  </ul>
+
+  <div class="note">
+    <strong>Large exports:</strong> For a 375 MB export, transfer can take 10–30+ minutes depending on network speed.
+  </div>
+
+  <div class="warning">
+    <strong>Important:</strong> Transfer overwrites all data and assets in the Cloud project. Source and target schemas must match. Admin users are not transferred.
+  </div>
+
+  <hr>
+
+  <h2>3. Bulk Delete Strapi Cloud Data</h2>
+  <p>You can clear data in Strapi Cloud in several ways, depending on scope.</p>
+
+  <h3>Option A: Admin Panel – Bulk Delete (per content type)</h3>
+  <ol>
+    <li>In the Strapi admin, go to <strong>Content Manager</strong> and select a content type (e.g. Article).</li>
+    <li>Select entries with the checkboxes (or <strong>Select all</strong>).</li>
+    <li>Use the bulk actions menu and choose <strong>Delete</strong>.</li>
+  </ol>
+  <p>Repeat for each content type you want to clear.</p>
+
+  <h3>Option B: Strapi Cloud – Reset Environment (full wipe)</h3>
+  <p>Removes <strong>all data and assets</strong> for that environment:</p>
+  <ol>
+    <li>Go to <a href="https://cloud.strapi.io" target="_blank" rel="noopener">Strapi Cloud</a> and select your project.</li>
+    <li>Open <strong>Settings</strong> and select the environment (e.g. Production).</li>
+    <li>Open the <strong>Configuration</strong> tab and scroll to <strong>Danger zone</strong>.</li>
+    <li>Click <strong>Reset environment</strong>.</li>
+    <li>Follow the prompts (e.g. confirm environment name) and confirm.</li>
+  </ol>
+  <p>The database and assets are cleared; the project stays connected to Git.</p>
+
+  <h3>Option C: API – Programmatic delete</h3>
+  <p>Use the REST API with a token that has delete permission. There is no single bulk-delete endpoint; list entries then delete each by document ID:</p>
+  <pre><code>DELETE https://your-project.strapiapp.com/api/articles/DOCUMENT_ID</code></pre>
+
+  <h3>Option D: Transfer/import overwrite</h3>
+  <p>Running a <strong>transfer</strong> or <strong>import</strong> into Strapi Cloud replaces all existing data. Transferring from an empty local instance, or importing a fresh export, effectively bulk-deletes everything on Cloud before loading the new data.</p>
+
+  <table style="width:100%; border-collapse: collapse; margin-top: 1rem;">
+    <thead>
+      <tr style="background: var(--code-bg);">
+        <th style="text-align:left; padding: 0.5rem; border: 1px solid var(--border);">Method</th>
+        <th style="text-align:left; padding: 0.5rem; border: 1px solid var(--border);">Scope</th>
+        <th style="text-align:left; padding: 0.5rem; border: 1px solid var(--border);">When to use</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Admin bulk delete</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Per content type</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Remove many entries of one type</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Reset environment</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Entire project</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Wipe everything and start fresh</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">API delete loop</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Custom</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Scripting or specific IDs</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Transfer/import</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Entire project</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Replace with another dataset or empty DB</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+
+  <h2>Quick Reference</h2>
+  <table style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr style="background: var(--code-bg);">
+        <th style="text-align:left; padding: 0.5rem; border: 1px solid var(--border);">Action</th>
+        <th style="text-align:left; padding: 0.5rem; border: 1px solid var(--border);">Where</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Create API token (frontend)</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Strapi Admin → Settings → API Tokens</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Create Transfer token</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Strapi Admin → Settings → Transfer Tokens</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Import .tar locally</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);"><code>npm run strapi import -- -f "path/to/file.tar" --force</code></td>
+      </tr>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Transfer to Cloud</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);"><code>npm run strapi transfer -- --to URL/admin --to-token TOKEN --force</code></td>
+      </tr>
+      <tr>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Bulk delete / Reset environment</td>
+        <td style="padding: 0.5rem; border: 1px solid var(--border);">Strapi Cloud → Settings → Environment → Configuration → Danger zone → Reset environment</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr>
+  <p style="font-size: 0.875rem; color: #666;">Strapi Cloud Setup Guide · Strapi Editorial Template</p>
+</body>
+</html>
