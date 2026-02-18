@@ -594,7 +594,20 @@ async function main() {
     }
   }
 
-  // Phase 2: restore relations (PATCH)
+  // Phase 2: restore relations (PATCH). API expects attribute names (category, tenant, author, cover). Export may nest under manyToOne/oneToOne – expand those.
+  const RELATION_TYPE_KEYS = new Set(['manyToOne', 'oneToOne', 'oneToMany', 'morphToMany', 'morphToOne']);
+  function addConnectPayload(connectPayload, field, value, logContext) {
+    if (RELATION_TYPE_KEYS.has(field) && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      for (const [subField, subValue] of Object.entries(value)) {
+        const conn = buildConnectPayload(subValue, docIdMap, { ...logContext, field: subField });
+        if (conn) connectPayload[subField] = conn;
+      }
+      return;
+    }
+    if (RELATION_TYPE_KEYS.has(field)) return;
+    const conn = buildConnectPayload(value, docIdMap, logContext);
+    if (conn) connectPayload[field] = conn;
+  }
   const withRelations = entityMeta.filter(m => m.relations && Object.keys(m.relations).length > 0);
   if (withRelations.length > 0 && !DRY_RUN) {
     console.log('\nPhase 2: restoring relations for', withRelations.length, 'entities...');
@@ -604,9 +617,9 @@ async function main() {
       const plural = typeToPlural[type];
       if (!plural) continue;
       const connectPayload = {};
+      const logContext = { type, ref };
       for (const [field, value] of Object.entries(relations)) {
-        const conn = buildConnectPayload(value, docIdMap, { type, ref, field });
-        if (conn) connectPayload[field] = conn;
+        addConnectPayload(connectPayload, field, value, logContext);
       }
       if (Object.keys(connectPayload).length === 0) continue;
       try {

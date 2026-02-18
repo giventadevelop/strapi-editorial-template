@@ -79,6 +79,7 @@
       <li><a href="#quickref">Quick reference</a></li>
       <li><a href="#docs">Official documentation</a></li>
       <li><a href="#rest-push-summary">REST push – summary and helper scripts</a></li>
+      <li><a href="#export-strip-uploads">Export: exclude upload.file entities (strip script)</a></li>
     </ol>
   </nav>
 
@@ -726,6 +727,11 @@ npm run clear:cloud-data</code></pre>
         <td><code>npm run push:rest-to-cloud -- my-export.tar.gz</code></td>
         <td>Pushes export content to Cloud via the Content API (phases 0–2 above). Env: <code>REST_PUSH_INCLUDE_UPLOADS=1</code> (default) or <code>0</code> to skip media.</td>
       </tr>
+      <tr>
+        <td>Strip upload.file from export</td>
+        <td><code>npm run export:strip-uploads -- my-export.tar.gz</code></td>
+        <td>Rewrites the export archive to remove all <code>plugin::upload.file</code> entities. Use when the export contains thousands of upload records that only cause 403 on asset read and you don’t need them. Output: <code>my-export.no-uploads.tar.gz</code>. See §10.1.7.</td>
+      </tr>
     </tbody>
   </table>
 
@@ -744,6 +750,22 @@ npm run clear:cloud-data</code></pre>
     <li><code>publishedAt</code> is not stripped from the payload; if the export has it, it is sent (Cloud/API may still override on create).</li>
     <li>If you see “0 links matched” in the log, the export’s <code>links/</code> use a different ref format; the script supports both <code>documentId</code> and numeric <code>id</code> for link left/right.</li>
   </ul>
+
+  <h3 id="export-strip-uploads">10.1.7 Export: exclude upload.file entities (strip script)</h3>
+  <p>When you run <code>strapi export</code> and media is on S3 (or another URL), Strapi still writes all <strong>entities</strong> (including <code>plugin::upload.file</code> – the 16k+ media records with URLs). When it then tries to read the <strong>asset bytes</strong> to put into the archive, the request often returns <strong>403 Forbidden</strong> (e.g. private bucket). The export still completes and produces a valid archive, but it contains thousands of upload records that are useless for push/import if you can't read the files. Strapi does not provide an option to exclude only <code>plugin::upload.file</code> (or "files") from the export.</p>
+  <p><strong>Strip script:</strong> After exporting, you can rewrite the archive to remove all <code>plugin::upload.file</code> entity lines. The result is a smaller export with no upload records; use it for REST push or import when you don't need those records (cover/image will stay empty unless you add media another way).</p>
+  <h4>Workflow</h4>
+  <ol>
+    <li><strong>Export</strong> (403 on assets is expected; the command still finishes):
+      <pre><code>npm run strapi export -- --no-encrypt -f my-export-5-records</code></pre>
+    </li>
+    <li><strong>Strip upload entities</strong> from the archive (output: <code>my-export-5-records.no-uploads.tar.gz</code>):
+      <pre><code>npm run export:strip-uploads -- my-export-5-records.tar.gz</code></pre>
+    </li>
+    <li><strong>Use the new file</strong> for push or import:
+      <pre><code>npm run push:rest-to-cloud -- my-export-5-records.no-uploads.tar.gz</code></pre>
+  </ol>
+  <p>The script only rewrites the archive; it does not change the original file. The 403 still occurs during the original export when Strapi tries to read asset bytes; the strip step only removes the upload.file entities from the resulting archive so downstream tools don't see 16k+ uploads.</p>
 
   <h3>10.2 Why images 404 after push/import to Strapi Cloud</h3>
   <p>Transfer creates or updates <strong>media entries</strong> in the database (admin shows files and URLs). The <strong>binary files</strong> either are not included in what gets deployed to Cloud, or are stored in a different/transient filesystem that does not match the app’s <code>/uploads</code> serving. So when the app or admin requests <code>/uploads/...</code>, the file is not there → <strong>404</strong>.</p>
@@ -801,6 +823,7 @@ npm run clear:cloud-data</code></pre>
       <tr><td>REST push to Cloud (bypass WebSocket)</td><td>Set <code>STRAPI_CLOUD_URL</code> and <code>STRAPI_CLOUD_API_TOKEN</code>; then <code>npm run push:rest-to-cloud -- my-export.tar.gz</code> (see §10.1.5 and §10.1.6)</td></tr>
       <tr><td>Clear collection data (remote or local)</td><td><code>npm run clear:cloud-data</code> (remote) or <code>npm run clear:cloud-data -- --local</code> (local). Optional: <code>--dry-run</code>, <code>--types=articles,parishes</code></td></tr>
       <tr><td>Keep 5 records per type (remote or local)</td><td><code>npm run cloud:keep-five</code> (remote) or <code>npm run cloud:keep-five -- --local</code> (local). Optional: <code>--dry-run</code></td></tr>
+      <tr><td>Strip upload.file entities from export</td><td><code>npm run export:strip-uploads -- my-export.tar.gz</code> → produces <code>my-export.no-uploads.tar.gz</code> (see §10.1.7)</td></tr>
     </tbody>
   </table>
 

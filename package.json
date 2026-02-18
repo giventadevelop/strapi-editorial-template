@@ -26,6 +26,7 @@
     "cloud:keep-five": "node ./scripts/cloud_keep_five.js",
     "bulk_publish:articles": "node ./scripts/bulk_publish_articles.js",
     "export:news_tenant_demo": "node ./scripts/export_news_tenant_demo.js",
+    "export:strip-uploads": "node ./scripts/strip_upload_entities_from_export.js",
     "seed:news_catholicatenews": "node ./scripts/data_import_seed_news_catholicatenews.js",
     "seed:parish-images": "node ./scripts/seed-parish-images.js",
     "test:bishop_upload": "node ./scripts/test_bishop_upload.js",
