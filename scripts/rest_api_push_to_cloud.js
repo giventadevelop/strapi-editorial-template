@@ -18,7 +18,7 @@
  *   STRAPI_CLOUD_URL     – base URL of the destination (no trailing slash).
  *   STRAPI_CLOUD_API_TOKEN – Full Access API token.
  *   REST_PUSH_BATCH_SIZE – optional, default 20.
- *   REST_PUSH_RETRY_LIMIT – optional, default 3.
+ *   REST_PUSH_RETRY_LIMIT – optional, default 3. Or use --retry=N (e.g. --retry=1 for no retries).
  *   REST_PUSH_DELAY_MS   – optional, ms between requests (default 0).
  *   REST_PUSH_DRY_RUN    – set to 1 to only parse and log, no HTTP.
  *   REST_PUSH_INCLUDE_UPLOADS – set to 1 to push upload (media) so cover/image can be linked.
@@ -48,10 +48,12 @@ const zlib = require('zlib');
 const { createGunzip } = zlib;
 const tarStream = require('tar-stream');
 
+const retryArg = process.argv.find(a => a.startsWith('--retry='));
+const retryFromArg = retryArg ? parseInt(retryArg.split('=')[1], 10) : NaN;
 const CLOUD_URL = (process.env.STRAPI_CLOUD_URL || '').replace(/\/$/, '');
 const API_TOKEN = process.env.STRAPI_CLOUD_API_TOKEN || '';
 const BATCH_SIZE = Math.max(1, parseInt(process.env.REST_PUSH_BATCH_SIZE || '20', 10));
-const RETRY_LIMIT = Math.max(1, parseInt(process.env.REST_PUSH_RETRY_LIMIT || '3', 10));
+const RETRY_LIMIT = Math.max(0, Number.isFinite(retryFromArg) ? retryFromArg : parseInt(process.env.REST_PUSH_RETRY_LIMIT || '3', 10));
 const RETRY_DELAY_MS = 2000;
 const DELAY_BETWEEN_REQUESTS_MS = Math.max(0, parseInt(process.env.REST_PUSH_DELAY_MS || '0', 10));
 const DRY_RUN = process.env.REST_PUSH_DRY_RUN === '1' || process.env.REST_PUSH_DRY_RUN === 'true';
@@ -389,7 +391,8 @@ function extractEntitiesAndLinksFromExport(exportPath, typeToPlural, singleTypes
 }
 
 async function main() {
-  const exportPath = process.argv[2] || process.env.EXPORT_FILE || path.join(projectRoot, 'my-export.tar.gz');
+  const args = process.argv.slice(2);
+  const exportPath = args.find(a => !a.startsWith('--')) || process.env.EXPORT_FILE || path.join(projectRoot, 'my-export.tar.gz');
   const altPath = exportPath.replace(/\.gz$/, '');
   const resolved = fs.existsSync(exportPath) ? exportPath : (fs.existsSync(altPath) ? altPath : null);
   if (!resolved) {
