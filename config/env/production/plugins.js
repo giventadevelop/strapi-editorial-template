@@ -14,7 +14,9 @@ module.exports = ({ env }) => ({
           },
           region: env('AWS_REGION', 'us-east-2'),
           params: {
-            ACL: env('AWS_ACL', 'public-read'),
+            // Set ACL to undefined when bucket has "Bucket owner enforced" (ACLs disabled).
+            // Provider adds default public-read if ACL key is absent, so we must include it.
+            ACL: (env('AWS_ACL') && env('AWS_ACL') !== 'none') ? env('AWS_ACL') : undefined,
             Bucket: env('AWS_S3_BUCKET_NAME', 'eventapp-media-bucket'),
           },
         },

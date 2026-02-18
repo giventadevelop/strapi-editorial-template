@@ -1,0 +1,31 @@
+---
+description: S3 upload — omit ACL when bucket has "Bucket owner enforced" (ACLs disabled)
+globs: config/env/**/plugins.js, config/plugins.js
+alwaysApply: false
+---
+
+# S3 Upload ACL Fix
+
+When the S3 bucket has **Object Ownership** set to "Bucket owner enforced", ACLs are disabled. Using `ACL: 'public-read'` in the S3 params causes:
+
+```
+AccessControlListNotSupported: The bucket does not allow ACLs
+http: POST /upload 500
+```
+
+## Fix Applied
+
+In `config/env/development/plugins.js` and `config/env/production/plugins.js`, the upload provider params **explicitly set ACL to undefined** when the bucket does not support ACLs:
+
+```js
+params: {
+  ACL: (env('AWS_ACL') && env('AWS_ACL') !== 'none') ? env('AWS_ACL') : undefined,
+  Bucket: env('AWS_S3_BUCKET_NAME', 'eventapp-media-bucket'),
+},
+```
+
+The provider adds `public-read` by default when the ACL key is absent. We must include `ACL: undefined` so the provider skips its default and does not send an ACL header to S3.
+
+## Verification
+
+Upload an image in Media Library or editorial-advertisements. Upload should succeed without 500 error.
