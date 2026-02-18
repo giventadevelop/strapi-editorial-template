@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Delete all Directory entries: Bishops, Churches, Dioceses, Directory Entries, Parishes, Priests.
+ * Delete all Directory entries: Bishops, Dioceses, Directory Entries, Parishes, Priests.
  * Use for a clean slate before re-running the directory import (e.g. to fix tenant mapping).
  *
  * Run from project root: node scripts/delete_directory_entries.js
@@ -16,7 +16,6 @@ const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 
 const DIRECTORY_TYPES = [
   { uid: 'api::priest.priest', label: 'Directory – Priests' },
-  { uid: 'api::church.church', label: 'Directory – Churches' },
   { uid: 'api::parish.parish', label: 'Directory – Parishes' },
   { uid: 'api::bishop.bishop', label: 'Directory – Bishops' },
   { uid: 'api::catholicos.catholicos', label: 'Directory – The Catholicos' },

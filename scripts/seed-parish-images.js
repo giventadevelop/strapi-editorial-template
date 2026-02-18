@@ -1,10 +1,9 @@
 'use strict';
 
 /**
- * Backfill parish image from the matching church (same name + diocese).
- * Use when Parish content type already has an image field but existing parishes
- * have no image (e.g. after adding the image field or before directory import
- * was updated to set parish images).
+ * Backfill parish image from another source (e.g. matching church by name + diocese).
+ * The Church content type was removed; this script now exits without error.
+ * Parish images are set during directory import (data_import_seed_directory_mosc_in.js).
  *
  * Run from project root: node scripts/seed-parish-images.js
  * Optional: DRY_RUN=1 to only list what would be updated.
@@ -47,6 +46,16 @@ async function setMediaRelationViaDb(strapi, contentTypeUid, entityDocumentId, f
 async function runBackfill(strapi) {
   const parishUid = 'api::parish.parish';
   const churchUid = 'api::church.church';
+  let churches;
+  try {
+    churches = await strapi.documents(churchUid).findMany({
+      populate: { image: true, diocese: true },
+      limit: 5000,
+    });
+  } catch (_) {
+    console.log('Church content type was removed. Parish images are set during directory import. Nothing to backfill.');
+    return;
+  }
 
   const parishes = await strapi.documents(parishUid).findMany({
     populate: { image: true, diocese: true },
@@ -59,11 +68,12 @@ async function runBackfill(strapi) {
     return;
   }
 
-  const churches = await strapi.documents(churchUid).findMany({
-    populate: { image: true, diocese: true },
-    limit: 5000,
-  });
-  const churchList = churches?.results ?? churches?.data ?? (Array.isArray(churches) ? churches : []);
+  const churchList = churches ? (churches?.results ?? churches?.data ?? (Array.isArray(churches) ? churches : [])) : [];
+  if (churchList.length === 0) {
+    console.log('No church records to copy images from. Nothing to do.');
+    return;
+  }
+
   const churchesWithImage = churchList.filter((c) => c.image?.documentId || c.image?.id);
   const churchByKey = new Map();
   for (const c of churchesWithImage) {

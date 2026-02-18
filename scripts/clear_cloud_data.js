@@ -1,21 +1,28 @@
 'use strict';
 
 /**
- * Delete all collection-type documents on a Strapi Cloud (or remote) instance
- * so you can run the REST push script again from a clean state. Uses the same
- * env as rest_api_push_to_cloud.js.
+ * Delete all collection-type documents on a Strapi instance (local or remote)
+ * so you can run the REST push script again from a clean state.
  *
  * Use when: articles (or other entries) were pushed but relations (category,
  * tenant, author) or media (cover) are empty, and you want to start fresh and
  * re-push from export.
  *
- * Prerequisites: STRAPI_CLOUD_URL, STRAPI_CLOUD_API_TOKEN (Full Access).
+ * Target:
+ *   --local   Use local Strapi (STRAPI_LOCAL_URL, STRAPI_LOCAL_API_TOKEN). Default URL: http://localhost:1337
+ *   --remote  Use remote/Cloud (STRAPI_CLOUD_URL, STRAPI_CLOUD_API_TOKEN). This is the default if no flag.
  *
- * Usage:
+ * Usage (remote/Cloud):
  *   set STRAPI_CLOUD_URL=https://YOUR-PROJECT.strapiapp.com
  *   set STRAPI_CLOUD_API_TOKEN=your-token
  *   node scripts/clear_cloud_data.js
  *   Or: npm run clear:cloud-data
+ *
+ * Usage (local):
+ *   set STRAPI_LOCAL_URL=http://localhost:1337
+ *   set STRAPI_LOCAL_API_TOKEN=your-full-access-token
+ *   node scripts/clear_cloud_data.js --local
+ *   Or: npm run clear:cloud-data -- --local
  *
  * Options:
  *   --types=articles,categories  Only delete these plural API IDs (comma-separated).
@@ -28,14 +35,28 @@ try {
 
 const path = require('path');
 
+const USE_LOCAL = process.argv.includes('--local');
+const USE_REMOTE = process.argv.includes('--remote');
+const target = USE_LOCAL ? 'local' : (USE_REMOTE ? 'remote' : 'remote');
+
 const CLOUD_URL = (process.env.STRAPI_CLOUD_URL || '').replace(/\/$/, '');
-const API_TOKEN = process.env.STRAPI_CLOUD_API_TOKEN || '';
+const CLOUD_TOKEN = process.env.STRAPI_CLOUD_API_TOKEN || '';
+const LOCAL_URL = (process.env.STRAPI_LOCAL_URL || 'http://localhost:1337').replace(/\/$/, '');
+const LOCAL_TOKEN = process.env.STRAPI_LOCAL_API_TOKEN || '';
+
+const BASE_URL = target === 'local' ? LOCAL_URL : CLOUD_URL;
+const API_TOKEN = target === 'local' ? LOCAL_TOKEN : CLOUD_TOKEN;
+
 const DRY_RUN = process.argv.includes('--dry-run');
 const typesArg = process.argv.find(a => a.startsWith('--types='));
 const ONLY_TYPES = typesArg ? new Set(typesArg.split('=')[1].split(',').map(s => s.trim())) : null;
 
-if (!CLOUD_URL || !API_TOKEN) {
-  console.error('Set STRAPI_CLOUD_URL and STRAPI_CLOUD_API_TOKEN.');
+if (!BASE_URL || !API_TOKEN) {
+  if (target === 'local') {
+    console.error('For --local set STRAPI_LOCAL_URL (default http://localhost:1337) and STRAPI_LOCAL_API_TOKEN (Full Access token from local Strapi admin).');
+  } else {
+    console.error('Set STRAPI_CLOUD_URL and STRAPI_CLOUD_API_TOKEN (or use --local for local instance).');
+  }
   process.exit(1);
 }
 
@@ -70,7 +91,7 @@ const DELETE_ORDER = [
   'articles', 'flash-news-items', 'sidebar-promotional-blocks', 'advertisement-slots',
   'directory-entries', 'bishops', 'diocesan-bishops', 'retired-bishops', 'catholicos-entries',
   'church-dignitaries', 'managing-committees', 'working-committees', 'pilgrim-centres',
-  'seminaries', 'spiritual-organisations', 'institutions', 'churches', 'parishes',
+  'seminaries', 'spiritual-organisations', 'institutions', 'parishes',
   'dioceses', 'priests', 'directory-homes',
   'authors', 'categories', 'tenants', 'editor-tenants',
 ];
@@ -80,7 +101,7 @@ async function fetchAllDocumentIds(plural) {
   let page = 1;
   const pageSize = 100;
   while (true) {
-    const url = `${CLOUD_URL}/api/${plural}?pagination[page]=${page}&pagination[pageSize]=${pageSize}`;
+    const url = `${BASE_URL}/api/${plural}?pagination[page]=${page}&pagination[pageSize]=${pageSize}`;
     const res = await fetch(url, { headers: { Authorization: `Bearer ${API_TOKEN}` } });
     if (!res.ok) {
       console.warn(`GET ${plural} page ${page}: ${res.status}`);
@@ -100,7 +121,7 @@ async function fetchAllDocumentIds(plural) {
 }
 
 async function deleteDocument(plural, documentId) {
-  const url = `${CLOUD_URL}/api/${plural}/${documentId}`;
+  const url = `${BASE_URL}/api/${plural}/${documentId}`;
   const res = await fetch(url, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${API_TOKEN}` },
@@ -122,6 +143,7 @@ async function main() {
     return;
   }
 
+  console.log('Target:', target === 'local' ? 'LOCAL' : 'REMOTE (Cloud)', '-', BASE_URL);
   console.log(DRY_RUN ? '[DRY RUN] Would clear types:' : 'Clearing collection types (delete order):', order.join(', '));
   console.log('');
 

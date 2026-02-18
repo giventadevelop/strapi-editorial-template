@@ -35,11 +35,11 @@
         <li><strong>Bishops</strong> from <code>bishops/index.html@the-holy-synod=diocesan-bishops.html</code>, <code>retired-bishops.html</code>, <code>the-primate.html</code> (name, slug, bishopType, address, email, phones, image).</li>
         <li><strong>Directory entries</strong> from <code>directories/index.html@type=*.html</code> for all seven types (name, slug, directoryType, address, email, phones, website, image).</li>
         <li><strong>Priests</strong> from diocese-based priest list pages when present (see below). The live site lists priests by diocese (e.g. <a href="https://directory.mosc.in/priests/?search=&amp;diocese=637">priests/?diocese=637</a>); the script looks for saved HTML for each diocese and imports name, title, address, email, phones, image, and diocese relation.</li>
-        <li><strong>Churches</strong> from parish list pages when present (see <strong>Church list pages</strong>). The live site lists churches by diocese (e.g. <a href="https://directory.mosc.in/parishes/?diocese=573">parishes/?diocese=573</a>); the script creates <strong>Directory – Churches</strong> and randomly assigns 2 priests (same diocese) per church for sample data.</li>
+        <li><strong>Parishes</strong> from parish list pages when present (see <strong>Parish list pages</strong>). The live site lists parishes by diocese (e.g. <a href="https://directory.mosc.in/parishes/?diocese=573">parishes/?diocese=573</a>); the script creates <strong>Directory – Parishes</strong> with name, slug, diocese, address, and image when available.</li>
       </ul>
     </li>
-    <li><strong>Creates</strong> in Strapi (in order): Tenant (if missing) → Dioceses → Bishops → Directory entries → Priests → Churches (then assigns 2 priests per church).</li>
-    <li><strong>Uploads media</strong>: images from the clone are uploaded to Strapi and attached to dioceses, bishops, directory entries, priests, and churches when the HTML references local image files under the clone (e.g. <code>../assets/upload/...</code>).</li>
+    <li><strong>Creates</strong> in Strapi (in order): Tenant (if missing) → Dioceses → Bishops → Directory entries → Priests → Parishes.</li>
+    <li><strong>Uploads media</strong>: images from the clone are uploaded to Strapi and attached to dioceses, bishops, directory entries, priests, and parishes when the HTML references local image files under the clone (e.g. <code>../assets/upload/...</code>).</li>
   </ul>
 
   <h2>Config from .env</h2>
@@ -63,7 +63,7 @@ node scripts/data_import_seed_directory_mosc_in.js
 STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR=/path/to/clone TENANT_ID=directory_mosc_001 node scripts/data_import_seed_directory_mosc_in.js</code></pre>
 
   <h2>Delete all directory entries</h2>
-  <p>To wipe all Directory content (Bishops, Churches, Dioceses, Entries, Parishes, Priests) before a clean re-import, run:</p>
+  <p>To wipe all Directory content (Bishops, Dioceses, Entries, Parishes, Priests) before a clean re-import, run:</p>
   <pre><code>npm run delete:directory_entries</code></pre>
   <p>To only see how many entries would be deleted (no changes):</p>
   <pre><code>DRY_RUN=1 npm run delete:directory_entries</code></pre>
@@ -94,28 +94,28 @@ STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR=/path/to/clone TENANT_ID=directory_mosc_001
   <p><strong>Discovery:</strong> If those are not present, the script scans the <code>priests/</code> folder for any HTML file whose content looks like a list (e.g. contains <code>article.dioceses-name</code> and “Diocese : …”). It infers the diocese from the first “Diocese :” line in the page or from the filename (e.g. <code>diocese=637</code>).</p>
   <p><strong>Optional fetch from live site:</strong> If no priest list is found locally for a diocese, set <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code> in <code>.env</code>. The script will then fetch <code>https://directory.mosc.in/priests/?diocese=&lt;id&gt;</code> for each missing diocese. Images from fetched pages (full or relative URLs) are downloaded and uploaded to Strapi when available.</p>
 
-  <h2>Church list pages</h2>
-  <p>The online directory shows churches (parishes) per diocese (e.g. <a href="https://directory.mosc.in/parishes/?diocese=573">parishes/?diocese=573</a>). Again, <strong>parsing is from the local clone</strong> unless optional fetch is enabled.</p>
+  <h2>Parish list pages</h2>
+  <p>The online directory shows parishes per diocese (e.g. <a href="https://directory.mosc.in/parishes/?diocese=573">parishes/?diocese=573</a>). Again, <strong>parsing is from the local clone</strong> unless optional fetch is enabled.</p>
   <p>The script looks for:</p>
   <ul>
     <li><code>parishes/parishes.html@diocese=&lt;id&gt;.html</code></li>
     <li><code>parishes/index.html@diocese=&lt;id&gt;.html</code></li>
     <li><code>parishes@diocese=&lt;id&gt;.html</code> or <code>parishes.html@diocese=&lt;id&gt;.html</code> at clone root</li>
   </ul>
-  <p><strong>Discovery:</strong> It also scans <code>parishes/</code> for any HTML that looks like a church list and infers diocese from content or filename.</p>
-  <p><strong>Optional fetch:</strong> With <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code>, the script will fetch <code>https://directory.mosc.in/parishes/?diocese=&lt;id&gt;</code> for dioceses that have no local list page. For each church created, the script randomly assigns 2 priests from the same diocese (sample data; no real church–priest mapping on the source site).</p>
-  <p><strong>Note on <code>directories/</code>:</strong> The clone folder <code>directories/</code> contains type-based listing pages (institutions, church dignitaries, etc.) and one subfolder per person/institution. Those are not diocese-filtered priest or church lists; they are used for <strong>Directory entries</strong> only. Priest and church lists come from <code>priests/</code> and <code>parishes/</code> (or from the live site when fetch is enabled).</p>
+  <p><strong>Discovery:</strong> It also scans <code>parishes/</code> for any HTML that looks like a parish list and infers diocese from content or filename.</p>
+  <p><strong>Optional fetch:</strong> With <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code>, the script will fetch <code>https://directory.mosc.in/parishes/?diocese=&lt;id&gt;</code> for dioceses that have no local list page. For each item, the script creates one <strong>Directory – Parish</strong> with image when available.</p>
+  <p><strong>Note on <code>directories/</code>:</strong> The clone folder <code>directories/</code> contains type-based listing pages (institutions, church dignitaries, etc.) and one subfolder per person/institution. Those are not diocese-filtered priest or parish lists; they are used for <strong>Directory entries</strong> only. Priest and parish lists come from <code>priests/</code> and <code>parishes/</code> (or from the live site when fetch is enabled).</p>
 
   <h2>After import</h2>
   <ol>
-    <li>Open Strapi Admin and check <strong>Directory – Dioceses</strong>, <strong>Directory – Bishops</strong>, <strong>Directory – Entries</strong>, <strong>Directory – Priests</strong>, and <strong>Directory – Churches</strong> (when list pages were present).</li>
+    <li>Open Strapi Admin and check <strong>Directory – Dioceses</strong>, <strong>Directory – Bishops</strong>, <strong>Directory – Entries</strong>, <strong>Directory – Priests</strong>, and <strong>Directory – Parishes</strong> (when list pages were present).</li>
     <li><strong>Editor role:</strong> If an editor sees e.g. “31 entries found” but “No content found” in the list, they are not assigned to the directory tenant. Assign their email to the same tenant via <strong>Editor Tenant Assignment</strong> in Admin, or run:<br>
       <code>node scripts/assign-editor-to-directory-tenant.js editor@example.com</code><br>
       Then have the editor log out and log back in.</li>
     <li>To show directory data on the frontend, filter by tenant, e.g.<br>
       <code>GET /api/dioceses?filters[tenant][tenantId][$eq]=directory_mosc_001</code>.</li>
     <li>Optionally create <strong>Directory – Home</strong> section cards manually (or extend the script to parse <code>index.html</code> and create the Directory Home single type).</li>
-    <li><strong>Directory – Parishes</strong> (administrative unit) is a separate content type and is <strong>not</strong> populated by this script; add parishes manually. <strong>Directory – Churches</strong> is populated from parish/church list pages when present; if you see 0 churches, add list pages or set <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code>. <strong>Directory – Priests</strong> is populated from priest list pages when present.</li>
+    <li><strong>Directory – Parishes</strong> is populated from parish list pages when present (name, slug, diocese, address, image). If you see 0 parishes from import, add list pages under <code>parishes/</code> or set <code>STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1</code>. <strong>Directory – Priests</strong> is populated from priest list pages when present.</li>
     <li><strong>Images:</strong> If bishop/diocese/entry images are missing in the admin, they were skipped during import; you can attach images manually per entry.</li>
   </ol>
 

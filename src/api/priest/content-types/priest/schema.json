@@ -39,13 +39,6 @@
       "mappedBy": "vicar",
       "description": "Parish where this priest is vicar (optional)"
     },
-    "church": {
-      "type": "relation",
-      "relation": "manyToOne",
-      "target": "api::church.church",
-      "inversedBy": "priests",
-      "description": "Church this priest is associated with (e.g. sample data)"
-    },
     "address": {
       "type": "text"
     },

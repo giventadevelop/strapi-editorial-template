@@ -4,7 +4,7 @@
  * Content-manager extension: inject the Editor's tenant filter into the list query
  * for all tenant-scoped content types (Article, Directory types, Flash News, etc.)
  * so the list is scoped to their assigned tenant. Same behavior as Article for
- * Directory – Bishops, Dioceses, Entries, Churches, Priests, Parishes, etc.
+ * Directory – Bishops, Dioceses, Entries, Priests, Parishes, etc.
  * Admin auth may run after global middlewares, so we resolve user from ctx.state
  * or from the Bearer token when state is not set.
  *
@@ -25,7 +25,6 @@ const TENANT_SCOPED_UIDS = new Set([
   'api::retired-bishop.retired-bishop',
   'api::diocese.diocese',
   'api::parish.parish',
-  'api::church.church',
   'api::priest.priest',
   'api::directory-entry.directory-entry',
   'api::institution.institution',
