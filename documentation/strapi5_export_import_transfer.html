@@ -426,9 +426,38 @@ at ... weekly-metrics.js</code></pre>
   <p>You have two main options:</p>
   <ul>
     <li><strong>Transfer (recommended)</strong> – From your self-hosted machine, run <code>strapi transfer --to https://your-project.strapiapp.com/admin</code>. Create a <strong>Transfer Token</strong> in the Strapi Cloud admin (Settings → Global settings → Transfer Tokens) with type <strong>Push</strong> or <strong>Full Access</strong>, then use that token when prompted. This streams content, files, and config into Cloud (same schema required).</li>
-    <li><strong>Export then Import</strong> – Export from self-hosted (see §3.1). Strapi Cloud projects can run CLI commands in some setups; refer to the <a href="https://docs.strapi.io/cloud" target="_blank" rel="noopener">Strapi Cloud documentation</a> for how to run <code>strapi import</code> on your Cloud project (e.g. via Cloud dashboard or support). If Cloud does not expose a shell, use <strong>transfer</strong> instead.</li>
+    <li><strong>Export then Import</strong> – Export from self-hosted (see §7.1); then run <code>strapi import</code> on Cloud if your plan supports it (see §9.2.1).</li>
   </ul>
   <p>After data is in Cloud, recreate admin users (and API tokens) in the Cloud admin as needed.</p>
+
+  <h3>9.2.1 When transfer keeps failing: Export locally, then import on Cloud</h3>
+  <p>If transfer repeatedly fails (e.g. 403 on assets, WebSocket closed, or timeouts), use a file-based flow:</p>
+  <ol>
+    <li><strong>Export on your local machine</strong> (project root):
+      <ul>
+        <li>With S3 for media: your DB already has file records with full S3 URLs. The export includes <strong>metadata and those URLs</strong>; it does <strong>not</strong> include the actual file bytes (they stay on S3). Export is relatively small and fast.</li>
+        <li>With local uploads: the export includes metadata <strong>and</strong> the files from <code>public/uploads</code> (archive can be large).</li>
+      </ul>
+      <pre><code>npm run strapi export -- --no-encrypt -f my-export</code></pre>
+      Or with encryption (you will need the key for import):
+      <pre><code>npm run strapi export -- -f my-export -k "your-secure-encryption-key"</code></pre>
+      This creates <code>my-export.tar.gz</code> or <code>my-export.tar.gz.enc</code> in the project root. Copy this file somewhere safe (you will upload it to Cloud if import is available).
+    </li>
+    <li><strong>Import on Strapi Cloud</strong> – As of the current <a href="https://docs.strapi.io/cloud" target="_blank" rel="noopener">Strapi Cloud documentation</a>:
+      <ul>
+        <li>The <strong>Strapi Cloud CLI</strong> (<code>strapi login</code>, <code>deploy</code>, <code>link</code>, <code>projects</code>, <code>logout</code>) runs on your machine only; it does not provide a shell or “run command” on the Cloud server, so you cannot run <code>strapi import</code> on Cloud via the official CLI.</li>
+        <li>The dashboard <strong>“Import data”</strong> (under project Settings → Configuration → Environment data) is for <strong>transferring data between Strapi Cloud environments</strong> (e.g. Production → Staging) on Pro/Scale plans only—not for uploading an export file from self-hosted.</li>
+        <li>There is no documented way to upload an export file and run <code>strapi import</code> inside a Strapi Cloud project. The supported path from self-hosted to Cloud is <strong>Transfer</strong> (see §9.2).</li>
+      </ul>
+      <p><strong>If transfer keeps failing</strong>, use the export above as a local backup, then:</p>
+      <ul>
+        <li><strong>Retry transfer</strong> when the Cloud app is warm (e.g. after opening the admin), or during off-peak times; Free tier may have limits on outbound/transfer.</li>
+        <li><strong>Upgrade plan</strong> (e.g. Pro/Scale) if you need higher limits or different transfer behavior; check <a href="https://strapi.io/pricing-cloud" target="_blank" rel="noopener">Strapi Cloud pricing</a>.</li>
+        <li><strong>Contact Strapi support</strong> to ask whether import-from-file is or will be available on Cloud, or for help with transfer 403/timeouts (e.g. <a href="https://support.strapi.io" target="_blank" rel="noopener">support.strapi.io</a>, or via the Cloud dashboard).</li>
+      </ul>
+    </li>
+    <li><strong>After import</strong>: Recreate admin users and API tokens in the Cloud admin. If you use S3 and the export contained only metadata + URLs, ensure the Cloud project is configured to use the same S3 bucket (or that the stored URLs are still reachable); then media will work without re-uploading files.</li>
+  </ol>
 
   <h3>9.3 Link an existing Strapi Cloud project</h3>
   <p>If you already created a project in the Strapi Cloud dashboard and want to link your local repo to it:</p>
@@ -449,6 +478,219 @@ at ... weekly-metrics.js</code></pre>
     <li><strong>Upload 404s</strong> – e.g. <code>GET /uploads/mar_chrisostomos_1520bbb7f7.jpeg</code> → 404. File <em>records</em> exist in the database (from the transfer), but the <em>actual files</em> are not on the Cloud server’s filesystem.</li>
     <li><strong>Data transfer behavior</strong> – Strapi Data Transfer (push with token) moves database content and can stream assets; on Strapi Cloud the runtime filesystem is ephemeral or not populated with your local <code>public/uploads</code>, so media files often do not exist where the app serves them → 404.</li>
   </ul>
+
+  <h3>10.1.1 Transfer fails: 403 on assets + “WebSocket is not open: readyState 3 (CLOSED)”</h3>
+  <p>If transfer succeeds for <strong>entities</strong> then fails with <code>Request failed with status code 403</code> in the assets phase and <code>WebSocket is not open: readyState 3 (CLOSED)</code>, the 403 is the root cause (the WebSocket closes after the error). This often happens when pushing to Strapi Cloud (e.g. Free tier limits, or the destination rejecting asset streams).</p>
+  <p><strong>Fix when your media is already on S3:</strong> Exclude the <strong>files</strong> (asset binaries) from the transfer. Content and file <em>records</em> (with S3 URLs) still transfer; only the binary stream is skipped, so you avoid the 403. Media will work on Cloud if the Cloud project uses the same S3 bucket (see §10.3).</p>
+  <p>From your <strong>local</strong> project root (<a href="https://docs.strapi.io/cms/data-management/transfer#exclude-data-types-during-transfer" target="_blank" rel="noopener">Strapi docs – exclude data types</a>):</p>
+  <pre><code>npm run strapi transfer -- --to https://YOUR-CLOUD-PROJECT.strapiapp.com/admin --exclude files</code></pre>
+  <p>With token in env (non-interactive):</p>
+  <pre><code>npm run strapi transfer -- --to https://YOUR-CLOUD-PROJECT.strapiapp.com/admin --to-token YOUR_TRANSFER_TOKEN --exclude files --force</code></pre>
+  <p><strong>Note:</strong> Excluding <code>files</code> means existing asset binaries on the <em>destination</em> are deleted by the transfer; your content and upload <em>records</em> (and S3 URLs) are still transferred. If you do <strong>not</strong> use S3 and need binaries on Cloud, you must resolve the 403 (e.g. retry, different plan, or support) instead of excluding files.</p>
+  <p>If you use custom <strong>WebSockets or Socket.io</strong> on the same port as Strapi, the <a href="https://docs.strapi.io/cms/data-management/transfer#setup-and-run-the-data-transfer" target="_blank" rel="noopener">data transfer docs</a> require disabling them or moving them to another port/route; otherwise the transfer can fail. This project does not enable custom websockets.</p>
+
+  <h3>10.1.2 Transfer runs a long time then fails: “WebSocket is not open: readyState 3 (CLOSED)” (no 403)</h3>
+  <p>If you see <strong>entities transferred</strong> (e.g. 12k+ in ~15–30 min) and then <code>WebSocket is not open: readyState 3 (CLOSED)</code> during or after <strong>links</strong> / <strong>configuration</strong>, with <strong>no 403</strong>, the connection is being closed by timeout or by the server during a long transfer. This is a <a href="https://github.com/strapi/strapi/issues/20304" target="_blank" rel="noopener">known Strapi issue</a> (see also <a href="https://github.com/strapi/strapi/issues/17749" target="_blank" rel="noopener">#17749</a>).</p>
+  <p><strong>Try in this order:</strong></p>
+  <ol>
+    <li><strong>Throttle the transfer</strong> – Slowing chunks can reduce memory pressure and help the WebSocket stay open (<a href="https://docs.strapi.io/cms/data-management/transfer#setup-and-run-the-data-transfer" target="_blank" rel="noopener">docs</a>). Example (add <code>--throttle 200</code> = 200 ms delay between chunks):
+      <pre><code>npm run strapi transfer -- --to https://YOUR-CLOUD-PROJECT.strapiapp.com/admin --to-token YOUR_TOKEN --exclude files --throttle 200 --force</code></pre>
+      Start with <code>100</code>–<code>500</code> ms; higher values make the transfer longer but may avoid closure.
+    </li>
+    <li><strong>Keep Cloud warm, then retry</strong> – Open the Cloud admin in a browser and leave it open; run the transfer immediately after. Retry once or twice; sometimes the connection survives.
+    </li>
+    <li><strong>Run during off-peak</strong> – Try when Cloud or your network is less loaded.
+    </li>
+    <li><strong>Escalate</strong> – If it still fails, add your case to <a href="https://github.com/strapi/strapi/issues/20304" target="_blank" rel="noopener">GitHub #20304</a> or contact <a href="https://support.strapi.io" target="_blank" rel="noopener">Strapi support</a>; long-transfer WebSocket closure is a platform/CLI limitation. Strapi Cloud does not offer <code>strapi import</code> from a file, so transfer is the only supported path (see §9.2.1).</li>
+  </ol>
+
+  <h3>10.1.3 How to know the total size of the transfer (and why it may fail around 6–7 MB)</h3>
+  <p><strong>Transfer does not write a single file</strong> – it streams data over WebSocket. You can still measure or estimate the payload size in two ways.</p>
+  <p><strong>1. From the transfer log (when you run transfer)</strong></p>
+  <p>The CLI prints the size for each phase, for example:</p>
+  <pre><code>✖ entities: 12640 transferred (size: 12 MB)
+✖ links: 32 transferred (size: 6.1 KB)
+✖ configuration: 32 transferred (size: 191 KB)</code></pre>
+  <p>Add those numbers to get the <strong>total size</strong> (e.g. ~12.2 MB without assets). If the run fails, you still see the last completed phase size (e.g. entities 12 MB), so you know at least that much was sent before the WebSocket closed.</p>
+  <p><strong>2. From an export (same data, gives a file size)</strong></p>
+  <p>An export contains the same kind of data as a transfer (entities, links, config; with S3, no file bytes). So the <strong>export file size</strong> is a good approximation of the transfer payload when using <code>--exclude files</code>.</p>
+  <ol>
+    <li>Run an export (project root):
+      <pre><code>npm run strapi export -- --no-encrypt -f transfer-size-check</code></pre>
+      This creates <code>transfer-size-check.tar.gz</code> (or use <code>--no-compress</code> for <code>transfer-size-check.tar</code>).
+    </li>
+    <li>Check the file size (Windows PowerShell):
+      <pre><code>(Get-Item .\transfer-size-check.tar.gz).Length / 1MB</code></pre>
+      Or in Explorer: right‑click the file → Properties → Size. The size in MB is roughly what gets streamed during transfer (without assets if you use S3 / exclude files). You can also run <code>npm run measure:transfer-size</code> to create this export and print its size in one step.</li>
+  </ol>
+  <p><strong>Why it might fail after ~6–7 MB (or at another size)</strong></p>
+  <p>Strapi does not document a fixed “6 MB limit.” Failures can be:</p>
+  <ul>
+    <li><strong>Payload / message limit</strong> – A proxy or Strapi Cloud may cap request/WebSocket message size (e.g. 6–10 MB). Once the stream exceeds that, the connection can close.</li>
+    <li><strong>Timeout</strong> – The connection may close after a period of time (e.g. 30–60 s) rather than at a specific byte count. Your “6–7 MB” might be how much was sent before the timeout.</li>
+    <li><strong>WebSocket / memory</strong> – Long or heavy streams can trigger closure (see <a href="https://github.com/strapi/strapi/issues/17749" target="_blank" rel="noopener">#17749</a>, <a href="https://github.com/strapi/strapi/issues/20304" target="_blank" rel="noopener">#20304</a>).</li>
+  </ul>
+  <p><strong>How to reduce the size of the transfer</strong></p>
+  <ul>
+    <li><strong>--exclude files</strong> – Already the biggest win: no asset binaries. Use this when media is on S3 (see §10.1.1).</li>
+    <li><strong>Reduce content at source</strong> – Archive or delete old or unused content (e.g. old articles, test data) so the database has fewer/smaller entities. Then run transfer again. Smaller DB ⇒ smaller entities payload.</li>
+    <li>There is <strong>no CLI option</strong> to “transfer only first N entities” or “limit to X MB.” The only levers are excluding <code>files</code> and reducing how much content you have.</li>
+  </ul>
+  <p>If you confirm the total size with the export file and it's still under a few dozen MB but transfer fails, the limit is likely <strong>time or connection stability</strong> rather than size; use <code>--throttle</code> and "keep Cloud warm" (see §10.1.2).</p>
+
+  <h3>10.1.4 Cloud log diagnosis: WebSocket connection cycling and resource contention</h3>
+  <p>If you have access to the Strapi Cloud runtime logs (Cloud dashboard → Logs), look for the following pattern that confirms the WebSocket is not sustaining a stable connection:</p>
+  <pre><code>[Data transfer] Disabling http timeouts
+[Data transfer] Disabling lifecycle hooks
+GET /admin/transfer/runner/push (1233 ms) 200
+[Data transfer] Restoring http timeouts
+[Data transfer] Restoring lifecycle hooks
+... (repeats 5+ times in rapid succession)</code></pre>
+  <p>Each cycle means the transfer push runner <strong>connects, runs for ~1–2 seconds, then tears down</strong>. The connection is not held open long enough to stream all entities. This pattern typically repeats many times before the WebSocket finally fails permanently.</p>
+
+  <h4>Common contributing factors visible in Cloud logs</h4>
+  <table>
+    <thead>
+      <tr><th>Log pattern</th><th>What it means</th><th>Impact</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>GET /content-manager/homepage/count-documents (5747 ms) 200</code></td>
+        <td>Someone is browsing the Cloud admin panel while the transfer is running.</td>
+        <td><strong>High.</strong> Admin queries (especially homepage stats and recent-documents) take 5–10 seconds on resource-constrained Cloud instances, starving the WebSocket of CPU/memory.</td>
+      </tr>
+      <tr>
+        <td><code>POST /admin/login (522 ms) 200</code> and content-manager requests interleaved with transfer cycles</td>
+        <td>Active admin session competing with the transfer for the same single-process Node.js runtime.</td>
+        <td><strong>High.</strong> Strapi runs in a single Node process; heavy admin queries block the event loop and can cause the WebSocket to miss heartbeats → closure.</td>
+      </tr>
+      <tr>
+        <td><code>GET /wordpress/ (5 ms) 404</code>, <code>POST / (2 ms) 405</code></td>
+        <td>External bot/scanner probes hitting the Cloud URL.</td>
+        <td><strong>Low.</strong> Fast 404/405 responses; negligible impact but adds noise.</td>
+      </tr>
+      <tr>
+        <td>All transfer runner responses taking 1200–1700 ms</td>
+        <td>The Cloud instance is slow to respond; each WebSocket handshake costs over a second.</td>
+        <td><strong>Medium.</strong> Indicates a resource-constrained instance (free or starter tier). Each reconnection attempt wastes time.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h4>Remediation checklist (before retrying transfer)</h4>
+  <ol>
+    <li><strong>Close all browser tabs</strong> pointing to the Cloud admin (<code>https://YOUR-PROJECT.strapiapp.com/admin</code>). Do not browse the admin during the transfer.</li>
+    <li><strong>Remove or reduce <code>--throttle</code></strong> – With <code>--throttle 500</code> (500 ms delay per chunk), the transfer takes far longer and is more likely to hit a timeout. If the problem is connection duration (not memory), use <strong>no throttle</strong> or <code>--throttle 50</code> so the transfer finishes before the connection is cycled:
+      <pre><code>npm run strapi transfer -- --to https://YOUR-CLOUD-PROJECT.strapiapp.com/admin --to-token YOUR_TOKEN --exclude files --force</code></pre>
+    </li>
+    <li><strong>Retry immediately after a fresh deploy</strong> – The Cloud instance is "warmest" right after deploy or after the admin loads once. Run the transfer within a minute of that.</li>
+    <li><strong>Check your Cloud plan</strong> – Free/starter tiers have lower resource limits (CPU, memory, request duration). If possible, temporarily upgrade during the migration.</li>
+  </ol>
+
+  <h3>10.1.5 Alternative: batched REST API push (bypasses WebSocket entirely)</h3>
+  <p>If <code>strapi transfer</code> consistently fails due to WebSocket instability on Strapi Cloud (see §10.1.2 and §10.1.4), you can bypass the WebSocket-based transfer protocol entirely and push content via the <strong>Strapi Content API (REST)</strong>. This approach is more resilient because each request is independent — a failure in one batch does not lose progress from previous batches.</p>
+
+  <h4>How it works</h4>
+  <ol>
+    <li><strong>Export</strong> your local data to a file (<code>strapi export --no-encrypt -f my-export</code>).</li>
+    <li>A script reads the export archive (tar.gz), extracts entities and links by content type.</li>
+    <li>For each content type, the script sends <strong>small batches</strong> (e.g. 10–50 entries) to the Cloud instance via <code>POST /api/&lt;content-type&gt;</code> or the bulk endpoint.</li>
+    <li>Each batch is an independent HTTP request with its own retry logic. If one batch fails, the script retries it (with backoff) without losing previous batches.</li>
+    <li>Relations/links are restored in a second pass after all entities exist on the destination.</li>
+  </ol>
+
+  <h4>Advantages over <code>strapi transfer</code></h4>
+  <table>
+    <thead>
+      <tr><th>Aspect</th><th><code>strapi transfer</code> (WebSocket)</th><th>Batched REST API push</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Connection</td>
+        <td>Single long-lived WebSocket — if it drops, <strong>all progress is lost</strong>.</td>
+        <td>Many short HTTP requests — each batch is independent; progress is preserved.</td>
+      </tr>
+      <tr>
+        <td>Retry</td>
+        <td>No built-in retry; must restart the entire transfer from scratch.</td>
+        <td>Per-batch retry with exponential backoff; can resume from where it stopped.</td>
+      </tr>
+      <tr>
+        <td>Proxy / timeout compatibility</td>
+        <td>WebSocket upgrades can be blocked or timed out by Cloud proxies and load balancers.</td>
+        <td>Standard HTTPS POST; works with any proxy, CDN, or load balancer.</td>
+      </tr>
+      <tr>
+        <td>Observability</td>
+        <td>Opaque stream; you see entity counts but cannot inspect or skip individual items.</td>
+        <td>Per-batch logging; you can see exactly which content types and entries succeeded or failed.</td>
+      </tr>
+      <tr>
+        <td>Cloud compatibility</td>
+        <td>Known issues on free/starter tiers (§10.1.2, §10.1.4).</td>
+        <td>Uses the same REST API that the admin panel uses; no special protocol needed.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h4>Prerequisites</h4>
+  <ul>
+    <li><strong>API token on Cloud</strong> – Create a <strong>Full Access</strong> API token in the Cloud admin (Settings → API Tokens → Create new). This is a regular API token (not a transfer token). The token must have permissions to create/update all content types you want to push.</li>
+    <li><strong>Schemas must match</strong> – The Cloud instance must have the same content-type schemas as your local project (deploy your code to Cloud first).</li>
+    <li><strong>Export file</strong> – Run <code>npm run strapi export -- --no-encrypt -f my-export</code> locally to create the archive.</li>
+  </ul>
+
+  <h4>Run the script</h4>
+  <p>From the project root, create an export and push it to Cloud:</p>
+  <ol>
+    <li>Create an export (if you don’t have one):
+      <pre><code>npm run strapi export -- --no-encrypt -f my-export</code></pre>
+      This creates <code>my-export.tar.gz</code> in the project root.
+    </li>
+    <li>Set environment variables and run the push script:
+      <pre><code>set STRAPI_CLOUD_URL=https://YOUR-PROJECT.strapiapp.com
+set STRAPI_CLOUD_API_TOKEN=your-full-access-api-token
+node scripts/rest_api_push_to_cloud.js my-export.tar.gz</code></pre>
+      Or with npm (pass the export file as an argument):
+      <pre><code>set STRAPI_CLOUD_URL=https://YOUR-PROJECT.strapiapp.com
+set STRAPI_CLOUD_API_TOKEN=your-full-access-api-token
+npm run push:rest-to-cloud -- my-export.tar.gz</code></pre>
+      On Linux/macOS use <code>export STRAPI_CLOUD_URL=...</code> instead of <code>set</code>.
+    </li>
+    <li>Optional env: <code>REST_PUSH_BATCH_SIZE=20</code>, <code>REST_PUSH_RETRY_LIMIT=3</code>, <code>REST_PUSH_DELAY_MS=100</code> (delay between requests to avoid rate limits), <code>REST_PUSH_DRY_RUN=1</code> to only parse the export and log without sending requests. <code>REST_PUSH_INCLUDE_UPLOADS=0</code> skips Phase 0 (no media push; cover will stay empty).</li>
+  </ol>
+  <p>The script (1) reads the export archive; (2) <strong>Phase 0</strong> – if <code>REST_PUSH_INCLUDE_UPLOADS</code> is not 0, parses <code>plugin::upload.file</code> entities from the export (their <code>data.url</code> are already S3 URLs if you use S3), fetches each file from that URL and POSTs to Cloud <code>/api/upload</code>, and stores ref→documentId so cover can be linked in phase 2; (3) pushes single types then collection types in dependency order (POST with retry); (4) restores relations and media links (PUT with <code>connect</code>). Content types are taken from your local <code>src/api/*/content-types/*/schema.json</code>.</p>
+
+  <div class="warn">
+    <strong>Limitations:</strong>
+    <ul>
+      <li>The Content API does <strong>not</strong> transfer admin users, API tokens, or permissions — same as <code>strapi transfer</code>.</li>
+      <li><strong>Upload (media) files:</strong> The script can push them via <strong>Phase 0</strong> (default on): it reads <code>plugin::upload.file</code> from the export (with S3 <code>data.url</code>), fetches each file from that URL and POSTs to Cloud <code>/api/upload</code>, then phase 2 connects <code>cover</code> and other media fields. Set <code>REST_PUSH_INCLUDE_UPLOADS=0</code> to skip. If Cloud uses the same S3 bucket, Phase 0 still re-uploads (Cloud may store a new key); media will work.</li>
+      <li>Relations inside <strong>dynamic zones</strong> or <strong>polymorphic</strong> relations may need extra handling; the script restores top-level relation fields in a second pass.</li>
+      <li><code>createdAt</code>, <code>updatedAt</code>, and <code>publishedAt</code> timestamps may not be preserved unless the API accepts them (Strapi 5 often ignores these on create).</li>
+      <li>If the Cloud database already has partial data from a failed <code>strapi transfer</code>, <strong>clear it first</strong> (e.g. reset the environment in the Cloud dashboard or redeploy) to avoid duplicate or conflicting entries.</li>
+    </ul>
+  </div>
+
+  <h4>When to use this approach</h4>
+  <ul>
+    <li><code>strapi transfer</code> has failed multiple times with WebSocket closure (§10.1.2) despite trying throttle, warm-up, and off-peak timing.</li>
+    <li>Your dataset is moderate (tens of thousands of entries, tens of MB) — too large for the WebSocket to survive but well within REST API capacity.</li>
+    <li>You are on a Strapi Cloud free or starter tier where WebSocket stability is limited.</li>
+    <li>You want <strong>resumable, observable progress</strong> rather than an all-or-nothing stream.</li>
+  </ul>
+
+  <h4>Why category, tenant, author, or cover (image) are empty after push</h4>
+  <p>If articles (or other entries) appear on Cloud but <strong>relations</strong> (category, tenant, author) or <strong>cover</strong> (image) are empty:</p>
+  <ul>
+    <li><strong>Relations</strong> – The script restores them in phase 2 (PATCH with <code>connect</code>). If category/author/tenant failed to create in phase 1 (e.g. 405, or duplicate slug and lookup failed), their documentIds are missing from the map, so phase 2 cannot link them. The script now pushes <strong>dependency types first</strong> (tenants, categories, authors, dioceses, etc.) so their documentIds are in the map before articles; if you had run an older run without that order, relations could be empty.</li>
+    <li><strong>Cover (image)</strong> – By default the script now runs <strong>Phase 0</strong>: it reads <code>plugin::upload.file</code> entities from the export (which already contain <strong>S3 URLs</strong> if you migrated to S3). For each file it fetches from that URL and POSTs to the Cloud <code>/api/upload</code> endpoint, then maps the old ref to the new documentId so phase 2 can connect <code>cover</code>. So <strong>cover is linked automatically</strong> when you run <code>npm run push:rest-to-cloud</code>. Set <code>REST_PUSH_INCLUDE_UPLOADS=0</code> to skip uploads (cover will stay empty).</li>
+  </ul>
+  <p><strong>Start fresh:</strong> Clear all collection data on Cloud, then re-run the push so relations are applied correctly (dependency order + phase 2). Use the clear script (same env as push):</p>
+  <pre><code>set STRAPI_CLOUD_URL=https://YOUR-PROJECT.strapiapp.com
+set STRAPI_CLOUD_API_TOKEN=your-token
+npm run clear:cloud-data</code></pre>
+  <p>Then run <code>npm run push:rest-to-cloud -- your-export.tar.gz</code> again. Optionally use <code>--dry-run</code> with the clear script to only list what would be deleted.</p>
 
   <h3>10.2 Why images 404 after push/import to Strapi Cloud</h3>
   <p>Transfer creates or updates <strong>media entries</strong> in the database (admin shows files and URLs). The <strong>binary files</strong> either are not included in what gets deployed to Cloud, or are stored in a different/transient filesystem that does not match the app’s <code>/uploads</code> serving. So when the app or admin requests <code>/uploads/...</code>, the file is not there → <strong>404</strong>.</p>
