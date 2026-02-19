@@ -9,16 +9,15 @@
  *      (from draft rows) and builds a slug → originalPublishedAt map.
  *   2. Queries the Cloud for the tenant (tenant_demo_002) documentId.
  *   3. Fetches all articles from Cloud (paginated).
- *   4. For each article:
- *      a. Matches by slug to get the original publishedAt.
- *      b. PUTs to update draft with correct publishedAt + tenant.
- *      c. POSTs to publish (with x-skip-publish-date-refresh header so the
- *         publishDateRefresh middleware does not overwrite the date to NOW).
+ *   4. For each article, matches by slug to get the original publishedAt.
+ *   5. Sends batches to POST /api/migration/fix-published which directly
+ *      updates the published DB rows (bypasses publish flow / lifecycle hooks).
  *
  * Prerequisites:
- *   - Deploy the updated bootstrap.js (with registerTenantPublishMiddleware and
- *     the x-skip-publish-date-refresh header support) to Cloud FIRST.
+ *   - Deploy the updated code (with src/api/migration/) to Cloud FIRST.
  *   - Full Access API token on the Cloud instance.
+ *   - Set STRAPI_MIGRATION_TOKEN on Cloud to match STRAPI_CLOUD_API_TOKEN
+ *     (or the controller falls back to API_TOKEN_SALT).
  *   - Export file: db_backup/my-export-3-prod.tar.gz (or pass path as CLI arg).
  *
  * Usage:
@@ -28,11 +27,10 @@
  *
  * Options:
  *   --dry-run        Parse and log only, no HTTP requests.
- *   --skip-publish   Only update drafts, do not publish.
  *   --tenant-only    Only fix tenant relation, do not touch publishedAt.
  *   --dates-only     Only fix publishedAt, do not touch tenant.
- *   --content-type=  Content type UID to fix (default: api::article.article).
- *                    Use --content-type=api::flash-news-item.flash-news-item for flash news.
+ *   --batch-size=N   Articles per request (default 20).
+ *   --content-type=  Content type UID (default: api::article.article).
  */
 
 try { require('dotenv').config(); } catch (_) {}
@@ -47,16 +45,17 @@ const projectRoot = path.resolve(__dirname, '..');
 // --- CLI args and env ---
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
-const SKIP_PUBLISH = args.includes('--skip-publish');
 const TENANT_ONLY = args.includes('--tenant-only');
 const DATES_ONLY = args.includes('--dates-only');
 const ctArg = args.find(a => a.startsWith('--content-type='));
 const CONTENT_TYPE_UID = ctArg ? ctArg.split('=')[1] : 'api::article.article';
+const bsArg = args.find(a => a.startsWith('--batch-size='));
+const BATCH_SIZE = bsArg ? Math.max(1, parseInt(bsArg.split('=')[1], 10)) : 20;
 
 const CLOUD_URL = (process.env.STRAPI_CLOUD_URL || '').replace(/\/$/, '');
 const API_TOKEN = process.env.STRAPI_CLOUD_API_TOKEN || '';
 const TENANT_ID_FILTER = process.env.TENANT_ID || 'tenant_demo_002';
-const TRANSFER_DATE_PREFIX = '2026-02-15'; // date when data was transferred; used to identify overwritten dates
+const TRANSFER_DATE_PREFIX = '2026-02-15'; // date when data was transferred
 
 if (!CLOUD_URL || !API_TOKEN) {
   console.error('Set STRAPI_CLOUD_URL and STRAPI_CLOUD_API_TOKEN env vars.');
@@ -86,10 +85,10 @@ async function apiFetch(urlPath, options = {}) {
   return text ? JSON.parse(text) : {};
 }
 
-async function apiFetchWithRetry(urlPath, options = {}, retries = 2) {
+async function fetchWithRetry(fn, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
-      return await apiFetch(urlPath, options);
+      return await fn();
     } catch (err) {
       if (attempt < retries) {
         const delay = 2000 * Math.pow(2, attempt);
@@ -105,7 +104,6 @@ async function apiFetchWithRetry(urlPath, options = {}, retries = 2) {
 // --- Step 1: Parse export tar.gz ---
 
 function loadPluralName(uid) {
-  // e.g. api::article.article -> article -> look up schema
   const parts = uid.split('.');
   const singularName = parts[parts.length - 1];
   const schemaPath = path.join(projectRoot, 'src', 'api', singularName, 'content-types', singularName, 'schema.json');
@@ -120,9 +118,9 @@ function loadPluralName(uid) {
 
 function parseExport(exportPath, contentTypeUid) {
   return new Promise((resolve, reject) => {
-    const entities = []; // { id, documentId, slug, publishedAt, ... }
-    const tenantLinks = []; // { entityRef, tenantRef }
-    const tenants = []; // { id, documentId, tenantId, name }
+    const entities = [];
+    const tenantLinks = [];
+    const tenants = [];
 
     let readStream = fs.createReadStream(exportPath);
     if (exportPath.endsWith('.gz')) {
@@ -151,7 +149,6 @@ function parseExport(exportPath, contentTypeUid) {
           const left = row.left;
           const right = row.right;
           if (!left || !right) return;
-          // Article-tenant links
           if (left.type === contentTypeUid && left.field === 'tenant') {
             tenantLinks.push({ entityRef: left.ref, tenantRef: right.ref });
           }
@@ -168,8 +165,6 @@ function parseExport(exportPath, contentTypeUid) {
               slug: row.data?.slug,
               title: row.data?.title,
               publishedAt: row.data?.publishedAt,
-              isFeatured: row.data?.isFeatured,
-              views: row.data?.views,
             });
           }
           if (row.type === 'api::tenant.tenant') {
@@ -195,7 +190,6 @@ function parseExport(exportPath, contentTypeUid) {
 }
 
 function buildSlugToOriginalDate(entities) {
-  // Group by documentId; pick the row with the original publishedAt (not transfer date, not null)
   const byDocId = {};
   for (const e of entities) {
     if (!e.documentId) continue;
@@ -203,9 +197,8 @@ function buildSlugToOriginalDate(entities) {
     byDocId[e.documentId].push(e);
   }
 
-  const slugMap = {}; // slug -> { originalPublishedAt, documentId, isFeatured, views }
+  const slugMap = {};
   for (const [docId, rows] of Object.entries(byDocId)) {
-    // Find the row with the original publishedAt (not transfer date prefix, not null)
     const original = rows.find(r => r.publishedAt && r.publishedAt.indexOf(TRANSFER_DATE_PREFIX) === -1);
     const any = rows.find(r => r.slug);
     const slug = any?.slug;
@@ -214,14 +207,12 @@ function buildSlugToOriginalDate(entities) {
     slugMap[slug] = {
       originalPublishedAt: original?.publishedAt || null,
       documentId: docId,
-      isFeatured: rows[0]?.isFeatured,
-      views: rows[0]?.views,
     };
   }
   return slugMap;
 }
 
-// --- Step 2–4: Cloud operations ---
+// --- Cloud operations ---
 
 async function findTenantOnCloud(tenantIdFilter) {
   const res = await apiFetch(`/api/tenants?filters[tenantId][$eq]=${encodeURIComponent(tenantIdFilter)}&pagination[pageSize]=1`);
@@ -262,8 +253,8 @@ async function main() {
   console.log(`Content type: ${CONTENT_TYPE_UID} (${pluralName})`);
   console.log('Export file:', exportPath);
   console.log('Cloud URL:', CLOUD_URL);
+  console.log(`Batch size: ${BATCH_SIZE}`);
   if (DRY_RUN) console.log('DRY RUN — no HTTP requests will be made.\n');
-  if (SKIP_PUBLISH) console.log('SKIP PUBLISH — drafts will be updated but not published.\n');
   if (TENANT_ONLY) console.log('TENANT ONLY — only fixing tenant relation.\n');
   if (DATES_ONLY) console.log('DATES ONLY — only fixing publishedAt.\n');
 
@@ -284,16 +275,13 @@ async function main() {
     Object.entries(slugMap).slice(0, 10).forEach(([slug, data]) => {
       console.log(`  ${slug} → ${data.originalPublishedAt || '(no date)'}`);
     });
+    console.log('\nDry run complete. No changes made.');
+    return;
   }
 
   if (slugCount === 0) {
     console.error('No entities found in export. Check content type UID.');
     process.exit(1);
-  }
-
-  if (DRY_RUN) {
-    console.log('\nDry run complete. No changes made.');
-    return;
   }
 
   // Step 2: Find tenant on Cloud
@@ -309,28 +297,19 @@ async function main() {
   const cloudArticles = await fetchAllArticlesFromCloud(pluralName);
   console.log(`  Found ${cloudArticles.length} published ${pluralName} on Cloud.`);
 
-  // Step 4: Update each article
-  console.log(`\nStep 4: Updating ${pluralName}...`);
-  let updated = 0;
-  let published = 0;
-  let skipped = 0;
-  let errors = 0;
+  // Step 4: Match and build migration payload
+  console.log(`\nStep 4: Building migration payload...`);
+  const migrationItems = [];
   const notMatched = [];
 
-  for (let i = 0; i < cloudArticles.length; i++) {
-    const article = cloudArticles[i];
+  for (const article of cloudArticles) {
     const slug = article.slug;
     const docId = article.documentId;
-
-    if (!slug || !docId) {
-      skipped++;
-      continue;
-    }
+    if (!slug || !docId) continue;
 
     const exportData = slugMap[slug];
     if (!exportData) {
       notMatched.push(slug);
-      skipped++;
       continue;
     }
 
@@ -339,67 +318,74 @@ async function main() {
     const needsDateFix = !TENANT_ONLY && originalDate && article.publishedAt !== originalDate;
     const needsTenantFix = !DATES_ONLY && tenantDocId && currentTenant !== tenantDocId;
 
-    if (!needsDateFix && !needsTenantFix) {
-      skipped++;
-      continue;
-    }
+    if (!needsDateFix && !needsTenantFix) continue;
 
-    // Build update payload
-    const data = {};
-    if (needsDateFix) {
-      data.publishedAt = originalDate;
-    }
-    if (needsTenantFix) {
-      data.tenant = { connect: [{ documentId: tenantDocId }] };
-    }
+    const item = { documentId: docId, uid: CONTENT_TYPE_UID };
+    if (needsDateFix) item.publishedAt = originalDate;
+    migrationItems.push(item);
+  }
 
-    const label = `[${i + 1}/${cloudArticles.length}] ${slug.slice(0, 50)}`;
+  console.log(`  Need to fix: ${migrationItems.length} articles`);
+  console.log(`  Already correct: ${cloudArticles.length - migrationItems.length - notMatched.length}`);
+  if (notMatched.length > 0) {
+    console.log(`  Not matched: ${notMatched.length} slugs`);
+  }
+
+  if (migrationItems.length === 0) {
+    console.log('\nNothing to fix. All articles are up to date.');
+    return;
+  }
+
+  // Step 5: Send to migration endpoint in batches
+  console.log(`\nStep 5: Sending ${migrationItems.length} articles to migration endpoint (batch size ${BATCH_SIZE})...`);
+  let totalUpdated = 0;
+  let totalTenantLinked = 0;
+  let totalErrors = 0;
+
+  const totalBatches = Math.ceil(migrationItems.length / BATCH_SIZE);
+  for (let b = 0; b < totalBatches; b++) {
+    const batch = migrationItems.slice(b * BATCH_SIZE, (b + 1) * BATCH_SIZE);
+    const batchNum = b + 1;
 
     try {
-      // PUT to update draft
-      await apiFetchWithRetry(`/api/${pluralName}/${docId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ data }),
-      });
-      updated++;
+      const res = await fetchWithRetry(() => apiFetch('/api/migration/fix-published', {
+        method: 'POST',
+        body: JSON.stringify({
+          token: API_TOKEN,
+          tenantDocumentId: tenantDocId,
+          articles: batch,
+        }),
+      }), 2);
 
-      // Publish (with skip header so publishDateRefresh doesn't overwrite the date)
-      if (!SKIP_PUBLISH) {
-        await apiFetchWithRetry(`/api/${pluralName}/${docId}/actions/publish`, {
-          method: 'POST',
-          body: JSON.stringify({}),
-          headers: {
-            'x-skip-publish-date-refresh': '1',
-          },
-        });
-        published++;
+      const r = res?.results || {};
+      totalUpdated += r.updated || 0;
+      totalTenantLinked += r.tenantLinked || 0;
+      totalErrors += (r.errors || []).length;
+
+      console.log(`  Batch ${batchNum}/${totalBatches}: updated=${r.updated || 0}, tenantLinked=${r.tenantLinked || 0}, skipped=${r.skipped || 0}, errors=${(r.errors || []).length}`);
+      if ((r.errors || []).length > 0) {
+        r.errors.forEach(e => console.warn(`    Error: ${e.documentId} → ${e.error}`));
       }
-
-      const changes = [];
-      if (needsDateFix) changes.push(`date→${originalDate.slice(0, 10)}`);
-      if (needsTenantFix) changes.push(`tenant→${TENANT_ID_FILTER}`);
-      console.log(`  ✓ ${label} (${changes.join(', ')})`);
     } catch (err) {
-      console.error(`  ✖ ${label}: ${err.message}`);
-      errors++;
+      console.error(`  Batch ${batchNum}/${totalBatches} FAILED: ${err.message}`);
+      totalErrors += batch.length;
     }
 
-    // Small delay to avoid rate limiting
-    if (i < cloudArticles.length - 1) await sleep(200);
+    if (b < totalBatches - 1) await sleep(500);
   }
 
   // Summary
   console.log('\n=== Summary ===');
-  console.log(`Total on Cloud: ${cloudArticles.length}`);
-  console.log(`Updated:        ${updated}`);
-  console.log(`Published:      ${published}`);
-  console.log(`Skipped:        ${skipped} (already correct or no match)`);
-  console.log(`Errors:         ${errors}`);
+  console.log(`Total on Cloud:     ${cloudArticles.length}`);
+  console.log(`Dates updated:      ${totalUpdated}`);
+  console.log(`Tenant linked:      ${totalTenantLinked}`);
+  console.log(`Errors:             ${totalErrors}`);
   if (notMatched.length > 0) {
     console.log(`\nNot matched (${notMatched.length} slugs not in export):`);
     notMatched.slice(0, 20).forEach(s => console.log(`  - ${s}`));
     if (notMatched.length > 20) console.log(`  ... and ${notMatched.length - 20} more`);
   }
+  console.log('\nDone. Remove src/api/migration/ after verifying results.');
 }
 
 main().catch(err => {
