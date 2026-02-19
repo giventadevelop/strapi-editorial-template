@@ -19,17 +19,21 @@
  */
 module.exports = {
   async fixPublished(ctx) {
-    const { token, tenantDocumentId, articles } = ctx.request.body || {};
+    const { tenantDocumentId, articles } = ctx.request.body || {};
 
-    // --- Auth: compare token to any valid API token ---
-    const apiTokenService = strapi.plugin('users-permissions')?.service('jwt')
-      || strapi.service('admin::api-token');
-    // Simpler: just compare against env
-    const expectedToken = process.env.STRAPI_MIGRATION_TOKEN
-      || process.env.STRAPI_CLOUD_API_TOKEN
-      || process.env.API_TOKEN_SALT; // fallback
-    if (!token || token !== expectedToken) {
-      return ctx.unauthorized('Invalid migration token.');
+    // --- Auth: validate the Bearer token against Strapi's API token store ---
+    const crypto = require('crypto');
+    const authHeader = ctx.request.header.authorization || '';
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    if (!bearerToken) {
+      return ctx.unauthorized('Missing Bearer token.');
+    }
+    const hashedToken = crypto.createHash('sha512').update(bearerToken).digest('hex');
+    const storedToken = await strapi.db.query('admin::api-token').findOne({
+      where: { accessKey: hashedToken },
+    });
+    if (!storedToken) {
+      return ctx.unauthorized('Invalid API token.');
     }
 
     if (!Array.isArray(articles) || articles.length === 0) {

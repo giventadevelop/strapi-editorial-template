@@ -351,7 +351,6 @@ async function main() {
       const res = await fetchWithRetry(() => apiFetch('/api/migration/fix-published', {
         method: 'POST',
         body: JSON.stringify({
-          token: API_TOKEN,
           tenantDocumentId: tenantDocId,
           articles: batch,
         }),
