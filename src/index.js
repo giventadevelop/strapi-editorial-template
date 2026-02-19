@@ -16,7 +16,7 @@ module.exports = {
       const crypto = require('crypto');
       const { tenantDocumentId, articles } = ctx.request.body || {};
 
-      // Validate Bearer token against Strapi's API token store
+      // Validate Bearer token against env var or Strapi's hashed token store
       const authHeader = ctx.request.header.authorization || '';
       const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
       if (!bearerToken) {
@@ -24,11 +24,21 @@ module.exports = {
         ctx.body = { error: { status: 401, message: 'Missing Bearer token.' } };
         return;
       }
-      const hashedToken = crypto.createHash('sha512').update(bearerToken).digest('hex');
-      const storedToken = await strapi.db.query('admin::api-token').findOne({
-        where: { accessKey: hashedToken },
-      });
-      if (!storedToken) {
+      // Try direct match against env var first (simplest)
+      const envToken = process.env.STRAPI_CLOUD_API_TOKEN || process.env.STRAPI_MIGRATION_TOKEN;
+      let authorized = envToken && bearerToken === envToken;
+      // Fallback: HMAC-SHA512 lookup in Strapi's token store
+      if (!authorized) {
+        try {
+          const salt = strapi.config.get('admin.apiToken.salt') || process.env.API_TOKEN_SALT || '';
+          const hashedToken = crypto.createHmac('sha512', salt).update(bearerToken).digest('hex');
+          const storedToken = await strapi.db.query('admin::api-token').findOne({
+            where: { accessKey: hashedToken },
+          });
+          if (storedToken) authorized = true;
+        } catch (_) {}
+      }
+      if (!authorized) {
         ctx.status = 401;
         ctx.body = { error: { status: 401, message: 'Invalid API token.' } };
         return;
