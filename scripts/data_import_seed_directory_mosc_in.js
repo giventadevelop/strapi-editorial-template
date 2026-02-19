@@ -3,15 +3,15 @@
 /**
  * Directory import from local clone of directory.mosc.in
  * Script: data_import_seed_directory_mosc_in.js
- * Parses dioceses, bishops, priests (by diocese), directory entries, and churches (from parishes pages) from HTML.
- * Uploads images. Randomly assigns 2 priests per church (same diocese) for sample data.
+ * Parses dioceses, bishops, priests (by diocese), directory entries, and parishes (from parish list pages) from HTML.
+ * Uploads images. Creates one parish per parsed item with image when available.
  *
  * Tenant: Every imported record gets the tenant from TENANT_ID (default directory_mosc_001). This is required so
  * editor-role users (assigned to that tenant via Editor Tenant Assignment) see the data. Per multi-tenant rules,
  * tenant is set by default and not chosen in the UI.
  *
  * Config from .env: STRAPI_DATA_IMPORT_PROJECT_CLONE_DIR, TENANT_ID
- * Optional: STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1 to fetch missing pages from live site: bishops, directory sections, priests, churches when not in clone.
+ * Optional: STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1 to fetch missing pages from live site: bishops, directory sections, priests, parishes when not in clone.
  * Run: npm run seed:data_import_seed_directory_mosc_in
  *
  * Bishop image upload test: Run with TEST_BISHOP_UPLOAD_ONLY=1 (or npm run test:bishop_upload) to process only
@@ -789,7 +789,6 @@ async function backfillTenantOnExistingRecords(strapi, tenantConnectId) {
     { uid: 'api::diocesan-bishop.diocesan-bishop', label: 'diocesan bishops' },
     { uid: 'api::retired-bishop.retired-bishop', label: 'retired bishops' },
     { uid: 'api::diocese.diocese', label: 'dioceses' },
-    { uid: 'api::church.church', label: 'churches' },
     { uid: 'api::parish.parish', label: 'parishes' },
     { uid: 'api::priest.priest', label: 'priests' },
     { uid: 'api::directory-entry.directory-entry', label: 'directory entries' },
@@ -900,19 +899,19 @@ async function runImport(strapi, cloneDir, tenantDoc) {
         const { items } = parseParishListPage(null, dioceseName, html);
         const baseDir = path.join(cloneDir, 'parishes');
         for (const c of items) allChurches.push({ ...c, htmlBaseDir: baseDir });
-        if (items.length) console.log('  Fetched churches for diocese', id, '-', items.length, 'churches');
+        if (items.length) console.log('  Fetched parishes for diocese', id, '-', items.length, 'parishes');
       } catch (e) {
         console.warn('  Fetch parishes for diocese', id, 'failed:', e.message);
       }
     }
   }
 
-  console.log(`Found ${dioceses.length} dioceses, ${bishops.length} bishops, ${directoryEntries.length} directory entries, ${allPriests.length} priests, ${allChurches.length} churches.`);
+  console.log(`Found ${dioceses.length} dioceses, ${bishops.length} bishops, ${directoryEntries.length} directory entries, ${allPriests.length} priests, ${allChurches.length} parish items.`);
   if (allPriests.length === 0 && priestDioceseIds.size > 0) {
     console.log('  Hint: 0 priests – add priest list pages under priests/ or set STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1 to fetch from the live site.');
   }
   if (allChurches.length === 0 && parishDioceseIdToName.size > 0) {
-    console.log('  Hint: 0 churches – add parish list pages under parishes/ or set STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1 to fetch from the live site.');
+    console.log('  Hint: 0 parish items – add parish list pages under parishes/ or set STRAPI_DIRECTORY_FETCH_MISSING_PAGES=1 to fetch from the live site.');
   }
 
   const dioceseBySlug = {};
@@ -1241,14 +1240,12 @@ async function runImport(strapi, cloneDir, tenantDoc) {
     }
   }
 
-  const assignedPriestIds = new Set();
-  const shuffle = (arr) => arr.slice().sort(() => Math.random() - 0.5);
   for (const c of allChurches) {
     try {
       const dioceseSlug = c.dioceseName ? slugify(c.dioceseName) : null;
       const dioceseDocId = dioceseSlug ? dioceseBySlug[dioceseSlug] : null;
       if (!dioceseDocId) {
-        console.warn('  Skip church (no matching diocese):', c.name, c.dioceseName);
+        console.warn('  Skip parish (no matching diocese):', c.name, c.dioceseName);
         continue;
       }
       let imageConnect = null;
@@ -1258,53 +1255,23 @@ async function runImport(strapi, cloneDir, tenantDoc) {
           if (uploaded) imageConnect = { connect: [{ documentId: uploaded.documentId }] };
         } catch (_) { /* proceed without image */ }
       }
-      const data = {
+      const parishSlug = c.slug + '-' + dioceseSlug;
+      const parishData = {
         name: c.name,
-        slug: c.slug,
-        location: c.location,
-        address: c.address,
+        slug: parishSlug,
         diocese: { connect: [dioceseDocId] },
+        address: c.address || c.location,
         tenant: connectTenant,
       };
-      const created = await createWithImageFallback('api::church.church', data, imageConnect, c.name);
-      const churchDocId = created?.documentId ?? created?.id;
-      if (created && imageConnect) {
+      const parishCreated = await createWithImageFallback('api::parish.parish', parishData, imageConnect, c.name);
+      if (parishCreated && imageConnect) {
         const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
-        if (fileDocId) await setMediaRelationViaDb(strapi, 'api::church.church', churchDocId, fileDocId, 'image');
+        const parishDocId = parishCreated?.documentId ?? parishCreated?.id;
+        if (fileDocId && parishDocId) await setMediaRelationViaDb(strapi, 'api::parish.parish', parishDocId, fileDocId, 'image');
       }
-      if (!churchDocId) continue;
-      const unassigned = (priestsByDioceseSlug[dioceseSlug] || []).filter((id) => !assignedPriestIds.has(id));
-      const pick = shuffle(unassigned).slice(0, 2);
-      for (const priestDocId of pick) {
-        try {
-          await strapi.documents('api::priest.priest').update({
-            documentId: priestDocId,
-            data: { church: { connect: [churchDocId] } },
-          });
-          assignedPriestIds.add(priestDocId);
-        } catch (_) {}
-      }
-      try {
-        const parishSlug = c.slug + '-' + dioceseSlug;
-        const parishData = {
-          name: c.name,
-          slug: parishSlug,
-          diocese: { connect: [dioceseDocId] },
-          address: c.address || c.location,
-          tenant: connectTenant,
-        };
-        const parishCreated = await createWithImageFallback('api::parish.parish', parishData, imageConnect, c.name + ' (parish)');
-        if (parishCreated && imageConnect) {
-          const fileDocId = imageConnect?.connect?.[0]?.documentId ?? imageConnect?.connect?.[0];
-          const parishDocId = parishCreated?.documentId ?? parishCreated?.id;
-          if (fileDocId && parishDocId) await setMediaRelationViaDb(strapi, 'api::parish.parish', parishDocId, fileDocId, 'image');
-        }
-      } catch (parishErr) {
-        console.warn('  Skip parish', c.name, parishErr.message);
-      }
-      console.log('  Created church:', c.name, pick.length, 'priests assigned');
+      console.log('  Created parish:', c.name);
     } catch (err) {
-      console.warn('  Skip church', c.name, err.message);
+      console.warn('  Skip parish', c.name, err.message);
     }
   }
 

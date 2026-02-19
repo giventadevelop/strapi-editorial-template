@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REST push – Issues, fixes, docs &amp; effective prompt</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { font-size: 1.75em; color: #1a1a1a; border-bottom: 2px solid #0066cc; padding-bottom: 0.5rem; }
+    h2 { font-size: 1.35em; color: #2d2d2d; margin-top: 1.75rem; border-left: 4px solid #0066cc; padding-left: 12px; }
+    h3 { font-size: 1.15em; margin-top: 1.25rem; }
+    ul, ol { margin: 0.5rem 0; }
+    li { margin: 0.35rem 0; }
+    code { background: #e8f4f8; color: #0d3b66; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+    pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; border-radius: 4px; border: 1px solid #ddd; font-size: 0.9em; }
+    .issue { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .fix { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .prompt-box { background: #f8f9fa; border: 2px solid #0066cc; padding: 1.25rem; margin: 1.5rem 0; border-radius: 6px; }
+    .prompt-box pre { background: #fff; margin: 0.5rem 0 0; white-space: pre-wrap; }
+    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+    th { background: #0066cc; color: white; }
+    .toc { background: #f0f7ff; padding: 1rem; margin: 1rem 0; border-radius: 4px; }
+    .strip-ok { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; }
+  </style>
+</head>
+<body>
+
+  <h1>REST push – Issues, fixes, documentation &amp; effective prompt</h1>
+  <p>This document summarizes the ongoing issues with the REST API push to Strapi Cloud, what has been fixed so far, where the project documentation lives, and whether the strip script removes any key data. It also provides a <strong>copy-paste prompt</strong> you can use for further debugging or when asking for help (e.g. AI or a colleague).</p>
+
+  <nav class="toc">
+    <strong>Contents</strong>
+    <ul>
+      <li><a href="#context">Project context</a></li>
+      <li><a href="#issues">What’s the issue</a></li>
+      <li><a href="#fixes">What’s been fixed / tried</a></li>
+      <li><a href="#docs">Where is the documentation</a></li>
+      <li><a href="#strip">Strip script – do we delete key information?</a></li>
+      <li><a href="#prompt">Effective prompt (copy-paste)</a></li>
+    </ul>
+  </nav>
+
+  <h2 id="context">Project context</h2>
+  <ul>
+    <li><strong>Project:</strong> Strapi 5 editorial template (<code>strapi-editorial-template</code>).</li>
+    <li><strong>Goal:</strong> Push content from a local (or exported) Strapi instance to <strong>Strapi Cloud</strong> via the <strong>REST Content API</strong> (no WebSocket/transfer).</li>
+    <li><strong>Main script:</strong> <code>scripts/rest_api_push_to_cloud.js</code>. Run with: <code>npm run push:rest-to-cloud -- my-export-5-records.tar.gz --retry=0 --uploads=local</code>.</li>
+    <li><strong>Export:</strong> Produced by <code>npm run strapi export -- --no-encrypt -f my-export-5-records</code>. Optional: strip upload entities with <code>npm run export:strip-uploads -- my-export-5-records.tar.gz</code> → <code>my-export-5-records.no-uploads.tar.gz</code>.</li>
+  </ul>
+
+  <h2 id="issues">What’s the issue</h2>
+  <div class="issue">
+    <strong>Observed behaviour after running REST push:</strong>
+    <ul>
+      <li><strong>Textual data</strong> (articles, categories, tenants, authors, etc.) <strong>are created</strong> on Cloud – e.g. “✓ articles batch 1/1 (6/6 entries)”.</li>
+      <li><strong>Relations are not applied:</strong> On the Cloud Content Manager, for an article, the fields <strong>tenant</strong>, <strong>category</strong>, and <strong>author</strong> show “Add or create a relation” (empty).</li>
+      <li><strong>Cover image is not applied:</strong> The article’s <strong>cover</strong> field is empty; no image is uploaded or linked.</li>
+    </ul>
+  </div>
+  <p><strong>Root cause (from logs):</strong></p>
+  <ul>
+    <li>Log line: <code>Merged 17830 relation links from export links/ into entity meta. 736 links matched entities.</code></li>
+    <li>So only <strong>736 of 17 830</strong> relation links are matched to entities. The rest are dropped because the script’s <strong>link-matching logic</strong> does not find a corresponding entity for the link’s <code>leftRef</code> (or the link’s <code>field</code> name is not recognized).</li>
+    <li>Because article→category, article→tenant, and article→cover links are not merged into entity meta:
+      <ul>
+        <li>Phase 2 has no relation data to PATCH for those fields → <strong>tenant/category/author stay empty</strong>.</li>
+        <li>The script only uploads media that are <strong>referenced</strong> by an entity’s <code>cover</code> / <code>image</code> relation. With no cover relation merged, the “referenced” set is empty → <strong>“16714 → 0 files”</strong> and no image upload (and <code>--uploads=local</code> is never used because the list of files to upload is already 0).</li>
+      </ul>
+    </li>
+    <li>When diagnostics run, <strong>“Sample links (leftRef, field): []”</strong> appears because no link in the export has <code>field</code> equal to the literal strings <code>category</code>, <code>tenant</code>, <code>cover</code>, or <code>author</code> – the export likely uses different field names (e.g. <code>api::article.article::category</code>).</li>
+  </ul>
+
+  <h2 id="fixes">What’s been fixed / tried</h2>
+  <div class="fix">
+    <ul>
+      <li><strong>Entity ref:</strong> Script now prefers <code>row.documentId</code> (top-level) then <code>row.ref</code> / <code>row.data?.documentId</code> when building entity ref so Cloud documentIds map correctly.</li>
+      <li><strong>Link field normalization:</strong> <code>normalizeRelationField(field)</code> maps export field names (e.g. <code>api::article.article::category</code>) to our attribute names (<code>category</code>, <code>tenant</code>, <code>cover</code>, <code>author</code>, etc.) so merged relations are used in Phase 2.</li>
+      <li><strong>More link keys:</strong> Left/right refs are read from <code>leftRef</code>, <code>rightRef</code>, <code>leftDocumentId</code>, <code>rightDocumentId</code>, <code>left</code>/<code>right</code> (object or primitive), <code>source</code>/<code>target</code>. Field from <code>field</code>, <code>attribute</code>, <code>relation</code>, <code>relationType</code>, <code>attributeName</code>, <code>name</code>.</li>
+      <li><strong>Local uploads:</strong> <code>--uploads=local</code> (or <code>REST_PUSH_UPLOAD_SOURCE=local</code>) makes the script look up media files under <code>public/uploads</code> (or <code>REST_PUSH_UPLOADS_DIR</code>) and upload from disk instead of fetching from S3. This only runs when there are referenced media; with 0 links merged for cover, the referenced set stays 0.</li>
+      <li><strong>Retries:</strong> <code>--retry=0</code> (one attempt) / <code>--retry=1</code> (one retry). HTTP 400 validation errors (e.g. “title must be a string”) are not retried.</li>
+      <li><strong>Diagnostics:</strong> When link match rate is low, the script logs “All link field names in export (sample)”, “Sample article entity refs”, and “Raw link row #1/#2/#3” so the exact export link format can be seen and the script adjusted.</li>
+    </ul>
+  </div>
+  <p>If relations and cover still do not apply after these changes, the next step is to <strong>inspect the actual link rows</strong> in the export (using the new diagnostics or by extracting <code>links/*.jsonl</code> from the tar) and align the script’s parsing with that format.</p>
+
+  <h2 id="docs">Where is the documentation</h2>
+  <table>
+    <thead>
+      <tr><th>Topic</th><th>Location</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Export, import, transfer, REST push, strip script, env, troubleshooting</td>
+        <td><strong><code>documentation/strapi5_export_import_transfer.html</code></strong></td>
+      </tr>
+      <tr>
+        <td>REST push – when to use it, phases, env, retries, local uploads</td>
+        <td>§10.1.5 and §10.1.6 in the above file</td>
+      </tr>
+      <tr>
+        <td>Why category/tenant/author/cover are empty; low link match rate</td>
+        <td>§10.1.5 “Why category, tenant, author, or cover (image) are empty after push” and §10.1.6 “Env and behavior summary”</td>
+      </tr>
+      <tr>
+        <td>Strip upload.file entities (strip script)</td>
+        <td>§10.1.7 in <code>strapi5_export_import_transfer.html</code>; script: <code>scripts/strip_upload_entities_from_export.js</code></td>
+      </tr>
+      <tr>
+        <td>Quick reference (commands, env)</td>
+        <td>“Quick reference” section and table in <code>strapi5_export_import_transfer.html</code></td>
+      </tr>
+      <tr>
+        <td>This issues-and-prompt summary</td>
+        <td><strong><code>documentation/REST_PUSH_ISSUES_AND_PROMPT.html</code></strong> (this file)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="strip">Strip script – do we delete key information?</h2>
+  <div class="strip-ok">
+    <strong>No.</strong> The strip script <strong>does not delete relation (link) data or any key relation information</strong>.
+  </div>
+  <p><strong>What the strip script does:</strong></p>
+  <ul>
+    <li><strong>Script:</strong> <code>scripts/strip_upload_entities_from_export.js</code> (npm: <code>npm run export:strip-uploads -- &lt;file.tar.gz&gt;</code>).</li>
+    <li>It only modifies <strong><code>entities/*.jsonl</code></strong> files: when reading each line, if the parsed row has <code>type === 'plugin::upload.file'</code>, that line is <strong>dropped</strong>. All other entity lines (articles, categories, tenants, authors, etc.) are <strong>kept</strong>.</li>
+    <li>Every other part of the archive is <strong>copied unchanged</strong>: <code>links/</code>, <code>schemas/</code>, <code>configuration/</code>, <code>metadata.json</code>, etc. So <strong>all relation links (leftRef, rightRef, field) remain in the export</strong>.</li>
+  </ul>
+  <p><strong>Summary:</strong></p>
+  <ul>
+    <li><strong>Removed:</strong> Only the <code>plugin::upload.file</code> entity lines (the media records themselves).</li>
+    <li><strong>Not removed:</strong> Links, schemas, configuration, and all other entity types. So category/tenant/cover relation information is still in the archive; the issue is that the REST push script is not matching those links to entities (link format / field names), not that the strip deleted them.</li>
+  </ul>
+
+  <h2 id="prompt">Effective prompt (copy-paste)</h2>
+  <p>Use the block below when asking for help (e.g. in a new chat or with a colleague) so the full context is available:</p>
+  <div class="prompt-box">
+    <strong>Copy from here ↓</strong>
+    <pre>## Context
+- Strapi 5 project: editorial template. We push content to Strapi Cloud via REST (no WebSocket transfer).
+- Script: `scripts/rest_api_push_to_cloud.js`. Command: `npm run push:rest-to-cloud -- my-export-5-records.tar.gz --retry=0 --uploads=local`.
+- Export: `strapi export --no-encrypt -f my-export-5-records`. Optionally stripped with `npm run export:strip-uploads` (only removes plugin::upload.file entity lines; links/ and all other data are unchanged).
+
+## Problem
+- After push, **textual data** (articles, categories, tenants, authors) are created on Cloud, but **relations are not applied**: article's **tenant**, **category**, and **author** show empty in Content Manager, and **cover** (image) is empty.
+- Logs: "Merged 17830 relation links from export links/ into entity meta. **736 links matched** entities." So most links are not matched; therefore no category/tenant/cover merged into entity meta, so Phase 2 has nothing to PATCH and "Upload filter: 16714 → 0 files" (no media to upload).
+
+## What we need
+1. **Link matching:** The export's `links/*.jsonl` rows must be parsed so that article→category, article→tenant, article→cover (and article→author) links are merged into entity meta. The script indexes entities by `documentId` and numeric `id`; link rows must provide leftRef/rightRef/field in a format we read (we already try leftRef, rightRef, leftDocumentId, rightDocumentId, left/right objects, source/target, and normalize field names like `api::article.article::category` → `category`).
+2. **Diagnostics:** When match rate is low, the script logs "All link field names in export", "Sample article entity refs", and "Raw link row #1/#2/#3". Use that output to align parsing with the real export format.
+3. **Images:** Once cover (and image) relations are merged, the script will have a non-empty set of referenced media; with `--uploads=local` it will then read those files from `public/uploads` and upload them to Cloud and link cover in Phase 2.
+
+## Docs and code
+- Full export/import/transfer and REST push docs: `documentation/strapi5_export_import_transfer.html` (§10.1.5, §10.1.6, §10.1.7).
+- This summary and prompt: `documentation/REST_PUSH_ISSUES_AND_PROMPT.html`.
+- Push script: `scripts/rest_api_push_to_cloud.js`. Strip script: `scripts/strip_upload_entities_from_export.js` (does not remove links; only removes plugin::upload.file entity lines).</pre>
+  </div>
+
+  <p><em>Last updated to reflect current script behaviour, diagnostics, and strip script behaviour.</em></p>
+
+</body>
+</html>

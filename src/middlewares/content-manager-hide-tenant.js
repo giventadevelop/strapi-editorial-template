@@ -12,7 +12,6 @@ const TARGET_UIDS = new Set([
   "api::bishop.bishop",
   "api::diocese.diocese",
   "api::parish.parish",
-  "api::church.church",
   "api::priest.priest",
   "api::directory-entry.directory-entry",
 ]);

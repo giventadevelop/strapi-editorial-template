@@ -50,13 +50,6 @@
       "mappedBy": "diocese",
       "description": "Parishes in this diocese"
     },
-    "churches": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::church.church",
-      "mappedBy": "diocese",
-      "description": "Churches in this diocese"
-    },
     "priests": {
       "type": "relation",
       "relation": "oneToMany",

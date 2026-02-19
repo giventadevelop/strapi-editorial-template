@@ -350,7 +350,6 @@ async function ensureEditorTenantScopedPermissions() {
     'api::retired-bishop.retired-bishop',
     'api::diocese.diocese',
     'api::parish.parish',
-    'api::church.church',
     'api::priest.priest',
     'api::directory-entry.directory-entry',
     'api::institution.institution',
@@ -464,7 +463,6 @@ async function hideTenantFieldInContentManagerLayout() {
     'api::retired-bishop.retired-bishop',
     'api::diocese.diocese',
     'api::parish.parish',
-    'api::church.church',
     'api::priest.priest',
     'api::directory-entry.directory-entry',
     'api::institution.institution',
@@ -522,7 +520,6 @@ async function registerTenantDocumentMiddleware() {
     'api::retired-bishop.retired-bishop',
     'api::diocese.diocese',
     'api::parish.parish',
-    'api::church.church',
     'api::priest.priest',
     'api::directory-entry.directory-entry',
     'api::institution.institution',
@@ -643,7 +640,6 @@ async function ensureContentApiPublicPermissions() {
     { controller: 'bishop', actions: ['find', 'findOne'] },
     { controller: 'diocese', actions: ['find', 'findOne'] },
     { controller: 'parish', actions: ['find', 'findOne'] },
-    { controller: 'church', actions: ['find', 'findOne'] },
     { controller: 'priest', actions: ['find', 'findOne'] },
     { controller: 'directory-entry', actions: ['find', 'findOne'] },
   ];
@@ -846,6 +842,14 @@ function registerPublishDateRefreshMiddleware() {
   strapi.documents.use(async (context, next) => {
     const doc = await next();
     if (context.action !== 'publish' || !doc?.documentId) return doc;
+
+    // Allow migration scripts to skip date refresh via request header
+    try {
+      const requestContext = require('./utils/request-context');
+      const ctx = requestContext.get();
+      if (ctx?.request?.header?.['x-skip-publish-date-refresh'] === '1') return doc;
+    } catch (_) {}
+
     const uid = context.uid;
     const documentId = doc.documentId;
     setImmediate(() => {
@@ -869,6 +873,120 @@ function registerPublishDateRefreshMiddleware() {
   });
 }
 
+/**
+ * Ensure tenant relation is copied from draft to published version on publish.
+ * Strapi 5 Draft & Publish maintains separate DB rows for draft and published;
+ * relations stored in link tables are not automatically copied on publish.
+ * Without this, the published row has no tenant and is excluded by tenant filters
+ * in the Content API (e.g. news pages return 0 results in production).
+ */
+function registerTenantPublishMiddleware() {
+  const tenantScopedUids = [
+    'api::article.article',
+    'api::advertisement-slot.advertisement-slot',
+    'api::flash-news-item.flash-news-item',
+    'api::directory-home.directory-home',
+    'api::bishop.bishop',
+    'api::catholicos.catholicos',
+    'api::diocesan-bishop.diocesan-bishop',
+    'api::retired-bishop.retired-bishop',
+    'api::diocese.diocese',
+    'api::parish.parish',
+    'api::priest.priest',
+    'api::directory-entry.directory-entry',
+    'api::institution.institution',
+    'api::church-dignitary.church-dignitary',
+    'api::working-committee.working-committee',
+    'api::managing-committee.managing-committee',
+    'api::spiritual-organisation.spiritual-organisation',
+    'api::pilgrim-centre.pilgrim-centre',
+    'api::seminary.seminary',
+  ];
+
+  strapi.documents.use(async (context, next) => {
+    const { uid, action } = context;
+    if (action !== 'publish' || !tenantScopedUids.includes(uid)) {
+      return next();
+    }
+
+    const documentId = context.params?.documentId;
+    const result = await next();
+    if (!documentId) return result;
+
+    try {
+      // Use Strapi metadata to discover the link table for the tenant relation
+      const meta = strapi.db.metadata.get(uid);
+      const tenantAttr = meta?.attributes?.tenant;
+      const joinTable = tenantAttr?.joinTable;
+
+      if (!joinTable?.name || !joinTable?.joinColumn?.name || !joinTable?.inverseJoinColumn?.name) {
+        return result;
+      }
+
+      const knex = strapi.db.connection;
+      const ct = strapi.contentType(uid);
+      if (!ct?.collectionName) return result;
+
+      const tableName = ct.collectionName;
+      const linkTable = joinTable.name;
+      const srcCol = joinTable.joinColumn.name;
+      const tgtCol = joinTable.inverseJoinColumn.name;
+      const ordCol = joinTable.orderColumnName;
+      const locale = context.params?.locale;
+
+      // Find draft row
+      const draftQuery = knex(tableName)
+        .where({ document_id: documentId })
+        .whereNull('published_at')
+        .select('id');
+      if (locale) draftQuery.andWhere({ locale });
+      const draftRow = await draftQuery.first();
+
+      // Find published row
+      const pubQuery = knex(tableName)
+        .where({ document_id: documentId })
+        .whereNotNull('published_at')
+        .select('id');
+      if (locale) pubQuery.andWhere({ locale });
+      const publishedRow = await pubQuery.first();
+
+      if (!draftRow || !publishedRow) return result;
+
+      // Get draft's tenant link
+      const draftLink = await knex(linkTable)
+        .where({ [srcCol]: draftRow.id })
+        .first();
+
+      if (!draftLink?.[tgtCol]) return result;
+
+      // Get published's tenant link
+      const pubLink = await knex(linkTable)
+        .where({ [srcCol]: publishedRow.id })
+        .first();
+
+      if (pubLink) {
+        // Update if tenant differs
+        if (pubLink[tgtCol] !== draftLink[tgtCol]) {
+          await knex(linkTable)
+            .where({ [srcCol]: publishedRow.id })
+            .update({ [tgtCol]: draftLink[tgtCol] });
+          strapi.log.info(`Tenant updated on published ${uid} (${documentId})`);
+        }
+      } else {
+        // Copy tenant link to the published row
+        const ins = { [srcCol]: publishedRow.id, [tgtCol]: draftLink[tgtCol] };
+        if (ordCol && draftLink[ordCol] != null) ins[ordCol] = draftLink[ordCol];
+        await knex(linkTable).insert(ins);
+        strapi.log.info(`Tenant copied to published ${uid} (${documentId})`);
+      }
+    } catch (err) {
+      strapi.log.warn(`Could not copy tenant on publish (${uid} ${documentId}):`, err.message);
+    }
+
+    return result;
+  });
+}
+
 module.exports = async () => {
   await seedExampleApp();
   await ensureContentApiPublicPermissions();
@@ -880,5 +998,6 @@ module.exports = async () => {
   await ensureArticleListSortAndColumns();
   await ensureCollectionTypesHaveDefaultSort();
   registerPublishDateRefreshMiddleware();
+  registerTenantPublishMiddleware();
   await registerTenantDocumentMiddleware();
 };

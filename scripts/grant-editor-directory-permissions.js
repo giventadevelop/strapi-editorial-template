@@ -3,7 +3,7 @@
 /**
  * Grant Editor role Content Manager permissions (create, read, update, delete)
  * for all Directory and tenant-scoped Editorial types so Editors can see and
- * edit Parishes, Churches, Dioceses, etc. Run if Editors only see content
+ * edit Parishes, Dioceses, etc. Run if Editors only see content
  * as Super Admin or permissions were not applied on first run.
  *
  * Run with Strapi stopped: node scripts/grant-editor-directory-permissions.js
@@ -28,7 +28,6 @@ const SUBJECTS = [
   'api::retired-bishop.retired-bishop',
   'api::diocese.diocese',
   'api::parish.parish',
-  'api::church.church',
   'api::priest.priest',
   'api::directory-entry.directory-entry',
   'api::institution.institution',

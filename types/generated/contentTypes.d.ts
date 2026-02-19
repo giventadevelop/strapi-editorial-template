@@ -768,58 +768,6 @@ export interface ApiChurchDignitaryChurchDignitary
   };
 }
 
-export interface ApiChurchChurch extends Struct.CollectionTypeSchema {
-  collectionName: 'churches';
-  info: {
-    description: 'Church (place of worship): name, location, diocese, optional priests; address/phone support India, Kerala, USA formats';
-    displayName: 'Directory \u2013 Churches';
-    pluralName: 'churches';
-    singularName: 'church';
-  };
-  options: {
-    draftAndPublish: false;
-  };
-  attributes: {
-    address: Schema.Attribute.Text;
-    addressLine1: Schema.Attribute.String;
-    addressLine2: Schema.Attribute.String;
-    city: Schema.Attribute.String;
-    country: Schema.Attribute.String;
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    diocese: Schema.Attribute.Relation<'manyToOne', 'api::diocese.diocese'> &
-      Schema.Attribute.Required;
-    email: Schema.Attribute.String;
-    image: Schema.Attribute.Media<'images'>;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::church.church'
-    > &
-      Schema.Attribute.Private;
-    location: Schema.Attribute.String;
-    name: Schema.Attribute.String & Schema.Attribute.Required;
-    phones: Schema.Attribute.Text;
-    phoneSecondary: Schema.Attribute.String;
-    postalCode: Schema.Attribute.String;
-    priests: Schema.Attribute.Relation<'oneToMany', 'api::priest.priest'>;
-    publishedAt: Schema.Attribute.DateTime;
-    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
-    state: Schema.Attribute.String;
-    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
-      Schema.Attribute.SetPluginOptions<{
-        'content-manager': {
-          visible: false;
-        };
-      }>;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    website: Schema.Attribute.String;
-  };
-}
-
 export interface ApiDiocesanBishopDiocesanBishop
   extends Struct.CollectionTypeSchema {
   collectionName: 'diocesan_bishops';
@@ -876,7 +824,6 @@ export interface ApiDioceseDiocese extends Struct.CollectionTypeSchema {
   };
   attributes: {
     address: Schema.Attribute.Text;
-    churches: Schema.Attribute.Relation<'oneToMany', 'api::church.church'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1349,7 +1296,6 @@ export interface ApiPriestPriest extends Struct.CollectionTypeSchema {
   };
   attributes: {
     address: Schema.Attribute.Text;
-    church: Schema.Attribute.Relation<'manyToOne', 'api::church.church'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -2147,7 +2093,6 @@ declare module '@strapi/strapi' {
       'api::category.category': ApiCategoryCategory;
       'api::catholicos.catholicos': ApiCatholicosCatholicos;
       'api::church-dignitary.church-dignitary': ApiChurchDignitaryChurchDignitary;
-      'api::church.church': ApiChurchChurch;
       'api::diocesan-bishop.diocesan-bishop': ApiDiocesanBishopDiocesanBishop;
       'api::diocese.diocese': ApiDioceseDiocese;
       'api::directory-entry.directory-entry': ApiDirectoryEntryDirectoryEntry;
