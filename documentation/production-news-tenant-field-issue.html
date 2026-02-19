@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strapi Production: News Tenant Field Issue</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 72rem; margin: 0 auto; padding: 2rem; color: #333; }
+        h1 { font-size: 1.75rem; border-bottom: 3px solid #0066cc; padding-bottom: 0.5rem; }
+        h2 { font-size: 1.35rem; margin-top: 2rem; border-left: 4px solid #0066cc; padding-left: 12px; }
+        h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+        p { margin: 0.75rem 0; }
+        ul, ol { margin: 0.75rem 0; padding-left: 1.5rem; }
+        li { margin: 0.35rem 0; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+        th, td { border: 1px solid #ddd; padding: 0.5rem 0.75rem; text-align: left; }
+        th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: bold; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        tr:hover { background: #e3f2fd; }
+        pre, code { background: #e8f4f8; color: #0d3b66; font-family: ui-monospace, monospace; font-size: 0.9em; border: 1px solid #b8d4e3; }
+        pre { padding: 1rem; overflow-x: auto; border-radius: 6px; }
+        code { padding: 0.2em 0.5em; border-radius: 4px; }
+        pre code { padding: 0; background: none; border: none; }
+        section { margin-bottom: 2rem; }
+        .info { background: #d1ecf1; padding: 1rem 1.25rem; border-left: 4px solid #0c5460; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .warning { background: #fff3cd; padding: 1rem 1.25rem; border-left: 4px solid #ffc107; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .success { background: #d4edda; padding: 1rem 1.25rem; border-left: 4px solid #28a745; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; padding: 1rem 1.25rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+        .toc { background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%); padding: 1rem 1.5rem; border-radius: 8px; margin: 1rem 0; border: 1px solid #b8d4e3; }
+        .toc ul { list-style: none; padding-left: 0; }
+        .toc li { margin: 0.35rem 0; }
+        .toc a { color: #0066cc; text-decoration: none; font-weight: 500; }
+        .toc a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <main>
+        <header>
+            <h1>Strapi Production: News Tenant Field Issue</h1>
+            <p>Documentation for the issue where news articles do not appear in production because the <strong>tenant</strong> relation is not set or not editable on <strong>published</strong> articles in Strapi Cloud.</p>
+        </header>
+
+        <nav class="toc" aria-label="Table of contents">
+            <h2>Contents</h2>
+            <ul>
+                <li><a href="#summary">Summary</a></li>
+                <li><a href="#symptoms">Symptoms</a></li>
+                <li><a href="#root-cause">Root Cause</a></li>
+                <li><a href="#verified">What Was Verified</a></li>
+                <li><a href="#where-to-fix">Where to Fix</a></li>
+                <li><a href="#checklist">Checklist</a></li>
+            </ul>
+        </nav>
+
+        <section id="summary">
+            <h2>Summary</h2>
+            <div class="section-intro">
+                <p>On <strong>production</strong> Strapi Cloud (<code>awesome-birthday-82f0a4fa96.strapiapp.com</code>), news articles and flash-news items return <strong>0 results</strong> when the Next.js app queries with <code>filters[tenant][tenantId][$eq]=tenant_demo_002</code>. The same filter works on <strong>local</strong> Strapi and returns articles. The Bishops page works in both environments because bishop entries have the tenant relation set in production.</p>
+                <p>The <strong>tenant</strong> field on <strong>Editorial - Article</strong> (and related content types) can be set on the <strong>Draft</strong> tab and saved/published, but on the <strong>Published</strong> tab the field appears <strong>inactive or grayed out</strong> and shows no selected tenant (&quot;Add or create a relation&quot;). As a result, the <strong>published</strong> document used by the Content API has no tenant relation and is excluded by the tenant filter.</p>
+            </div>
+        </section>
+
+        <section id="symptoms">
+            <h2>Symptoms</h2>
+            <ul>
+                <li>News homepage (featured, main news, press release, most read) and flash-news sections are <strong>empty</strong> in production.</li>
+                <li>Local Strapi (<code>NEXT_PUBLIC_STRAPI_URL=http://localhost:1337</code>) shows articles correctly with the same tenant filter.</li>
+                <li>Bishops directory works in both environments (tenant relation is set on bishop entries in production).</li>
+                <li>In Strapi Admin (production): on the <strong>Draft</strong> tab for an article, the <strong>tenant</strong> field is editable and <code>tenant_demo_002</code> can be assigned; on the <strong>Published</strong> tab, the tenant field is inactive/grayed out and shows no tenant, and the user cannot edit it even as Super Admin or Editor.</li>
+            </ul>
+        </section>
+
+        <section id="root-cause">
+            <h2>Root Cause</h2>
+            <div class="info">
+                <p><strong>Draft &amp; Publish behavior.</strong> Strapi maintains separate draft and published versions of an entry. The Next.js app requests only <strong>published</strong> content (<code>filters[publishedAt][$notNull]=true</code>). If the <strong>tenant</strong> relation is not copied to the published version when publishing, or if it cannot be set/edited on the published version in the Content Manager, then the published document has no tenant and does not match the filter.</p>
+            </div>
+            <p>Possible contributing factors:</p>
+            <ul>
+                <li><strong>Relation not copied on publish:</strong> When clicking &quot;Publish&quot;, Strapi may not be including the <code>tenant</code> relation in the data written to the published version.</li>
+                <li><strong>Field read-only for published entries:</strong> Strapi Cloud or Content Manager configuration may make the <code>tenant</code> field non-editable when viewing/editing the <strong>Published</strong> tab.</li>
+                <li><strong>Role/permissions:</strong> Super Admin and Editor both have full CREATE, READ, UPDATE, DELETE, PUBLISH on Article; field-level or &quot;edit published&quot; restrictions could still apply and were not ruled out.</li>
+            </ul>
+        </section>
+
+        <section id="verified">
+            <h2>What Was Verified</h2>
+            <ul>
+                <li><strong>Next.js app:</strong> Uses the same tenant filter (<code>filters[tenant][tenantId][$eq]=tenant_demo_002</code>) for both local and production; no environment-specific logic. No code change required on the frontend.</li>
+                <li><strong>Content-Type Builder:</strong> The <code>tenant</code> field is defined as <strong>Relation (manyToOne) with Tenant</strong> on Editorial - Article in both local and production. Schema looks the same; in production the schema may be locked (padlocks) which is normal for Strapi Cloud and does not prevent editing content.</li>
+                <li><strong>Roles:</strong> Super Admin and Editor have CREATE, READ, UPDATE, DELETE, PUBLISH checked for Article (and Flash-news-item). So the issue is not a simple lack of &quot;update&quot; permission at the role level.</li>
+            </ul>
+        </section>
+
+        <section id="where-to-fix">
+            <h2>Where to Fix</h2>
+            <p>Fixes are on the <strong>Strapi side</strong> (production Strapi Cloud or project configuration). The Next.js app does not need to handle production differently.</p>
+
+            <h3>1. Try setting tenant on the Published tab</h3>
+            <p>In production Strapi Admin, open an article, switch to the <strong>Published</strong> tab, and try to set the <strong>tenant</strong> relation to <code>tenant_demo_002</code>. If the field is editable and Save works, do this for all articles that should appear; then confirm the news page shows them.</p>
+
+            <h3>2. Content-Type Builder (tenant field)</h3>
+            <p>In <strong>Settings → Content-Type Builder → Collection Types → Editorial - Article</strong>, open the <strong>tenant</strong> relation field. Ensure:</p>
+            <ul>
+                <li>No option that makes the field &quot;draft only&quot; or excludes it from the published version.</li>
+                <li>If available, that the field is included when publishing and (if possible) editable on published entries.</li>
+            </ul>
+            <p>In production, the schema may be locked; if so, changes must be made in the Strapi project code and redeployed.</p>
+
+            <h3>3. Lifecycle hooks</h3>
+            <p>If the Strapi project has custom lifecycle hooks for the Article content type (e.g. <code>beforeCreate</code>, <code>beforeUpdate</code>, or publish-related hooks), check that they do not remove or overwrite the <code>tenant</code> relation when publishing.</p>
+
+            <h3>4. Test whether tenant survives publish</h3>
+            <div class="success">
+                <p><strong>Quick test:</strong> Create a <strong>new</strong> article in production, set <strong>tenant</strong> = <code>tenant_demo_002</code> on the <strong>Draft</strong> tab, then click <strong>Publish</strong>. Open the <strong>Published</strong> tab and check if the tenant is now set. If yes, the issue is limited to already-published entries (and possibly UI edit restrictions). If no, the publish process is not copying the tenant relation.</p>
+            </div>
+
+            <h3>5. API workaround (bypass UI)</h3>
+            <p>To confirm whether the backend allows the tenant to be set on published articles: use the Strapi REST API (or Postman) with an admin API token and <code>PUT</code> or <code>PATCH</code> the article by id/documentId with <code>tenant: &lt;tenant_id&gt;</code> in the body. If the API accepts it and the article then appears on the site, the problem is limited to the Content Manager UI (e.g. field disabled for published entries).</p>
+        </section>
+
+        <section id="checklist">
+            <h2>Checklist</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Tenant on Published tab</td><td>Try editing and saving tenant on the Published tab for existing articles.</td></tr>
+                    <tr><td>New article test</td><td>Create new article, set tenant on Draft, Publish, then check Published tab for tenant.</td></tr>
+                    <tr><td>Content-Type Builder</td><td>Ensure tenant field is not draft-only and is included in publish (schema may be locked in Cloud).</td></tr>
+                    <tr><td>Lifecycle hooks</td><td>Review Article lifecycles; ensure tenant is not stripped on publish.</td></tr>
+                    <tr><td>Roles / field-level</td><td>If Article has expandable permissions, ensure tenant (or &quot;update&quot;) is allowed for the role.</td></tr>
+                    <tr><td>API bypass</td><td>Optional: PATCH article with tenant via API to confirm backend allows it.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <div class="info">
+            <p><strong>Reference.</strong> Frontend filtering and data flow are documented in the analysis plan and in <code>src/app/syro/news/getNewsHomePageData.ts</code> and <code>src/app/syro/directory/bishops/getBishopsData.ts</code>. Strapi API patterns (tenant filter, no fallback when 200 with 0 items) are in <code>.cursor/rules/strapi_5_api_patterns.mdc</code>.</p>
+        </div>
+    </main>
+</body>
+</html>
