@@ -14,6 +14,7 @@ const TARGET_UIDS = new Set([
   "api::parish.parish",
   "api::priest.priest",
   "api::directory-entry.directory-entry",
+  "api::liturgy-day.liturgy-day",
 ]);
 
 function stripHiddenFromArray(arr) {

@@ -27,6 +27,7 @@ const TENANT_SCOPED_UIDS = new Set([
   'api::parish.parish',
   'api::priest.priest',
   'api::directory-entry.directory-entry',
+  'api::liturgy-day.liturgy-day',
   'api::institution.institution',
   'api::church-dignitary.church-dignitary',
   'api::working-committee.working-committee',

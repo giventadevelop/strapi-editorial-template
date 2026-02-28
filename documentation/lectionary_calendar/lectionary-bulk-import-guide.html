@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lectionary Bulk Import from PDFs – Requirements &amp; Guidelines</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; --green: #3fb950; --warn: #d29922; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 52rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    h4 { font-size: 0.95rem; margin-top: 1rem; color: var(--text); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: var(--surface); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; }
+    pre code { background: none; padding: 0; color: #0d3b66; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    .note { background: rgba(88, 166, 255, 0.1); border-left: 4px solid var(--accent); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    .warn { background: rgba(210, 153, 34, 0.1); border-left: 4px solid var(--warn); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    .good { background: rgba(63, 185, 80, 0.1); border-left: 4px solid var(--green); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    li { margin: 0.25rem 0; }
+    a { color: var(--accent); }
+    .toc { margin: 1.5rem 0; padding: 1rem; background: var(--surface); border-radius: 8px; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc li { margin: 0.35rem 0; }
+    .toc a { text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; }
+    .section-intro code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; padding: 0; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-type { font-weight: bold; color: #0d3b66; }
+    .command-header-buttons { display: flex; gap: 8px; }
+    .copy-button, .copy-button-template { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; }
+    .copy-button { background: #0066cc; color: white; }
+    .copy-button-template { background: #6c757d; color: white; }
+    .command-parameters { padding: 15px; background: rgba(255,255,255,0.5); border-bottom: 1px solid rgba(0,0,0,0.1); }
+    .command-parameters h5 { margin: 0 0 12px 0; font-size: 0.9em; color: #333; }
+    .parameter-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .parameter-group.single { grid-template-columns: 1fr; }
+    .parameter-input label { font-size: 0.8em; color: #555; font-weight: 600; }
+    .parameter-input input { padding: 8px 12px; border: 2px solid #ddd; border-radius: 4px; font-family: 'Courier New', monospace; }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
+    .command-single-line { padding: 12px 15px; background: #e8f4f8; border-top: 1px solid #b8d4e3; }
+    .command-single-line-label { font-size: 0.8em; color: #666; margin-bottom: 4px; }
+    .command-single-line code { background: #e8f4f8; color: #0d3b66; padding: 4px 8px; border: 1px solid #b8d4e3; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <h1>Lectionary Bulk Import from PDFs</h1>
+    <p>Requirements and guidelines for bulk-seeding the <strong>Liturgy Day</strong> (lectionary) collection from English and Malayalam PDF calendars. Use the delete script to clear existing data for a tenant, then the import script to parse the PDFs and create liturgy-day entries in Strapi.</p>
+
+    <nav class="toc" aria-label="Contents">
+      <h2 id="toc">Contents</h2>
+      <ul>
+        <li><a href="#overview">1. Overview</a></li>
+        <li><a href="#prerequisites">2. Prerequisites</a></li>
+        <li><a href="#script-delete">3. Script 1 – Delete Liturgy Days</a></li>
+        <li><a href="#script-import">4. Script 2 – Import from PDF</a></li>
+        <li><a href="#run-order">5. Run Order</a></li>
+        <li><a href="#pdf-format">6. PDF Format and Mapping</a></li>
+        <li><a href="#troubleshooting">7. Troubleshooting</a></li>
+        <li><a href="#related">8. Related Documentation</a></li>
+      </ul>
+    </nav>
+
+    <h2 id="overview">1. Overview</h2>
+    <div class="section-intro">
+      <p>Two scripts automate populating the liturgical calendar:</p>
+      <ul>
+        <li><strong>Delete</strong>: Removes all Liturgy Day entries for a given tenant so you can re-import without duplicates.</li>
+        <li><strong>Import</strong>: Reads <code>2026-Liturgical-Calender.pdf</code> (English) and <code>Panjangom_26.pdf</code> (Malayalam), parses them, merges by date, and bulk-creates liturgy-day records for a tenant.</li>
+      </ul>
+      <p>Run delete first, then import. Use <code>DRY_RUN=1</code> to preview without changing data.</p>
+    </div>
+
+    <h2 id="prerequisites">2. Prerequisites</h2>
+    <ul>
+      <li><strong>Strapi project root</strong>: All commands are run from the root of <code>strapi-editorial-template</code>.</li>
+      <li><strong>Dependencies</strong>: <code>npm install</code> (includes <code>pdf-parse</code> as devDependency for the import script).</li>
+      <li><strong>Tenant</strong>: The tenant (e.g. <code>tenant_demo_002</code>) must exist in Strapi Admin (Content Manager → Tenant).</li>
+      <li><strong>Strapi server</strong>: Do <strong>not</strong> run the scripts while the Strapi server is running; they load Strapi programmatically and need exclusive use of the database.</li>
+      <li><strong>PDF files</strong>: Place <code>2026-Liturgical-Calender.pdf</code> and <code>Panjangom_26.pdf</code> in <code>documentation/lectionary_calendar/</code> (or pass paths via options).</li>
+    </ul>
+
+    <h2 id="script-delete">3. Script 1 – Delete Liturgy Days</h2>
+    <p>Purpose: Remove all Liturgy Day entries for a single tenant. Use before re-importing from PDF.</p>
+    <p>Script: <code class="script-name">delete-liturgy-days.js</code></p>
+
+    <div class="command-block" data-command-base="node scripts/delete-liturgy-days.js" data-template-command="node scripts/delete-liturgy-days.js --tenant-id=tenant_demo_002">
+      <div class="command-header">
+        <span class="command-type">Delete script</span>
+        <div class="command-header-buttons">
+          <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-delete')" title="Copy template">Template</button>
+          <button class="copy-button" onclick="copyCommand(this, 'cmd-delete')" title="Copy command">Copy</button>
+        </div>
+      </div>
+      <div class="command-parameters">
+        <h5>Customize parameters</h5>
+        <div class="parameter-group">
+          <div class="parameter-input">
+            <label for="cmd-delete-tenant">Tenant ID:</label>
+            <input type="text" id="cmd-delete-tenant" value="tenant_demo_002" oninput="updateCommand('cmd-delete', 'tenant', this.value)">
+          </div>
+          <div class="parameter-input">
+            <label for="cmd-delete-dry">DRY_RUN (1 = no delete):</label>
+            <input type="text" id="cmd-delete-dry" placeholder="1 or leave empty" oninput="updateCommand('cmd-delete', 'dry', this.value)">
+          </div>
+        </div>
+      </div>
+      <div class="command-content" id="cmd-delete">node scripts/delete-liturgy-days.js --tenant-id=tenant_demo_002</div>
+      <div class="command-single-line">
+        <div class="command-single-line-label">Windows single-line (set DRY_RUN first if needed):</div>
+        <code id="cmd-delete-single-code">node scripts/delete-liturgy-days.js --tenant-id=tenant_demo_002</code>
+      </div>
+    </div>
+
+    <p>Alternatively: <code>TENANT_ID=tenant_demo_002 node scripts/delete-liturgy-days.js</code> or <code>DRY_RUN=1 node scripts/delete-liturgy-days.js</code> to only log the count.</p>
+
+    <h2 id="script-import">4. Script 2 – Import from PDF</h2>
+    <p>Purpose: Parse the English and Malayalam PDFs and create Liturgy Day entries for a tenant.</p>
+    <p>Script: <code class="script-name">import-liturgy-days-from-pdf.js</code></p>
+
+    <div class="command-block" data-command-base="node scripts/import-liturgy-days-from-pdf.js" data-template-command="node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_demo_002 --year=2026">
+      <div class="command-header">
+        <span class="command-type">Import script</span>
+        <div class="command-header-buttons">
+          <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-import')" title="Copy template">Template</button>
+          <button class="copy-button" onclick="copyCommand(this, 'cmd-import')" title="Copy command">Copy</button>
+        </div>
+      </div>
+      <div class="command-parameters">
+        <h5>Customize parameters</h5>
+        <div class="parameter-group">
+          <div class="parameter-input">
+            <label for="cmd-import-tenant">Tenant ID:</label>
+            <input type="text" id="cmd-import-tenant" value="tenant_demo_002" oninput="updateCommand('cmd-import', 'tenant', this.value)">
+          </div>
+          <div class="parameter-input">
+            <label for="cmd-import-limit">Limit (optional, e.g. 10):</label>
+            <input type="text" id="cmd-import-limit" placeholder="empty = all" oninput="updateCommand('cmd-import', 'limit', this.value)">
+          </div>
+        </div>
+        <div class="parameter-group">
+          <div class="parameter-input">
+            <label for="cmd-import-year">Year (e.g. 2026):</label>
+            <input type="text" id="cmd-import-year" value="2026" placeholder="2026" oninput="updateCommand('cmd-import', 'year', this.value)">
+          </div>
+          <div class="parameter-input"></div>
+        </div>
+        <div class="parameter-group single">
+          <div class="parameter-input">
+            <label>DRY_RUN=1</label>
+            <span style="color: var(--muted);">Set environment variable to log parsed days without creating.</span>
+          </div>
+        </div>
+      </div>
+      <div class="command-content" id="cmd-import">node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_demo_002 --year=2026</div>
+      <div class="command-single-line">
+        <div class="command-single-line-label">Windows single-line:</div>
+        <code id="cmd-import-single-code">node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_demo_002 --year=2026</code>
+      </div>
+    </div>
+
+    <p><strong>Options:</strong></p>
+    <ul>
+      <li><code>--tenant-id=...</code> or <code>TENANT_ID=...</code> – Tenant to attach entries to (default: <code>tenant_demo_002</code>).</li>
+      <li><code>--year=YYYY</code> or <code>YEAR=...</code> – Calendar year for parsed dates (default: <code>2026</code>).</li>
+      <li><code>--limit=N</code> – Create at most N entries (for testing).</li>
+      <li><code>DRY_RUN=1</code> – Parse PDFs and log first few days; do not create.</li>
+      <li><code>--dump-text</code> – Extract raw text from both PDFs into <code>documentation/lectionary_calendar/dumped-en.txt</code> and <code>dumped-ml.txt</code> for debugging.</li>
+      <li><code>--en-pdf=path</code> / <code>--ml-pdf=path</code> – Override PDF paths (defaults: <code>documentation/lectionary_calendar/2026-Liturgical-Calender.pdf</code> and <code>Panjangom_26.pdf</code>).</li>
+    </ul>
+
+    <h2 id="run-order">5. Run Order</h2>
+    <ol>
+      <li>Stop the Strapi server if it is running.</li>
+      <li>Run the <strong>delete</strong> script for the target tenant (optionally with <code>DRY_RUN=1</code> to confirm count).</li>
+      <li>Run the <strong>import</strong> script (optionally with <code>DRY_RUN=1</code> or <code>--limit=10</code> to test).</li>
+      <li>Start Strapi and verify in Content Manager → Liturgical Calendar – Day.</li>
+    </ol>
+
+    <h2 id="pdf-format">6. PDF Format and Mapping</h2>
+    <p>The parser assumes both PDFs use the same structure: lines starting with a day number and a period (e.g. <code>1. New Year.</code>, <code>15. First Sunday of Great Lent...</code>). Month is inferred from the order of days (when day 1 appears again, the next month starts). Year is 2026.</p>
+    <table>
+      <tr><th>Schema field</th><th>Source</th></tr>
+      <tr><td><code>date</code></td><td>YYYY-MM-DD from parsed day and inferred month.</td></tr>
+      <tr><td><code>dayHeadingEn</code></td><td>Text after the day number in the English PDF.</td></tr>
+      <tr><td><code>dayHeadingMalylm</code></td><td>Text after the day number in the Malayalam PDF (same line order).</td></tr>
+      <tr><td><code>seasonNameEn</code> / <code>seasonNameMalylm</code></td><td>Not extracted from these PDFs; left empty.</td></tr>
+      <tr><td><code>readings</code></td><td>Empty array (PDFs do not list per-day readings).</td></tr>
+    </table>
+    <p>Parsing is best-effort. If the PDF layout changes, adjust <code class="script-name">lectionary-pdf-parser.js</code> or re-run <code>--dump-text</code> and inspect the generated <code>dumped-en.txt</code> / <code>dumped-ml.txt</code>.</p>
+
+    <h2 id="troubleshooting">7. Troubleshooting</h2>
+    <ul>
+      <li><strong>Tenant not found</strong>: Create the tenant in Strapi Admin (Content Manager → Tenant) and use its <code>tenantId</code> in the script.</li>
+      <li><strong>PDF not found</strong>: Ensure the PDFs are in <code>documentation/lectionary_calendar/</code> or pass full paths via <code>--en-pdf</code> and <code>--ml-pdf</code>.</li>
+      <li><strong>Parse errors / wrong dates</strong>: Run with <code>--dump-text</code> and check the dumped text files; update the parser if the format differs.</li>
+      <li><strong>Strapi already running</strong>: Stop the server before running the scripts; they load Strapi in-process.</li>
+    </ul>
+
+    <h2 id="related">8. Related Documentation</h2>
+    <ul>
+      <li><a href="liturgy-calendar-api-reference.html">Liturgy Day API Reference</a> – frontend integration and API usage.</li>
+      <li><a href="liturgy-calendar-seed-script.html">Liturgy Calendar Seed Script</a> – small manual seed (7 days) without PDFs.</li>
+      <li><a href="liturgical-calendar-strapi-server.html">Liturgical Calendar – Strapi Server Specification</a> – content model and schema.</li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid var(--border); margin: 2rem 0;">
+    <p style="font-size: 0.875rem; color: var(--muted);">Lectionary Bulk Import – requirements and guidelines. Part of <code>documentation/lectionary_calendar/</code>.</p>
+  </div>
+
+  <script>
+    const commandParams = {};
+    function updateCommand(commandId, paramName, paramValue) {
+      if (!commandParams[commandId]) commandParams[commandId] = {};
+      commandParams[commandId][paramName] = paramValue;
+      const el = document.getElementById(commandId);
+      const block = el && el.closest('.command-block');
+      if (!block || !el) return;
+      const base = block.getAttribute('data-command-base');
+      let cmd = base;
+      const p = commandParams[commandId] || {};
+      if (commandId === 'cmd-delete') {
+        if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
+      } else if (commandId === 'cmd-import') {
+        if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
+        if (p.year) cmd += ' --year=' + p.year;
+        if (p.limit) cmd += ' --limit=' + p.limit;
+      }
+      el.textContent = cmd;
+      const single = document.getElementById(commandId + '-single-code');
+      if (single) single.textContent = cmd;
+    }
+    function copyCommand(button, commandId) {
+      const el = document.getElementById(commandId);
+      if (!el) return;
+      const text = el.textContent.trim();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          button.textContent = 'Copied!';
+          setTimeout(function() { button.textContent = 'Copy'; }, 2000);
+        });
+      }
+    }
+    function copyTemplateCommand(button, commandId) {
+      const block = document.getElementById(commandId).closest('.command-block');
+      let text = block ? block.getAttribute('data-template-command') : '';
+      if (text) text = text.replace(/&quot;/g, '"');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          button.textContent = 'Copied!';
+          setTimeout(function() { button.textContent = 'Template'; }, 2000);
+        });
+      }
+    }
+  </script>
+</body>
+</html>

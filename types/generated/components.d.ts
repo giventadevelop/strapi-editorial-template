@@ -16,6 +16,32 @@ export interface DirectorySectionCard extends Struct.ComponentSchema {
   };
 }
 
+export interface LiturgyReading extends Struct.ComponentSchema {
+  collectionName: 'components_liturgy_readings';
+  info: {
+    description: 'A single liturgical reading with bilingual heading and reference';
+    displayName: 'Reading';
+  };
+  attributes: {
+    contentPlaceEn: Schema.Attribute.RichText &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    contentPlaceMalylm: Schema.Attribute.RichText &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    liturgyHeadingEn: Schema.Attribute.RichText &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    liturgyHeadingMalylm: Schema.Attribute.RichText &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+  };
+}
+
 export interface SharedMedia extends Struct.ComponentSchema {
   collectionName: 'components_shared_media';
   info: {
@@ -82,6 +108,7 @@ declare module '@strapi/strapi' {
   export module Public {
     export interface ComponentSchemas {
       'directory.section-card': DirectorySectionCard;
+      'liturgy.reading': LiturgyReading;
       'shared.media': SharedMedia;
       'shared.quote': SharedQuote;
       'shared.rich-text': SharedRichText;

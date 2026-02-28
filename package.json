@@ -10,12 +10,14 @@
     "develop": "strapi develop",
     "seed:example": "node ./scripts/seed.js",
     "seed:flash-news": "node ./scripts/seed-flash-news.js",
+    "seed:liturgy-days": "node ./scripts/seed-liturgy-days.js",
     "seed:data_import_seed_directory_mosc_in": "node ./scripts/data_import_seed_directory_mosc_in.js",
     "grant:editor-ads": "node ./scripts/grant-editor-ad-permissions.js",
     "grant:editor-directory": "node ./scripts/grant-editor-directory-permissions.js",
     "assign:editor-directory-tenant": "node ./scripts/assign-editor-to-directory-tenant.js",
     "delete:directory_entries": "node ./scripts/delete_directory_entries.js",
     "delete:articles": "node ./scripts/delete_articles.js",
+    "delete:liturgy-days": "node ./scripts/delete-liturgy-days.js",
     "fix:article_covers": "node ./scripts/fix_article_covers.js",
     "fix:article_category_tenant": "node ./scripts/fix_article_category_tenant.js",
     "restore:article_dates_from_export": "node ./scripts/restore_article_dates_from_export.js",
@@ -29,6 +31,7 @@
     "export:strip-uploads": "node ./scripts/strip_upload_entities_from_export.js",
     "seed:news_catholicatenews": "node ./scripts/data_import_seed_news_catholicatenews.js",
     "seed:parish-images": "node ./scripts/seed-parish-images.js",
+    "import:liturgy-days-pdf": "node ./scripts/import-liturgy-days-from-pdf.js",
     "test:bishop_upload": "node ./scripts/test_bishop_upload.js",
     "migrate:upload-records-to-s3": "node ./scripts/migrate_upload_records_to_s3.js",
     "migrate:upload-records-to-s3:prod": "node ./scripts/migrate_upload_records_to_s3_prod.js",
@@ -50,6 +53,9 @@
     "react-dom": "^18.0.0",
     "react-router-dom": "^6.0.0",
     "styled-components": "^6.0.0"
+  },
+  "devDependencies": {
+    "pdf-parse": "^1.1.4"
   },
   "engines": {
     "node": ">=18.0.0 <=22.x.x",

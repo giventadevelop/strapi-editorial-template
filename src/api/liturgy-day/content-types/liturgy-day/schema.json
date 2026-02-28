@@ -1,0 +1,56 @@
+{
+  "kind": "collectionType",
+  "collectionName": "liturgy_days",
+  "info": {
+    "singularName": "liturgy-day",
+    "pluralName": "liturgy-days",
+    "displayName": "Liturgical Calendar – Day",
+    "description": "Daily liturgical readings with bilingual support (EN/ML)"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "date": {
+      "type": "date",
+      "required": true
+    },
+    "dayHeadingEn": {
+      "type": "richtext",
+      "maxLength": 500
+    },
+    "dayHeadingMalylm": {
+      "type": "richtext",
+      "maxLength": 500
+    },
+    "seasonNameEn": {
+      "type": "richtext",
+      "maxLength": 500
+    },
+    "seasonNameMalylm": {
+      "type": "richtext",
+      "maxLength": 500
+    },
+    "readings": {
+      "type": "component",
+      "repeatable": true,
+      "component": "liturgy.reading"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

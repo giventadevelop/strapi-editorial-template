@@ -1145,6 +1145,59 @@ export interface ApiInstitutionInstitution extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiLiturgyDayLiturgyDay extends Struct.CollectionTypeSchema {
+  collectionName: 'liturgy_days';
+  info: {
+    description: 'Daily liturgical readings with bilingual support (EN/ML)';
+    displayName: 'Liturgical Calendar \u2013 Day';
+    pluralName: 'liturgy-days';
+    singularName: 'liturgy-day';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    date: Schema.Attribute.Date & Schema.Attribute.Required;
+    dayHeadingEn: Schema.Attribute.RichText &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    dayHeadingMalylm: Schema.Attribute.RichText &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::liturgy-day.liturgy-day'
+    > &
+      Schema.Attribute.Private;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    publishedAt: Schema.Attribute.DateTime;
+    readings: Schema.Attribute.Component<'liturgy.reading', true>;
+    seasonNameEn: Schema.Attribute.RichText &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    seasonNameMalylm: Schema.Attribute.RichText &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 500;
+      }>;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiManagingCommitteeManagingCommittee
   extends Struct.CollectionTypeSchema {
   collectionName: 'managing_committees';
@@ -2102,6 +2155,7 @@ declare module '@strapi/strapi' {
       'api::global.global': ApiGlobalGlobal;
       'api::homepage.homepage': ApiHomepageHomepage;
       'api::institution.institution': ApiInstitutionInstitution;
+      'api::liturgy-day.liturgy-day': ApiLiturgyDayLiturgyDay;
       'api::managing-committee.managing-committee': ApiManagingCommitteeManagingCommittee;
       'api::parish.parish': ApiParishParish;
       'api::pilgrim-centre.pilgrim-centre': ApiPilgrimCentrePilgrimCentre;

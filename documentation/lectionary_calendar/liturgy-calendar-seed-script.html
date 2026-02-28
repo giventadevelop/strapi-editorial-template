@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liturgy Calendar Seed Script – Usage &amp; Details</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; --green: #3fb950; --warn: #d29922; --red: #f85149; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 52rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    h4 { font-size: 0.95rem; margin-top: 1rem; color: var(--text); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: var(--surface); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; }
+    pre code { background: none; padding: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .note { background: rgba(88, 166, 255, 0.1); border-left: 4px solid var(--accent); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    .warn { background: rgba(210, 153, 34, 0.1); border-left: 4px solid var(--warn); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    .good { background: rgba(63, 185, 80, 0.1); border-left: 4px solid var(--green); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    li { margin: 0.25rem 0; }
+    a { color: var(--accent); }
+    .toc { margin: 1.5rem 0; padding: 1rem; background: var(--surface); border-radius: 8px; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc li { margin: 0.35rem 0; }
+    .toc a { text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .file-badge { display: inline-block; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0.1em 0.5em; font-size: 0.85em; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <h1>Liturgy Calendar Seed Script</h1>
+    <p>This document describes how to run the <strong>Liturgy Day</strong> seed script that creates sample liturgical calendar entries in Strapi. Use it to populate the calendar for a tenant with a few days of data (e.g. for development or demos).</p>
+
+    <nav class="toc" aria-label="Contents">
+      <h2 id="toc">Contents</h2>
+      <ul>
+        <li><a href="#what-it-does">1. What the Script Does</a></li>
+        <li><a href="#prerequisites">2. Prerequisites</a></li>
+        <li><a href="#how-to-run">3. How to Run</a></li>
+        <li><a href="#output">4. Expected Output</a></li>
+        <li><a href="#re-seeding">5. Re-seeding or Re-running</a></li>
+        <li><a href="#script-details">6. Script Details &amp; Customization</a></li>
+        <li><a href="#related">7. Related Documentation</a></li>
+      </ul>
+    </nav>
+
+    <h2 id="what-it-does">1. What the Script Does</h2>
+    <p>The seed script:</p>
+    <ul>
+      <li>Loads Strapi programmatically (no need to have the Strapi server running).</li>
+      <li>Looks up the tenant with <code>tenantId</code> = <code>tenant_demo_002</code>.</li>
+      <li>If that tenant exists and has <strong>no</strong> liturgy-day entries yet, it creates <strong>7 liturgy days</strong>:
+        <ul>
+          <li>Dates: from <strong>2026-02-27</strong> through <strong>2026-03-05</strong> (Thursday through Wednesday).</li>
+          <li>Each entry has: date, day heading (English and Malayalam), season name &ldquo;Great Lent&rdquo; / &ldquo;വലിയ നോമ്പ്&rdquo;, and two sample readings (First Reading, Gospel) with bilingual headings and scripture references.</li>
+        </ul>
+      </li>
+      <li>If the tenant already has at least one liturgy-day entry, the script <strong>does not</strong> create new entries (to avoid duplicates).</li>
+    </ul>
+
+    <h2 id="prerequisites">2. Prerequisites</h2>
+    <ul>
+      <li><strong>Strapi project</strong>: Run from the root of <code>strapi-editorial-template</code> (or your Strapi app that contains the liturgy-day API).</li>
+      <li><strong>Dependencies installed</strong>: <code>npm install</code> (or equivalent) must have been run.</li>
+      <li><strong>Tenant exists</strong>: A tenant with <code>tenantId</code> = <code>tenant_demo_002</code> must exist in the database. Create it in Strapi Admin under <strong>Content Manager → Tenant</strong> if needed.</li>
+      <li><strong>Strapi not running</strong>: The seed script loads Strapi in the same process. Do not run the script while the Strapi server is running (e.g. <code>npm run develop</code>), to avoid port or DB conflicts. Stop the server, run the script, then start the server again if desired.</li>
+    </ul>
+
+    <h2 id="how-to-run">3. How to Run</h2>
+    <p>From the project root, use either of the following.</p>
+
+    <h4>Using npm script (recommended)</h4>
+    <pre><code>npm run seed:liturgy-days</code></pre>
+
+    <h4>Using Node directly</h4>
+    <pre><code>node scripts/seed-liturgy-days.js</code></pre>
+
+    <p>On Windows (PowerShell or CMD), the same commands apply. The script runs in the current directory, so ensure you are in the Strapi project root.</p>
+
+    <h2 id="output">4. Expected Output</h2>
+    <p>On success you will see log lines like:</p>
+    <pre><code>Created liturgy day: 2026-02-27 – Thursday, 27 February 2026
+Created liturgy day: 2026-02-28 – Friday, 28 February 2026
+Created liturgy day: 2026-03-01 – Saturday, 1 March 2026
+Created liturgy day: 2026-03-02 – Sunday, 2 March 2026
+Created liturgy day: 2026-03-03 – Monday, 3 March 2026
+Created liturgy day: 2026-03-04 – Tuesday, 4 March 2026
+Created liturgy day: 2026-03-05 – Wednesday, 5 March 2026
+Created 7 liturgy days for tenant tenant_demo_002</code></pre>
+    <p>If the tenant is not found:</p>
+    <pre><code>Tenant with tenantId "tenant_demo_002" not found. Create it in Strapi Admin (Content Manager → Tenant).</code></pre>
+    <p>If liturgy days already exist for that tenant:</p>
+    <pre><code>Liturgy days already exist for this tenant. Skipping seed to avoid duplicates.
+Delete existing liturgy-day entries in Admin if you want to re-seed.</code></pre>
+
+    <h2 id="re-seeding">5. Re-seeding or Re-running</h2>
+    <p>The script is <strong>idempotent</strong> for a given tenant: it only creates entries when the tenant has <strong>no</strong> liturgy-day records. To seed again for the same tenant you must first remove the existing liturgy-day entries:</p>
+    <ol>
+      <li>Open Strapi Admin → <strong>Content Manager</strong> → <strong>Liturgical Calendar – Day</strong>.</li>
+      <li>Delete the existing liturgy-day entries for that tenant (or clear the collection as your setup allows).</li>
+      <li>Run <code>npm run seed:liturgy-days</code> again.</li>
+    </ol>
+    <p>To seed a <strong>different tenant</strong>, edit the script (see <a href="#script-details">§6</a>).</p>
+
+    <h2 id="script-details">6. Script Details &amp; Customization</h2>
+    <p><span class="file-badge">scripts/seed-liturgy-days.js</span></p>
+    <ul>
+      <li><strong>Tenant ID</strong>: Hard-coded as <code>TENANT_ID = 'tenant_demo_002'</code>. Change this constant to target another tenant.</li>
+      <li><strong>Dates and labels</strong>: The <code>DAYS</code> array defines the date and bilingual day headings. <code>SEASON_EN</code> and <code>SEASON_MAL</code> set the season name. <code>DEFAULT_READINGS</code> defines the sample readings (First Reading, Gospel) for each day. Edit these to add more days or change text.</li>
+      <li><strong>Duplicate check</strong>: The script checks for any existing liturgy-day for the tenant; if found, it skips creation entirely.</li>
+    </ul>
+
+    <h2 id="related">7. Related Documentation</h2>
+    <ul>
+      <li><a href="liturgy-calendar-api-reference.html">Liturgy Day API Reference</a> – for frontend integration and API usage.</li>
+      <li><a href="liturgical-calendar-strapi-server.html">Liturgical Calendar – Strapi Server Specification</a> – content model, schema, and server-side behavior.</li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid var(--border); margin: 2rem 0;">
+    <p style="font-size: 0.875rem; color: var(--muted);">Liturgy Calendar Seed Script – usage and details. Part of the lectionary calendar documentation in <code>documentation/lectionary_calendar/</code>.</p>
+  </div>
+</body>
+</html>

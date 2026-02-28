@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liturgical Calendar – Strapi Server Specification</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; --green: #3fb950; --warn: #d29922; --red: #f85149; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 52rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    h4 { font-size: 0.95rem; margin-top: 1rem; color: var(--text); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: var(--surface); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; }
+    pre code { background: none; padding: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .note { background: rgba(88, 166, 255, 0.1); border-left: 4px solid var(--accent); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    .warn { background: rgba(210, 153, 34, 0.1); border-left: 4px solid var(--warn); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    .good { background: rgba(63, 185, 80, 0.1); border-left: 4px solid var(--green); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    li { margin: 0.25rem 0; }
+    a { color: var(--accent); }
+    .toc { margin: 1.5rem 0; padding: 1rem; background: var(--surface); border-radius: 8px; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc li { margin: 0.35rem 0; }
+    .toc a { text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .diagram { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin: 1rem 0; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 0.85rem; white-space: pre; color: var(--text); }
+    .file-badge { display: inline-block; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 0.1em 0.5em; font-size: 0.85em; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <h1>Liturgical Calendar &ndash; Strapi Server Specification</h1>
+    <p>Complete specification for implementing the liturgical calendar in the Strapi editorial template (<code>strapi-editorial-template</code>). Covers content types, component schema, REST API, tenant handling, and bilingual (English + Malayalam) support. Follows existing patterns from editorial (<code>article</code>) and directory (<code>directory-entry</code>) content types.</p>
+
+    <nav class="toc" aria-label="Contents">
+      <h2 id="toc">Contents</h2>
+      <ul>
+        <li><a href="#overview">1. Overview</a></li>
+        <li><a href="#content-model">2. Content Model</a></li>
+        <li><a href="#schema">3. Schema Definitions (JSON)</a></li>
+        <li><a href="#tenant">4. Tenant Integration</a></li>
+        <li><a href="#rest-api">5. REST API</a></li>
+        <li><a href="#language">6. Language Handling (English &amp; Malayalam)</a></li>
+        <li><a href="#response-mapping">7. Response Mapping for Frontend Compatibility</a></li>
+        <li><a href="#editing">8. Content Editing Workflow</a></li>
+        <li><a href="#permissions">9. Permissions &amp; Bootstrap</a></li>
+        <li><a href="#files">10. File Locations in Strapi Repo</a></li>
+        <li><a href="#references">11. Related Documents</a></li>
+      </ul>
+    </nav>
+
+    <!-- 1 -->
+    <h2 id="overview">1. Overview</h2>
+    <p>The liturgical calendar is a <strong>tenant-scoped</strong> collection in Strapi. Each record represents one liturgical day (by date) with bilingual fields (English and Malayalam) for the day heading, season name, and a repeatable component for readings. This mirrors the data returned by the external SMCIM API but is fully self-hosted and editable by tenant editors.</p>
+
+    <h3>Design Decisions</h3>
+    <ul>
+      <li><strong>Single record per day per tenant</strong> &ndash; Both English and Malayalam fields live on the same record. No Strapi i18n locale is needed; language selection happens at request time.</li>
+      <li><strong>Repeatable component for readings</strong> &ndash; Each day can have 1&ndash;N readings, each with bilingual heading and scripture reference.</li>
+      <li><strong>Tenant relation</strong> &ndash; Same <code>manyToOne</code> pattern as <code>article</code> and <code>directory-entry</code>. Auto-assigned via lifecycles, hidden in content-manager.</li>
+      <li><strong>No draft-and-publish</strong> &ndash; Readings are simple factual data; publish immediately like <code>directory-entry</code>.</li>
+    </ul>
+
+    <!-- 2 -->
+    <h2 id="content-model">2. Content Model</h2>
+
+    <h3>2.1 Content Type: Liturgy Day</h3>
+    <table>
+      <tr><th>Property</th><th>Value</th></tr>
+      <tr><td>Kind</td><td><code>collectionType</code></td></tr>
+      <tr><td>Singular name</td><td><code>liturgy-day</code></td></tr>
+      <tr><td>Plural name</td><td><code>liturgy-days</code></td></tr>
+      <tr><td>Display name</td><td><code>Liturgical Calendar – Day</code></td></tr>
+      <tr><td>Draft &amp; publish</td><td><code>false</code></td></tr>
+      <tr><td>API UID</td><td><code>api::liturgy-day.liturgy-day</code></td></tr>
+    </table>
+
+    <h4>Attributes</h4>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+      <tr><td><code>date</code></td><td>date</td><td>Yes</td><td>Calendar date (YYYY-MM-DD). One record per date per tenant.</td></tr>
+      <tr><td><code>dayHeadingEn</code></td><td>string</td><td>No</td><td>Day heading in English (e.g. &ldquo;Thursday, 27 February 2026&rdquo;).</td></tr>
+      <tr><td><code>dayHeadingMalylm</code></td><td>string</td><td>No</td><td>Day heading in Malayalam.</td></tr>
+      <tr><td><code>seasonNameEn</code></td><td>string</td><td>No</td><td>Liturgical season name in English (e.g. &ldquo;Great Lent&rdquo;).</td></tr>
+      <tr><td><code>seasonNameMalylm</code></td><td>string</td><td>No</td><td>Liturgical season name in Malayalam.</td></tr>
+      <tr><td><code>readings</code></td><td>component (repeatable)</td><td>No</td><td>List of readings for the day. Component: <code>liturgy.reading</code>.</td></tr>
+      <tr><td><code>order</code></td><td>integer</td><td>No</td><td>Display order (default 0). Useful when multiple entries share a date.</td></tr>
+      <tr><td><code>tenant</code></td><td>relation (manyToOne)</td><td>Auto</td><td>Relation to <code>api::tenant.tenant</code>. Auto-assigned by lifecycle. Hidden in content-manager.</td></tr>
+    </table>
+
+    <h3>2.2 Component: Liturgy Reading</h3>
+    <table>
+      <tr><th>Property</th><th>Value</th></tr>
+      <tr><td>Category</td><td><code>liturgy</code></td></tr>
+      <tr><td>Display name</td><td><code>Reading</code></td></tr>
+      <tr><td>UID</td><td><code>liturgy.reading</code></td></tr>
+    </table>
+
+    <h4>Attributes</h4>
+    <table>
+      <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+      <tr><td><code>liturgyHeadingEn</code></td><td>string</td><td>Reading title in English (e.g. &ldquo;First Reading&rdquo;, &ldquo;Gospel&rdquo;).</td></tr>
+      <tr><td><code>liturgyHeadingMalylm</code></td><td>string</td><td>Reading title in Malayalam.</td></tr>
+      <tr><td><code>contentPlaceEn</code></td><td>string</td><td>Scripture reference in English (e.g. &ldquo;Genesis 1:1-5&rdquo;).</td></tr>
+      <tr><td><code>contentPlaceMalylm</code></td><td>string</td><td>Scripture reference in Malayalam.</td></tr>
+    </table>
+
+    <h3>2.3 Entity-Relationship Diagram</h3>
+    <div class="diagram">Tenant (api::tenant.tenant)
+  |
+  | 1 ──── * (manyToOne)
+  v
+LiturgyDay (api::liturgy-day.liturgy-day)
+  |-- date          (date, required)
+  |-- dayHeadingEn  (string)
+  |-- dayHeadingMalylm  (string)
+  |-- seasonNameEn  (string)
+  |-- seasonNameMalylm  (string)
+  |-- order         (integer, default 0)
+  |
+  | 1 ──── * (repeatable component)
+  v
+liturgy.reading
+  |-- liturgyHeadingEn  (string)
+  |-- liturgyHeadingMalylm  (string)
+  |-- contentPlaceEn    (string)
+  |-- contentPlaceMalylm    (string)</div>
+
+    <!-- 3 -->
+    <h2 id="schema">3. Schema Definitions (JSON)</h2>
+
+    <h3>3.1 Content Type Schema</h3>
+    <p><span class="file-badge">src/api/liturgy-day/content-types/liturgy-day/schema.json</span></p>
+    <pre><code>{
+  "kind": "collectionType",
+  "collectionName": "liturgy_days",
+  "info": {
+    "singularName": "liturgy-day",
+    "pluralName": "liturgy-days",
+    "displayName": "Liturgical Calendar – Day",
+    "description": "Daily liturgical readings with bilingual support (EN/ML)"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "date": {
+      "type": "date",
+      "required": true
+    },
+    "dayHeadingEn": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "dayHeadingMalylm": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "seasonNameEn": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "seasonNameMalylm": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "readings": {
+      "type": "component",
+      "repeatable": true,
+      "component": "liturgy.reading"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}</code></pre>
+
+    <h3>3.2 Component Schema</h3>
+    <p><span class="file-badge">src/components/liturgy/reading.json</span></p>
+    <pre><code>{
+  "collectionName": "components_liturgy_readings",
+  "info": {
+    "displayName": "Reading",
+    "description": "A single liturgical reading with bilingual heading and reference"
+  },
+  "options": {},
+  "attributes": {
+    "liturgyHeadingEn": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "liturgyHeadingMalylm": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "contentPlaceEn": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "contentPlaceMalylm": {
+      "type": "string",
+      "maxLength": 300
+    }
+  }
+}</code></pre>
+
+    <!-- 4 -->
+    <h2 id="tenant">4. Tenant Integration</h2>
+    <p>Follows the same pattern as <code>article</code> and <code>directory-entry</code>.</p>
+
+    <h3>4.1 Lifecycle Hooks</h3>
+    <p><span class="file-badge">src/api/liturgy-day/content-types/liturgy-day/lifecycles.js</span></p>
+    <p>Copy and adapt from the <code>article</code> lifecycle file. Change the <code>strapi.documents()</code> UID to <code>'api::liturgy-day.liturgy-day'</code>:</p>
+    <pre><code>'use strict';
+
+const requestContext = require('../../../../utils/request-context');
+
+async function getTenantForAdminUser(strapi, adminUserId) {
+  if (!adminUserId) return null;
+  const adminUser = await strapi.db.query('admin::user').findOne({
+    where: { id: adminUserId },
+    select: ['email'],
+  });
+  if (!adminUser?.email) return null;
+  return getTenantForEmail(strapi, adminUser.email);
+}
+
+async function getTenantForEmail(strapi, email) {
+  if (!email) return null;
+  const emailLower = String(email).toLowerCase();
+  const mappings = await strapi.db
+    .query('api::editor-tenant.editor-tenant')
+    .findMany({ where: {}, populate: { tenant: true } });
+  const mapping = mappings.find(
+    (m) => (m.adminUserEmail || '').toLowerCase() === emailLower
+  );
+  const tenant = mapping?.tenant;
+  if (!tenant) return null;
+  const id = tenant.id;
+  const documentId = tenant.documentId ?? tenant.document_id;
+  if (id == null && documentId == null) return null;
+  return { id: id ?? undefined, documentId: documentId ?? undefined };
+}
+
+module.exports = {
+  async beforeCreate(event) {
+    if (!event.params?.data) return;
+    const ctx = requestContext.get();
+    const user = ctx?.state?.user || ctx?.state?.admin;
+    const email = user?.email;
+    const tenant = email
+      ? await getTenantForEmail(strapi, email)
+      : null;
+    const relationId = tenant?.id ?? tenant?.documentId;
+    if (relationId != null) {
+      event.params.data.tenant = relationId;
+    } else {
+      delete event.params.data.tenant;
+    }
+  },
+
+  async afterCreate(event) {
+    const { result } = event;
+    if (!result || result.tenant) return;
+    const createdById =
+      typeof result.createdBy === 'object'
+        ? result.createdBy?.id
+        : result.createdBy;
+    const tenant = await getTenantForAdminUser(strapi, createdById);
+    const relationId = tenant?.id ?? tenant?.documentId;
+    if (relationId == null || !result.documentId) return;
+    try {
+      await strapi
+        .documents('api::liturgy-day.liturgy-day')
+        .update({
+          documentId: result.documentId,
+          data: { tenant: { connect: [relationId] } },
+        });
+    } catch (err) {
+      strapi.log.warn(
+        'Could not auto-assign tenant to liturgy-day:',
+        err.message
+      );
+    }
+  },
+
+  async afterUpdate(event) {
+    const { result } = event;
+    if (!result || result.tenant) return;
+    const updatedBy = result.updatedBy ?? result.createdBy;
+    const updatedById =
+      typeof updatedBy === 'object' ? updatedBy?.id : updatedBy;
+    const tenant = await getTenantForAdminUser(strapi, updatedById);
+    const relationId = tenant?.id ?? tenant?.documentId;
+    if (relationId == null || !result.documentId) return;
+    try {
+      await strapi
+        .documents('api::liturgy-day.liturgy-day')
+        .update({
+          documentId: result.documentId,
+          data: { tenant: { connect: [relationId] } },
+        });
+    } catch (err) {
+      strapi.log.warn(
+        'Could not auto-assign tenant to liturgy-day:',
+        err.message
+      );
+    }
+  },
+};</code></pre>
+
+    <h3>4.2 Content-Manager Extension</h3>
+    <p><span class="file-badge">src/extensions/content-manager/strapi-server.js</span></p>
+    <p>Add <code>'api::liturgy-day.liturgy-day'</code> to the <code>TENANT_SCOPED_UIDS</code> array so list views are filtered by the editor&rsquo;s tenant:</p>
+    <pre><code>const TENANT_SCOPED_UIDS = [
+  'api::article.article',
+  'api::directory-entry.directory-entry',
+  'api::directory-home.directory-home',
+  // ... other existing UIDs ...
+  'api::liturgy-day.liturgy-day',   // &lt;--- ADD THIS
+];</code></pre>
+
+    <h3>4.3 Hide-Tenant Middleware</h3>
+    <p>If the Strapi project uses a <code>content-manager-hide-tenant</code> middleware (to hide the tenant field, views, and isFeatured from the editor UI), add <code>'api::liturgy-day.liturgy-day'</code> to its list of target UIDs as well.</p>
+
+    <!-- 5 -->
+    <h2 id="rest-api">5. REST API</h2>
+    <p>Strapi exposes the standard CRUD endpoints automatically. Use the default <code>createCoreRouter</code> and <code>createCoreController</code>.</p>
+
+    <h3>5.1 Routes &amp; Controllers</h3>
+    <p><span class="file-badge">src/api/liturgy-day/routes/liturgy-day.js</span></p>
+    <pre><code>'use strict';
+
+const { createCoreRouter } = require('@strapi/strapi').factories;
+module.exports = createCoreRouter('api::liturgy-day.liturgy-day');</code></pre>
+
+    <p><span class="file-badge">src/api/liturgy-day/controllers/liturgy-day.js</span></p>
+    <pre><code>'use strict';
+
+const { createCoreController } = require('@strapi/strapi').factories;
+module.exports = createCoreController('api::liturgy-day.liturgy-day');</code></pre>
+
+    <p><span class="file-badge">src/api/liturgy-day/services/liturgy-day.js</span></p>
+    <pre><code>'use strict';
+
+const { createCoreService } = require('@strapi/strapi').factories;
+module.exports = createCoreService('api::liturgy-day.liturgy-day');</code></pre>
+
+    <h3>5.2 Endpoints</h3>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr><td><code>GET</code></td><td><code>/api/liturgy-days</code></td><td>List liturgy days (with filters, populate, pagination).</td></tr>
+      <tr><td><code>GET</code></td><td><code>/api/liturgy-days/:documentId</code></td><td>Get a single liturgy day by document ID.</td></tr>
+      <tr><td><code>POST</code></td><td><code>/api/liturgy-days</code></td><td>Create a liturgy day (admin/editor only).</td></tr>
+      <tr><td><code>PUT</code></td><td><code>/api/liturgy-days/:documentId</code></td><td>Update a liturgy day (admin/editor only).</td></tr>
+      <tr><td><code>DELETE</code></td><td><code>/api/liturgy-days/:documentId</code></td><td>Delete a liturgy day (admin/editor only).</td></tr>
+    </table>
+
+    <h3>5.3 Query Examples</h3>
+
+    <h4>Get today&rsquo;s liturgy for a tenant (with readings)</h4>
+    <pre><code>GET /api/liturgy-days
+  ?filters[tenant][tenantId][$eq]=tenant_demo_002
+  &amp;filters[date][$eq]=2026-02-27
+  &amp;populate[readings]=*
+  &amp;sort=order:asc</code></pre>
+
+    <h4>Get all liturgy days for a month</h4>
+    <pre><code>GET /api/liturgy-days
+  ?filters[tenant][tenantId][$eq]=tenant_demo_002
+  &amp;filters[date][$gte]=2026-02-01
+  &amp;filters[date][$lte]=2026-02-28
+  &amp;populate[readings]=*
+  &amp;sort=date:asc
+  &amp;pagination[pageSize]=31</code></pre>
+
+    <h4>Example Response (raw Strapi)</h4>
+    <pre><code>{
+  "data": [
+    {
+      "id": 1,
+      "documentId": "abc123def456",
+      "date": "2026-02-27",
+      "dayHeadingEn": "Thursday, 27 February 2026",
+      "dayHeadingMalylm": "വ്യാഴാഴ്ച, 27 ഫെബ്രുവരി 2026",
+      "seasonNameEn": "Great Lent",
+      "seasonNameMalylm": "വലിയ നോമ്പ്",
+      "order": 0,
+      "readings": [
+        {
+          "id": 1,
+          "liturgyHeadingEn": "First Reading",
+          "liturgyHeadingMalylm": "ഒന്നാം വായന",
+          "contentPlaceEn": "Genesis 1:1-5",
+          "contentPlaceMalylm": "ഉൽപത്തി 1:1-5"
+        },
+        {
+          "id": 2,
+          "liturgyHeadingEn": "Gospel",
+          "liturgyHeadingMalylm": "സുവിശേഷം",
+          "contentPlaceEn": "Matthew 4:1-11",
+          "contentPlaceMalylm": "മത്തായി 4:1-11"
+        }
+      ],
+      "createdAt": "2026-02-26T10:00:00.000Z",
+      "updatedAt": "2026-02-26T10:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "pagination": { "page": 1, "pageSize": 25, "pageCount": 1, "total": 1 }
+  }
+}</code></pre>
+
+    <!-- 6 -->
+    <h2 id="language">6. Language Handling (English &amp; Malayalam)</h2>
+    <p>The recommended approach stores <strong>both languages in the same record</strong> (no Strapi i18n locale). Language selection happens at request time:</p>
+
+    <h3>6.1 How It Works</h3>
+    <ol>
+      <li>The frontend (or Next.js API route) sends a <code>lang</code> parameter (<code>en</code> or <code>ml</code>).</li>
+      <li>The API caller (Next.js proxy) fetches the raw Strapi response (which contains both <code>*En</code> and <code>*Ml</code> fields).</li>
+      <li>The proxy selects the appropriate fields based on <code>lang</code> and maps them to the frontend-expected field names (<code>liturgy_day_heading</code>, <code>season_name</code>, <code>liturgy_heading</code>, <code>content_place</code>).</li>
+    </ol>
+
+    <h3>6.2 Field Mapping by Language</h3>
+    <table>
+      <tr><th>Frontend Field</th><th>Strapi Field (EN)</th><th>Strapi Field (ML)</th></tr>
+      <tr><td><code>liturgy_day_heading</code></td><td><code>dayHeadingEn</code></td><td><code>dayHeadingMalylm</code></td></tr>
+      <tr><td><code>season_name</code></td><td><code>seasonNameEn</code></td><td><code>seasonNameMalylm</code></td></tr>
+      <tr><td><code>liturgy_heading</code></td><td><code>readings[].liturgyHeadingEn</code></td><td><code>readings[].liturgyHeadingMalylm</code></td></tr>
+      <tr><td><code>content_place</code></td><td><code>readings[].contentPlaceEn</code></td><td><code>readings[].contentPlaceMalylm</code></td></tr>
+    </table>
+
+    <h3>6.3 Why Not Strapi i18n?</h3>
+    <ul>
+      <li>The liturgical calendar data is the <em>same day</em> in both languages &ndash; only labels and references differ. Storing both in one record is simpler than maintaining two locale-separated documents per day.</li>
+      <li>It avoids the complexity of Strapi i18n plugin configuration and keeps the API surface minimal.</li>
+      <li>Editors can fill in both languages in a single form submission.</li>
+    </ul>
+
+    <!-- 7 -->
+    <h2 id="response-mapping">7. Response Mapping for Frontend Compatibility</h2>
+    <p>The existing frontend component (<code>SyroLiturgySection</code>) expects the response shape <code>{ message: LiturgyReading[] }</code> where each reading has <code>liturgy_day_heading</code>, <code>season_name</code>, <code>liturgy_heading</code>, <code>content_place</code>.</p>
+
+    <h3>7.1 Mapping Algorithm (in Next.js API Route)</h3>
+    <pre><code>// Given: lang = 'en' | 'ml', strapiDay = one liturgy-day object from Strapi
+function mapStrapiToLegacy(strapiDay, lang) {
+  const isEn = lang === 'en';
+  const dayHeading = isEn ? strapiDay.dayHeadingEn : strapiDay.dayHeadingMalylm;
+  const seasonName = isEn ? strapiDay.seasonNameEn : strapiDay.seasonNameMalylm;
+
+  const readings = (strapiDay.readings || []).map((r) => ({
+    liturgy_day_heading: dayHeading || '',
+    season_name: seasonName || '',
+    liturgy_heading: isEn ? r.liturgyHeadingEn : r.liturgyHeadingMalylm || '',
+    content_place: isEn ? r.contentPlaceEn : r.contentPlaceMalylm || '',
+  }));
+
+  // If no readings, still return a single item with day/season info
+  if (readings.length === 0) {
+    readings.push({
+      liturgy_day_heading: dayHeading || '',
+      season_name: seasonName || '',
+      liturgy_heading: '',
+      content_place: '',
+    });
+  }
+
+  return readings;
+}
+
+// Final response for the frontend:
+// { message: mapStrapiToLegacy(strapiDay, lang) }</code></pre>
+
+    <h3>7.2 Mapped Response Example (<code>lang=en</code>)</h3>
+    <pre><code>{
+  "message": [
+    {
+      "liturgy_day_heading": "Thursday, 27 February 2026",
+      "season_name": "Great Lent",
+      "liturgy_heading": "First Reading",
+      "content_place": "Genesis 1:1-5"
+    },
+    {
+      "liturgy_day_heading": "Thursday, 27 February 2026",
+      "season_name": "Great Lent",
+      "liturgy_heading": "Gospel",
+      "content_place": "Matthew 4:1-11"
+    }
+  ]
+}</code></pre>
+    <p>This is identical to the external SMCIM API response format, so the frontend component requires <strong>no changes</strong>.</p>
+
+    <!-- 8 -->
+    <h2 id="editing">8. Content Editing Workflow</h2>
+    <ol>
+      <li>Log in to Strapi admin panel as an editor mapped to a tenant (via <code>editor-tenant</code>).</li>
+      <li>Navigate to <strong>Content Manager &rarr; Liturgical Calendar &ndash; Day</strong>.</li>
+      <li>Click <strong>Create new entry</strong>.</li>
+      <li>Fill in:
+        <ul>
+          <li><strong>Date</strong> &ndash; Select the calendar date.</li>
+          <li><strong>Day Heading EN</strong> &ndash; e.g. &ldquo;Thursday, 27 February 2026&rdquo;.</li>
+          <li><strong>Day Heading ML</strong> &ndash; e.g. &ldquo;വ്യാഴാഴ്ച, 27 ഫെബ്രുവരി 2026&rdquo;.</li>
+          <li><strong>Season Name EN</strong> &ndash; e.g. &ldquo;Great Lent&rdquo;.</li>
+          <li><strong>Season Name ML</strong> &ndash; e.g. &ldquo;വലിയ നോമ്പ്&rdquo;.</li>
+          <li><strong>Readings</strong> &ndash; Click &ldquo;Add an entry&rdquo; for each reading. For each:
+            <ul>
+              <li>Liturgy Heading EN (e.g. &ldquo;First Reading&rdquo;)</li>
+              <li>Liturgy Heading ML (e.g. &ldquo;ഒന്നാം വായന&rdquo;)</li>
+              <li>Content Place EN (e.g. &ldquo;Genesis 1:1-5&rdquo;)</li>
+              <li>Content Place ML (e.g. &ldquo;ഉൽപത്തി 1:1-5&rdquo;)</li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+      <li>Click <strong>Save</strong>. The tenant field is auto-assigned by the lifecycle hook.</li>
+    </ol>
+
+    <div class="note">
+      <strong>Note:</strong> The <code>tenant</code> field is hidden in the content-manager UI. Editors do not see or edit it. The lifecycle hook assigns it automatically based on the editor&rsquo;s email mapping in <code>editor-tenant</code>.
+    </div>
+
+    <!-- 9 -->
+    <h2 id="permissions">9. Permissions &amp; Bootstrap</h2>
+
+    <h3>9.1 Public API Access</h3>
+    <p>For the frontend to fetch readings without authentication, grant <strong>Public</strong> role permissions:</p>
+    <table>
+      <tr><th>Action</th><th>Granted?</th></tr>
+      <tr><td><code>find</code> (list)</td><td>Yes</td></tr>
+      <tr><td><code>findOne</code></td><td>Yes</td></tr>
+      <tr><td><code>create</code></td><td>No (admin/editor only)</td></tr>
+      <tr><td><code>update</code></td><td>No (admin/editor only)</td></tr>
+      <tr><td><code>delete</code></td><td>No (admin/editor only)</td></tr>
+    </table>
+    <p>Go to <strong>Settings &rarr; Roles &rarr; Public</strong> in Strapi admin. Under <strong>Liturgy-day</strong>, enable <code>find</code> and <code>findOne</code>.</p>
+
+    <h3>9.2 Tenant Filtering Requirement</h3>
+    <div class="warn">
+      <strong>Important:</strong> Every public <code>GET</code> request must include <code>filters[tenant][tenantId][$eq]=&lt;tenantId&gt;</code>. Without this filter, readings from all tenants will be returned. The frontend (or Next.js API route) is responsible for including the tenant filter.
+    </div>
+
+    <!-- 10 -->
+    <h2 id="files">10. File Locations in Strapi Repo</h2>
+    <p>All files are relative to the <code>strapi-editorial-template</code> project root.</p>
+    <table>
+      <tr><th>File</th><th>Purpose</th></tr>
+      <tr><td><code>src/api/liturgy-day/content-types/liturgy-day/schema.json</code></td><td>Content type schema</td></tr>
+      <tr><td><code>src/api/liturgy-day/content-types/liturgy-day/lifecycles.js</code></td><td>Tenant auto-assignment lifecycle hooks</td></tr>
+      <tr><td><code>src/api/liturgy-day/controllers/liturgy-day.js</code></td><td>Core controller</td></tr>
+      <tr><td><code>src/api/liturgy-day/services/liturgy-day.js</code></td><td>Core service</td></tr>
+      <tr><td><code>src/api/liturgy-day/routes/liturgy-day.js</code></td><td>Core router</td></tr>
+      <tr><td><code>src/components/liturgy/reading.json</code></td><td>Repeatable reading component schema</td></tr>
+      <tr><td><code>src/extensions/content-manager/strapi-server.js</code></td><td>Add UID to TENANT_SCOPED_UIDS (modify existing file)</td></tr>
+    </table>
+
+    <div class="good">
+      <strong>Copy for Strapi repo:</strong> This HTML document can be copied to <code>strapi-editorial-template/documentation/liturgical_calendar/liturgical-calendar-strapi-server.html</code> so Strapi-only developers have it in that repository.
+    </div>
+
+    <!-- 11 -->
+    <h2 id="references">11. Related Documents</h2>
+    <table>
+      <tr><th>Document</th><th>Description</th></tr>
+      <tr>
+        <td><a href="liturgical-calendar-project-requirements.html">Project Requirements</a></td>
+        <td>Generic feature scope, functional requirements, EN+ML, tenant.</td>
+      </tr>
+      <tr>
+        <td><a href="liturgical-calendar-api-integration.html">API Integration Guide (External)</a></td>
+        <td>External SMCIM API reference, legacy integration details.</td>
+      </tr>
+      <tr>
+        <td><a href="liturgical-calendar-frontend-integration.html">Frontend Integration (Strapi)</a></td>
+        <td>How Next.js calls Strapi, maps the response, displays liturgy data.</td>
+      </tr>
+    </table>
+
+    <hr style="border: 0; border-top: 1px solid var(--border); margin: 2rem 0;">
+    <p style="font-size: 0.875rem; color: var(--muted);">Document version 1.0 &ndash; February 2026. Specification for Strapi implementation in <code>strapi-editorial-template</code>. Follows existing patterns from <code>article</code> (editorial) and <code>directory-entry</code> (directory) content types.</p>
+  </div>
+</body>
+</html>

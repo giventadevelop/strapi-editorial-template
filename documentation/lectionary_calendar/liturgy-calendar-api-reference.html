@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liturgy Day API Reference – Frontend Integration</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; --green: #3fb950; --warn: #d29922; --red: #f85149; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 52rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    h4 { font-size: 0.95rem; margin-top: 1rem; color: var(--text); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: var(--surface); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; }
+    pre code { background: none; padding: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 600; }
+    .note { background: rgba(88, 166, 255, 0.1); border-left: 4px solid var(--accent); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    .warn { background: rgba(210, 153, 34, 0.1); border-left: 4px solid var(--warn); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    .good { background: rgba(63, 185, 80, 0.1); border-left: 4px solid var(--green); padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    li { margin: 0.25rem 0; }
+    a { color: var(--accent); }
+    .toc { margin: 1.5rem 0; padding: 1rem; background: var(--surface); border-radius: 8px; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc li { margin: 0.35rem 0; }
+    .toc a { text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .endpoint { font-family: 'Courier New', monospace; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <h1>Liturgy Day API Reference</h1>
+    <p>REST API reference for the <strong>Liturgical Calendar (Liturgy Day)</strong> content type. Use this document to integrate the liturgy calendar in your frontend application. Data is tenant-scoped and supports English and Malayalam.</p>
+
+    <nav class="toc" aria-label="Contents">
+      <h2 id="toc">Contents</h2>
+      <ul>
+        <li><a href="#base-url">1. Base URL &amp; Authentication</a></li>
+        <li><a href="#endpoints">2. Endpoints</a></li>
+        <li><a href="#query-parameters">3. Query Parameters</a></li>
+        <li><a href="#tenant-filter">4. Tenant Filter (Required for List)</a></li>
+        <li><a href="#examples">5. Request Examples</a></li>
+        <li><a href="#response">6. Response Format</a></li>
+        <li><a href="#language">7. Language Fields (EN / Malayalam)</a></li>
+        <li><a href="#errors">8. Errors</a></li>
+      </ul>
+    </nav>
+
+    <h2 id="base-url">1. Base URL &amp; Authentication</h2>
+    <p>All endpoints are relative to your Strapi server. Example base URL:</p>
+    <pre><code>https://your-strapi-host.com</code></pre>
+    <p>For local development: <code>http://localhost:1337</code>.</p>
+    <p><strong>Public access:</strong> <code>find</code> (list) and <code>findOne</code> are granted to the Public role. No Bearer token is required for read-only requests. Create, update, and delete require admin/editor authentication.</p>
+
+    <h2 id="endpoints">2. Endpoints</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td class="endpoint">/api/liturgy-days</td>
+        <td>List liturgy days. Supports filters, sort, pagination, and <code>populate</code> for readings.</td>
+      </tr>
+      <tr>
+        <td><code>GET</code></td>
+        <td class="endpoint">/api/liturgy-days/<var>:documentId</var></td>
+        <td>Get a single liturgy day by its <code>documentId</code>.</td>
+      </tr>
+      <tr>
+        <td><code>POST</code></td>
+        <td class="endpoint">/api/liturgy-days</td>
+        <td>Create a liturgy day (admin/editor only).</td>
+      </tr>
+      <tr>
+        <td><code>PUT</code></td>
+        <td class="endpoint">/api/liturgy-days/<var>:documentId</var></td>
+        <td>Update a liturgy day (admin/editor only).</td>
+      </tr>
+      <tr>
+        <td><code>DELETE</code></td>
+        <td class="endpoint">/api/liturgy-days/<var>:documentId</var></td>
+        <td>Delete a liturgy day (admin/editor only).</td>
+      </tr>
+    </table>
+    <p><var>:documentId</var> is the unique document identifier (e.g. <code>yir6jkd2ypglko2khemveu1b</code>). It is returned in the response as <code>documentId</code>.</p>
+
+    <h2 id="query-parameters">3. Query Parameters</h2>
+    <p>For <code>GET /api/liturgy-days</code> (list), Strapi supports:</p>
+    <table>
+      <tr><th>Parameter</th><th>Description</th></tr>
+      <tr><td><code>filters[<var>field</var>][<var>operator</var>]</code></td><td>Filter by field. See <a href="#tenant-filter">§4</a> for tenant and date.</td></tr>
+      <tr><td><code>populate[readings]</code></td><td>Set to <code>*</code> to include the <code>readings</code> component in the response.</td></tr>
+      <tr><td><code>sort</code></td><td>Sort order, e.g. <code>date:asc</code>, <code>order:asc</code>.</td></tr>
+      <tr><td><code>pagination[page]</code></td><td>Page number (1-based).</td></tr>
+      <tr><td><code>pagination[pageSize]</code></td><td>Number of items per page (e.g. 31 for a month).</td></tr>
+    </table>
+
+    <h2 id="tenant-filter">4. Tenant Filter (Required for List)</h2>
+    <div class="warn">
+      <strong>Important:</strong> Every list request must filter by tenant. Without it, the API may return liturgy days from all tenants or behave inconsistently. The frontend (or your API route) must send the tenant identifier.
+    </div>
+    <p>Filter by the tenant&rsquo;s <code>tenantId</code> (string, e.g. <code>tenant_demo_002</code>):</p>
+    <pre><code>filters[tenant][tenantId][$eq]=tenant_demo_002</code></pre>
+    <p>Combine with date and populate for a typical &ldquo;today&rdquo; request:</p>
+    <pre><code>GET /api/liturgy-days?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[date][$eq]=2026-02-27&amp;populate[readings]=*&amp;sort=order:asc</code></pre>
+
+    <h2 id="examples">5. Request Examples</h2>
+
+    <h4>Get today&rsquo;s liturgy for a tenant (with readings)</h4>
+    <pre><code>GET /api/liturgy-days?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[date][$eq]=2026-02-27&amp;populate[readings]=*&amp;sort=order:asc</code></pre>
+
+    <h4>Get all liturgy days for a month</h4>
+    <pre><code>GET /api/liturgy-days?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[date][$gte]=2026-02-01&amp;filters[date][$lte]=2026-02-28&amp;populate[readings]=*&amp;sort=date:asc&amp;pagination[pageSize]=31</code></pre>
+
+    <h4>Get a single liturgy day by documentId</h4>
+    <pre><code>GET /api/liturgy-days/yir6jkd2ypglko2khemveu1b?populate[readings]=*</code></pre>
+
+    <h2 id="response">6. Response Format</h2>
+    <p>List endpoint returns a Strapi v5-style response:</p>
+    <pre><code>{
+  "data": [
+    {
+      "id": 1,
+      "documentId": "yir6jkd2ypglko2khemveu1b",
+      "date": "2026-02-27",
+      "dayHeadingEn": "Thursday, 27 February 2026",
+      "dayHeadingMalylm": "വ്യാഴാഴ്ച, 27 ഫെബ്രുവരി 2026",
+      "seasonNameEn": "Great Lent",
+      "seasonNameMalylm": "വലിയ നോമ്പ്",
+      "order": 0,
+      "readings": [
+        {
+          "id": 1,
+          "liturgyHeadingEn": "First Reading",
+          "liturgyHeadingMalylm": "ഒന്നാം വായന",
+          "contentPlaceEn": "Genesis 1:1-5",
+          "contentPlaceMalylm": "ഉൽപത്തി 1:1-5"
+        },
+        {
+          "id": 2,
+          "liturgyHeadingEn": "Gospel",
+          "liturgyHeadingMalylm": "സുവിശേഷം",
+          "contentPlaceEn": "Matthew 4:1-11",
+          "contentPlaceMalylm": "മത്തായി 4:1-11"
+        }
+      ],
+      "createdAt": "2026-02-27T10:00:00.000Z",
+      "updatedAt": "2026-02-27T10:00:00.000Z"
+    }
+  ],
+  "meta": {
+    "pagination": { "page": 1, "pageSize": 25, "pageCount": 1, "total": 1 }
+  }
+}</code></pre>
+    <p>Single-document <code>GET /api/liturgy-days/:documentId</code> returns the one document in <code>data</code> (object, not array). Text fields (<code>dayHeadingEn</code>, <code>seasonNameEn</code>, etc.) may be rich text (e.g. HTML or Markdown) depending on Strapi configuration.</p>
+
+    <h2 id="language">7. Language Fields (EN / Malayalam)</h2>
+    <p>Each liturgy day has parallel fields for English and Malayalam:</p>
+    <table>
+      <tr><th>Purpose</th><th>English field</th><th>Malayalam field</th></tr>
+      <tr><td>Day heading</td><td><code>dayHeadingEn</code></td><td><code>dayHeadingMalylm</code></td></tr>
+      <tr><td>Season name</td><td><code>seasonNameEn</code></td><td><code>seasonNameMalylm</code></td></tr>
+      <tr><td>Reading title (inside <code>readings[]</code>)</td><td><code>liturgyHeadingEn</code></td><td><code>liturgyHeadingMalylm</code></td></tr>
+      <tr><td>Scripture reference (inside <code>readings[]</code>)</td><td><code>contentPlaceEn</code></td><td><code>contentPlaceMalylm</code></td></tr>
+    </table>
+    <p>Use the language preferred by the user (e.g. from locale or query param) to pick the corresponding field when rendering.</p>
+
+    <h2 id="errors">8. Errors</h2>
+    <p>Standard HTTP status codes apply. <code>404</code> when no document exists for the given <code>documentId</code>. <code>400</code> for invalid query parameters. <code>403</code> when the role does not have permission for the action. Response body may include a <code>error</code> object with <code>message</code> and details.</p>
+
+    <hr style="border: 0; border-top: 1px solid var(--border); margin: 2rem 0;">
+    <p style="font-size: 0.875rem; color: var(--muted);">Liturgy Day API Reference – for frontend integration. See also <a href="liturgical-calendar-strapi-server.html">Liturgical Calendar – Strapi Server Specification</a> and <a href="liturgy-calendar-seed-script.html">Liturgy Calendar Seed Script</a>.</p>
+  </div>
+</body>
+</html>

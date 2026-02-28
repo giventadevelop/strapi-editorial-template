@@ -1,0 +1,26 @@
+{
+  "collectionName": "components_liturgy_readings",
+  "info": {
+    "displayName": "Reading",
+    "description": "A single liturgical reading with bilingual heading and reference"
+  },
+  "options": {},
+  "attributes": {
+    "liturgyHeadingEn": {
+      "type": "richtext",
+      "maxLength": 500
+    },
+    "liturgyHeadingMalylm": {
+      "type": "richtext",
+      "maxLength": 500
+    },
+    "contentPlaceEn": {
+      "type": "richtext",
+      "maxLength": 500
+    },
+    "contentPlaceMalylm": {
+      "type": "richtext",
+      "maxLength": 500
+    }
+  }
+}

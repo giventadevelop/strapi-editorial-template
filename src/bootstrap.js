@@ -352,6 +352,7 @@ async function ensureEditorTenantScopedPermissions() {
     'api::parish.parish',
     'api::priest.priest',
     'api::directory-entry.directory-entry',
+    'api::liturgy-day.liturgy-day',
     'api::institution.institution',
     'api::church-dignitary.church-dignitary',
     'api::working-committee.working-committee',
@@ -642,6 +643,7 @@ async function ensureContentApiPublicPermissions() {
     { controller: 'parish', actions: ['find', 'findOne'] },
     { controller: 'priest', actions: ['find', 'findOne'] },
     { controller: 'directory-entry', actions: ['find', 'findOne'] },
+    { controller: 'liturgy-day', actions: ['find', 'findOne'] },
   ];
   for (const { controller, actions } of toEnsure) {
     for (const action of actions) {
