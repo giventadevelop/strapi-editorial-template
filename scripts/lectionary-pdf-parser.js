@@ -157,11 +157,17 @@ async function parseLiturgyPdfs(enPdfPath, mlPdfPath, year = 2026) {
 
   const merged = mergeByDate(enEntries, mlEntries);
 
+  let lastSeasonEn = '';
+  let lastSeasonMl = '';
   const days = merged.map((row) => {
     const headingEn = truncate(row.dayHeadingEn);
     const headingMl = truncate(row.dayHeadingMalylm);
-    const seasonEn = row.seasonNameEn || extractSeasonFromText(row.dayHeadingEn || '', true);
-    const seasonMl = row.seasonNameMalylm || extractSeasonFromText(row.dayHeadingMalylm || '', false);
+    let seasonEn = row.seasonNameEn || extractSeasonFromText(row.dayHeadingEn || '', true);
+    let seasonMl = row.seasonNameMalylm || extractSeasonFromText(row.dayHeadingMalylm || '', false);
+    if (seasonEn) lastSeasonEn = seasonEn;
+    else seasonEn = lastSeasonEn;
+    if (seasonMl) lastSeasonMl = seasonMl;
+    else seasonMl = lastSeasonMl;
     return {
       date: row.date,
       dayHeadingEn: headingEn,
@@ -171,6 +177,20 @@ async function parseLiturgyPdfs(enPdfPath, mlPdfPath, year = 2026) {
       readings: row.readings || [],
     };
   });
+
+  // Backfill leading days that have no season with the first known season
+  let firstSeasonEn = null;
+  let firstSeasonMl = null;
+  for (const d of days) {
+    if (d.seasonNameEn) firstSeasonEn = d.seasonNameEn;
+    if (d.seasonNameMalylm) firstSeasonMl = d.seasonNameMalylm;
+    if (firstSeasonEn != null && firstSeasonMl != null) break;
+  }
+  for (const d of days) {
+    if (d.seasonNameEn != null && d.seasonNameMalylm != null) break;
+    if (firstSeasonEn != null && d.seasonNameEn == null) d.seasonNameEn = firstSeasonEn;
+    if (firstSeasonMl != null && d.seasonNameMalylm == null) d.seasonNameMalylm = firstSeasonMl;
+  }
 
   return { days, stats: { enCount: enEntries.length, mlCount: mlEntries.length, mergedCount: merged.length } };
 }

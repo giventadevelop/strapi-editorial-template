@@ -55,7 +55,8 @@
     "styled-components": "^6.0.0"
   },
   "devDependencies": {
-    "pdf-parse": "^1.1.4"
+    "pdf-parse": "^1.1.4",
+    "xlsx": "^0.18.5"
   },
   "engines": {
     "node": ">=18.0.0 <=22.x.x",

@@ -50,6 +50,14 @@ async function getDocumentIdsForTenant(strapi, tenant) {
   return list.map((doc) => doc.documentId).filter(Boolean);
 }
 
+async function getAllLiturgyDayDocumentIds(strapi) {
+  const result = await strapi.documents(LITURGY_DAY_UID).findMany({
+    limit: 50000,
+  });
+  const list = result?.results ?? result?.data ?? (Array.isArray(result) ? result : []);
+  return list.map((doc) => doc.documentId).filter(Boolean);
+}
+
 async function deleteLiturgyDaysForTenant(strapi, tenantId) {
   const tenant = await getTenant(strapi, tenantId);
   if (!tenant) {
@@ -80,6 +88,29 @@ async function deleteLiturgyDaysForTenant(strapi, tenantId) {
   console.log('Liturgy days:', deleted, 'deleted for tenant', tenantId);
 }
 
+async function deleteAllLiturgyDays(strapi) {
+  const docIds = await getAllLiturgyDayDocumentIds(strapi);
+  const count = docIds.length;
+  if (count === 0) {
+    console.log('Liturgy days: 0 entries (all tenants) – skip');
+    return;
+  }
+  if (DRY_RUN) {
+    console.log('Liturgy days:', count, 'entries (all tenants) – DRY_RUN, not deleted');
+    return;
+  }
+  let deleted = 0;
+  for (const documentId of docIds) {
+    try {
+      await strapi.documents(LITURGY_DAY_UID).delete({ documentId });
+      deleted++;
+    } catch (e) {
+      console.warn('  Delete failed:', documentId, e.message);
+    }
+  }
+  console.log('Liturgy days:', deleted, 'deleted (all tenants)');
+}
+
 async function main() {
   const tenantId = getTenantId();
   const { createStrapi, compileStrapi } = require('@strapi/strapi');
@@ -88,4 +119,20 @@ async function main() {
   app.log.level = 'error';
 
   try {
-    if (DRY_RUN) console.log('DRY RUN – no da
+    if (DRY_RUN) console.log('DRY RUN – no data will be deleted.\n');
+    if (tenantId) {
+      await deleteLiturgyDaysForTenant(app, tenantId);
+    } else {
+      await deleteAllLiturgyDays(app);
+    }
+    console.log('\nDone.');
+  } catch (err) {
+    console.error(err);
+    process.exitCode = 1;
+  } finally {
+    await app.destroy();
+  }
+  process.exit(process.exitCode || 0);
+}
+
+main();
