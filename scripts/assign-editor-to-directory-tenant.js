@@ -1,29 +1,35 @@
 'use strict';
 
 /**
- * Assign an Editor (admin user) to the directory tenant so they can see
- * Directory – Bishops, Dioceses, Entries, etc. in the Content Manager.
- * Without this, the list shows "31 entries found" but "No content found" because
- * list results are filtered by the editor's assigned tenant.
+ * Assign an Editor (admin user) to a tenant so they can see that tenant's
+ * content (Directory, Liturgical Calendar – Day, Articles, etc.) in the Content Manager.
+ * Without this mapping, the list shows "0 entries" for tenant-scoped types.
  *
- * Usage:
+ * Usage (Windows and Unix):
+ *   node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_demo_002
  *   node scripts/assign-editor-to-directory-tenant.js editor@example.com
- *   EDITOR_EMAIL=editor@example.com node scripts/assign-editor-to-directory-tenant.js
  *
- * Uses TENANT_ID from .env (same as directory import); default: directory_mosc_001
+ * With env (Unix only): TENANT_ID=tenant_demo_002 node scripts/assign-editor-to-directory-tenant.js editor@example.com
+ * Default tenant if omitted: directory_mosc_001 (from .env TENANT_ID or this default)
  */
 
 try {
   require('dotenv').config();
 } catch (_) {}
 
-const tenantId = process.env.TENANT_ID || 'directory_mosc_001';
+function getTenantId() {
+  if (process.argv[3] && String(process.argv[3]).trim()) return process.argv[3].trim();
+  if (process.env.TENANT_ID) return process.env.TENANT_ID.trim();
+  return 'directory_mosc_001';
+}
+
+const tenantId = getTenantId();
 
 async function main() {
   const email = process.argv[2] || process.env.EDITOR_EMAIL;
   if (!email || !String(email).trim()) {
-    console.error('Usage: node scripts/assign-editor-to-directory-tenant.js <editor-email>');
-    console.error('   or: EDITOR_EMAIL=editor@example.com node scripts/assign-editor-to-directory-tenant.js');
+    console.error('Usage: node scripts/assign-editor-to-directory-tenant.js <editor-email> [tenant-id]');
+    console.error('Example (Windows): node scripts/assign-editor-to-directory-tenant.js mosc.regular.user@keleno.com tenant_demo_002');
     process.exit(1);
   }
   const editorEmail = String(email).trim().toLowerCase();
