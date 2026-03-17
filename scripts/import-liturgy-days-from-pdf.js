@@ -2,16 +2,21 @@
 
 /**
  * Bulk import Liturgy Day entries from English and Malayalam PDFs.
+ * Import is tenant-specific: all created entries get the given --tenant-id.
+ * Editors see them in Content Manager only if they are mapped to that tenant
+ * (Editor Tenant Assignment). Run assign-editor-to-directory-tenant.js with
+ * TENANT_ID=<same-tenant> after import so the editor sees the list.
  *
  * Run from project root:
- *   node scripts/import-liturgy-days-from-pdf.js
+ *   node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_demo_002 --year=2026
  *   node scripts/import-liturgy-days-from-pdf.js --dump-text   (extract raw text for debugging)
  *
  * Options:
- *   TENANT_ID=tenant_demo_002  or  --tenant-id=tenant_demo_002
- *   DRY_RUN=1                  (log parsed days, do not create)
- *   --limit=N                  (create at most N entries)
+ *   --tenant-id=XXX            (required for import; e.g. tenant_demo_002)
  *   --year=YYYY                (calendar year for parsed dates, default: 2026)
+ *   --split-en-headings         (split dayHeadingEn by sentences; one entry per sentence, same date)
+ *   --limit=N                  (create at most N entries)
+ *   DRY_RUN=1                  (log parsed days, do not create)
  *   --en-pdf=path              (default: documentation/lectionary_calendar/2026-Liturgical-Calender.pdf)
  *   --ml-pdf=path              (default: documentation/lectionary_calendar/Panjangom_26.pdf)
  */
@@ -46,6 +51,19 @@ function getArg(name, defaultValue) {
 
 function getDumpText() {
   return process.argv.includes('--dump-text');
+}
+
+function getSplitEnHeadings() {
+  return process.argv.includes('--split-en-headings');
+}
+
+/** Split English heading into sentences (period + space). Returns array of trimmed strings. */
+function splitEnHeadingIntoSentences(text) {
+  if (!text || typeof text !== 'string') return [''];
+  const trimmed = text.trim();
+  if (!trimmed) return [''];
+  const parts = trimmed.split(/(?<=\.)\s+/).map((s) => s.trim()).filter(Boolean);
+  return parts.length ? parts : [trimmed];
 }
 
 async function dumpText(enPdf, mlPdf) {
@@ -84,11 +102,27 @@ async function main() {
   }
 
   const parseLiturgyPdfs = require('./lectionary-pdf-parser');
-  const { days, stats } = await parseLiturgyPdfs(enPdf, mlPdf, year);
+  let { days, stats } = await parseLiturgyPdfs(enPdf, mlPdf, year);
   if (!days || days.length === 0) {
     console.log('No liturgy days parsed from PDFs.');
     process.exit(0);
     return;
+  }
+
+  if (getSplitEnHeadings()) {
+    const expanded = [];
+    for (const d of days) {
+      const sentences = splitEnHeadingIntoSentences(d.dayHeadingEn);
+      for (let i = 0; i < sentences.length; i++) {
+        expanded.push({
+          ...d,
+          dayHeadingEn: sentences[i],
+          dayHeadingMalylm: i === 0 ? (d.dayHeadingMalylm || '') : '',
+        });
+      }
+    }
+    days = expanded;
+    console.log('Split EN headings: expanded to', days.length, 'entries (one per sentence, same date where multiple).');
   }
 
   const toCreate = limit != null ? days.slice(0, limit) : days;
@@ -109,13 +143,14 @@ async function main() {
 
   const tenant = await app.db.query('api::tenant.tenant').findOne({
     where: { tenantId },
-    select: ['id'],
+    select: ['id', 'documentId'],
   });
   if (!tenant) {
     console.error('Tenant not found:', tenantId);
     process.exit(1);
   }
-
+  // Use tenant.id so the relation is stored the same way as seed-liturgy-days and
+  // document API filters (tenant: tenant.id) find these entries.
   const LITURGY_DAY_UID = 'api::liturgy-day.liturgy-day';
   let created = 0;
   for (let i = 0; i < toCreate.length; i++) {
@@ -143,14 +178,30 @@ async function main() {
     }, null, 2));
     console.log('');
     try {
-      await app.documents(LITURGY_DAY_UID).create({ data });
+      const createdDoc = await app.documents(LITURGY_DAY_UID).create({ data });
       created++;
+      // Document Service may not persist manyToOne relation; set tenant via entity table so filters find it.
+      if (createdDoc?.documentId != null) {
+        try {
+          await app.db.query(LITURGY_DAY_UID).update({
+            where: { documentId: createdDoc.documentId },
+            data: { tenant: tenant.id },
+          });
+        } catch (e2) {
+          console.warn('  Set tenant relation failed:', day.date, e2.message);
+        }
+      }
       if (toCreate.length > 10 && created % 50 === 0) console.log('Created', created, '/', toCreate.length);
     } catch (e) {
       console.warn('  Create failed:', day.date, e.message);
     }
   }
   console.log('Created', created, 'liturgy days for tenant', tenantId);
+  console.log('');
+  console.log('To see these in Content Manager as an editor, assign that editor to this tenant:');
+  console.log('  node scripts/assign-editor-to-directory-tenant.js <editor-email> ' + tenantId);
+  console.log('Example: node scripts/assign-editor-to-directory-tenant.js mosc.regular.user@keleno.com ' + tenantId);
+  console.log('Then have the editor log out and log back in. Verify with: node scripts/verify-editor-tenant-liturgy.js <editor-email>');
   await app.destroy();
   process.exit(0);
 }

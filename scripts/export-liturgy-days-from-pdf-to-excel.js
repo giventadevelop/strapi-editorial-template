@@ -4,6 +4,10 @@
  * Export parsed liturgy days from the two PDFs to an Excel file.
  * Uses the same parser as import-liturgy-days-from-pdf.js; does not touch Strapi.
  *
+ * Malayalam columns (dayHeadingMalylm, seasonNameMalylm, etc.) are styled with
+ * a Malayalam font so Excel displays the script correctly. PDF extraction uses
+ * disableCombineTextItems + NFC normalization to preserve Unicode (see pdf-extract.js).
+ *
  * Run from project root:
  *   node scripts/export-liturgy-days-from-pdf-to-excel.js
  *   node scripts/export-liturgy-days-from-pdf-to-excel.js --year=2026
@@ -29,6 +33,25 @@ function getArg(name, defaultValue) {
 const DEFAULT_EN_PDF = path.join('documentation', 'lectionary_calendar', '2026-Liturgical-Calender.pdf');
 const DEFAULT_ML_PDF = path.join('documentation', 'lectionary_calendar', 'Panjangom_26.pdf');
 
+/** 0-based column indices for Malayalam fields (dayHeadingMalylm, seasonNameMalylm, readings ML). */
+const MALAYALAM_COL_INDICES = [2, 4, 7, 9, 11, 13];
+const MALAYALAM_FONT = 'Noto Sans Malayalam';
+
+function colLetter(colIndex) {
+  if (colIndex < 26) return String.fromCharCode(65 + colIndex);
+  return String.fromCharCode(64 + Math.floor(colIndex / 26)) + String.fromCharCode(65 + (colIndex % 26));
+}
+
+function applyMalayalamStyle(ws, numRows) {
+  const fontStyle = { font: { name: MALAYALAM_FONT, sz: 11 } };
+  for (let r = 0; r <= numRows; r++) {
+    for (const c of MALAYALAM_COL_INDICES) {
+      const ref = colLetter(c) + (r + 1);
+      if (ws[ref]) ws[ref].s = { ...ws[ref].s, ...fontStyle };
+    }
+  }
+}
+
 async function main() {
   const yearArg = getArg('year', '2026');
   const year = Math.max(1900, Math.min(9999, parseInt(yearArg, 10) || 2026));
@@ -43,7 +66,7 @@ async function main() {
     return;
   }
 
-  const XLSX = require('xlsx');
+  const XLSX = require('xlsx-js-style');
   const outDir = path.join(process.cwd(), 'documentation', 'lectionary_calendar');
   const outPath = path.join(outDir, 'liturgy-days-from-pdf.xlsx');
 
@@ -77,6 +100,7 @@ async function main() {
 
   const wsData = [headers, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
+  applyMalayalamStyle(ws, rows.length);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Liturgy Days');
 
@@ -84,7 +108,7 @@ async function main() {
   XLSX.writeFile(wb, outPath);
 
   console.log('Parser stats: EN entries=', stats.enCount, 'ML entries=', stats.mlCount, 'merged days=', stats.mergedCount);
-  console.log('Written', days.length, 'rows to', outPath);
+  console.log('Written', days.length, 'rows to', outPath, '(Malayalam columns use', MALAYALAM_FONT + ')');
 }
 
 main().catch((err) => {

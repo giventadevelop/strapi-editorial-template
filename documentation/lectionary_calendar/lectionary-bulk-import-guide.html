@@ -175,6 +175,7 @@
     <ul>
       <li><code>--tenant-id=...</code> or <code>TENANT_ID=...</code> – Tenant to attach entries to (default: <code>tenant_demo_002</code>).</li>
       <li><code>--year=YYYY</code> or <code>YEAR=...</code> – Calendar year for parsed dates (default: <code>2026</code>).</li>
+      <li><code>--split-en-headings</code> – Split <code>dayHeadingEn</code> by sentences (period + space); creates one Liturgy Day entry per sentence for the same date (e.g. “New Year. Circumcision of our Lord.” → two entries for that day).</li>
       <li><code>--limit=N</code> – Create at most N entries (for testing).</li>
       <li><code>DRY_RUN=1</code> – Parse PDFs and log first few days; do not create.</li>
       <li><code>--dump-text</code> – Extract raw text from both PDFs into <code>documentation/lectionary_calendar/dumped-en.txt</code> and <code>dumped-ml.txt</code> for debugging.</li>
@@ -207,6 +208,7 @@
       <li><strong>PDF not found</strong>: Ensure the PDFs are in <code>documentation/lectionary_calendar/</code> or pass full paths via <code>--en-pdf</code> and <code>--ml-pdf</code>.</li>
       <li><strong>Parse errors / wrong dates</strong>: Run with <code>--dump-text</code> and check the dumped text files; update the parser if the format differs.</li>
       <li><strong>Strapi already running</strong>: Stop the server before running the scripts; they load Strapi in-process.</li>
+      <li><strong>Editor sees “0 entries” in Content Manager</strong>: Liturgy Day list is tenant-scoped. The editor must be mapped to the same tenant via <strong>Editor Tenant Assignment</strong>. Run: <code class="code-highlight">TENANT_ID=tenant_demo_002 node scripts/assign-editor-to-directory-tenant.js <em>editor@example.com</em></code> (use the editor’s exact login email). Then have the editor log out and log back in. Super Admin always sees all entries.</li>
     </ul>
 
     <h2 id="related">8. Related Documentation</h2>

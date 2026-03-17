@@ -5,8 +5,13 @@
  * Use before re-importing from PDF to avoid duplicates.
  *
  * Run from project root:
- *   node scripts/delete-liturgy-days.js              → delete ALL liturgy days (all tenants)
- *   node scripts/delete-liturgy-days.js --tenant-id=tenant_demo_002  → delete only that tenant's
+ *
+ *   Delete ALL liturgy days (all tenants) – e.g. for Super Admin purge:
+ *     node scripts/delete-liturgy-days.js
+ *     node scripts/delete-liturgy-days.js --all
+ *
+ *   Delete only one tenant's liturgy days:
+ *     node scripts/delete-liturgy-days.js --tenant-id=tenant_demo_002
  *
  * Optional: TENANT_ID=tenant_demo_002 or --tenant-id=tenant_demo_002 to limit to one tenant.
  * Optional: DRY_RUN=1 to only list count and skip deletion.
@@ -18,16 +23,17 @@ try {
 
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 
-/** Returns tenant ID if provided via env or argv; otherwise null (meaning delete all). */
+/** Returns tenant ID if provided via env or argv; --all or no tenant = delete all (null). */
 function getTenantId() {
-  const env = process.env.TENANT_ID;
-  if (env) return env.trim();
   for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i];
+    if (arg === '--all') return null;
     if (arg === '--tenant-id' && process.argv[i + 1]) return process.argv[i + 1].trim();
     const match = arg.match(/^--tenant-id=(.+)$/);
     if (match) return match[1].trim();
   }
+  const env = process.env.TENANT_ID;
+  if (env) return env.trim();
   return null;
 }
 
@@ -36,14 +42,19 @@ const LITURGY_DAY_UID = 'api::liturgy-day.liturgy-day';
 async function getTenant(strapi, tenantId) {
   const tenant = await strapi.db.query('api::tenant.tenant').findOne({
     where: { tenantId },
-    select: ['id', 'documentId'],
+    select: ['id', 'documentId', 'document_id'],
   });
   return tenant;
 }
 
 async function getDocumentIdsForTenant(strapi, tenant) {
+  const docId = tenant.documentId ?? tenant.document_id;
+  const filters =
+    docId != null
+      ? { $or: [{ tenant: tenant.id }, { tenant: { documentId: docId } }] }
+      : { tenant: tenant.id };
   const result = await strapi.documents(LITURGY_DAY_UID).findMany({
-    filters: { tenant: tenant.id },
+    filters,
     limit: 10000,
   });
   const list = result?.results ?? result?.data ?? (Array.isArray(result) ? result : []);
