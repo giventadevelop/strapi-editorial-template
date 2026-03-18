@@ -773,7 +773,8 @@ async function main() {
 
   // Phase 1b: collection types (POST per entry, in batches). Push in dependency order so
   // category, author, tenant exist before articles — phase 2 needs their documentIds in the map.
-  const PUSH_FIRST = ['tenants', 'editor-tenants', 'categories', 'authors', 'dioceses', 'parishes'];
+  // liturgy-days depend on tenant, so push after tenants.
+  const PUSH_FIRST = ['tenants', 'editor-tenants', 'categories', 'authors', 'dioceses', 'parishes', 'liturgy-days'];
   const typeList = Object.keys(entitiesByType);
   const typesOrder = [
     ...typeList.filter(t => PUSH_FIRST.includes(typeToPlural[t])),

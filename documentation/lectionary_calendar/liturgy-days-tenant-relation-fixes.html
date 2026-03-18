@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Documentation of liturgy-days tenant relation fixes and production replication for Liturgical Calendar – Day in Strapi.">
+  <title>Liturgy Days – Tenant Relation Fixes &amp; Production Replication</title>
+  <style>
+    :root {
+      --code-bg: #e8f4f8;
+      --code-text: #0d3b66;
+      --code-border: #b8d4e3;
+      --info-bg: #d1ecf1;
+      --info-border: #0c5460;
+      --warn-bg: #fff3cd;
+      --warn-border: #ffc107;
+      --success-bg: #d4edda;
+      --success-border: #28a745;
+      --error-bg: #f8d7da;
+      --error-border: #dc3545;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      max-width: 1200px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 { font-size: 2.5em; border-bottom: 3px solid #0066cc; padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.8em; border-left: 4px solid #0066cc; padding-left: 15px; margin-top: 2rem; }
+    h3 { font-size: 1.4em; color: #333; margin-top: 1.5rem; }
+    h4 { font-size: 1.2em; color: #555; margin-top: 1rem; }
+    p { margin: 0.5rem 0 1rem; }
+    code, .code-highlight {
+      background-color: var(--code-bg);
+      color: var(--code-text);
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid var(--code-border);
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    pre, .code-block {
+      background-color: var(--code-bg);
+      color: var(--code-text);
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid var(--code-border);
+      overflow-x: auto;
+      margin: 15px 0;
+    }
+    pre code { background: none; padding: 0; color: var(--code-text); }
+    .script-name {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      display: inline-block;
+      box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+    }
+    .section-intro {
+      background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%);
+      border-left: 4px solid #0066cc;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1);
+    }
+    .section-intro code { background-color: var(--code-bg); color: var(--code-text); padding: 3px 8px; border-radius: 3px; border: 1px solid var(--code-border); }
+    .section-container {
+      background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+      border-left: 4px solid #0066cc;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1);
+    }
+    .section-container.parameters {
+      background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+      border-left-color: #ff9800;
+    }
+    .section-container.output {
+      background: linear-gradient(135deg, #e6ffe6 0%, #ccffcc 100%);
+      border-left-color: #28a745;
+    }
+    .section-container.usage {
+      background: linear-gradient(135deg, #f0e6ff 0%, #e6ccff 100%);
+      border-left-color: #9c27b0;
+    }
+    .section-header {
+      background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
+      color: white;
+      padding: 12px 20px;
+      margin: -20px -20px 20px -20px;
+      border-radius: 8px 8px 0 0;
+      font-size: 1.2em;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-header.parameters { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); }
+    .section-header.output { background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); }
+    .section-header.usage { background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); }
+    .parameters-list {
+      background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+      border-left: 4px solid #ff9800;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin: 15px 0;
+    }
+    .parameters-list code { background-color: var(--code-bg); color: var(--code-text); padding: 3px 8px; border-radius: 3px; border: 1px solid var(--code-border); }
+    .info { background: var(--info-bg); border-left: 4px solid var(--info-border); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+    .info code, .info .code-highlight { background-color: var(--code-bg); color: var(--code-text); padding: 2px 6px; border-radius: 3px; border: 1px solid var(--code-border); }
+    .warning { background: var(--warn-bg); border-left: 4px solid var(--warn-border); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+    .warning code, .warning .code-highlight { background-color: var(--code-bg); color: var(--code-text); padding: 2px 6px; border-radius: 3px; border: 1px solid var(--code-border); }
+    .success { background: var(--success-bg); border-left: 4px solid var(--success-border); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+    .success code, .success .code-highlight { background-color: var(--code-bg); color: var(--code-text); padding: 2px 6px; border-radius: 3px; border: 1px solid var(--code-border); }
+    table { border-collapse: collapse; width: 100%; margin: 15px 0; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: bold; text-transform: uppercase; font-size: 0.9em; letter-spacing: 0.5px; }
+    tr:nth-child(even) { background-color: #f8f9fa; }
+    tr:hover { background-color: #e3f2fd; transition: background-color 0.2s ease; }
+    td code { background-color: var(--code-bg); color: var(--code-text); padding: 3px 8px; border-radius: 3px; border: 1px solid var(--code-border); font-family: 'Courier New', monospace; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; }
+    li { margin: 0.25rem 0; }
+    a { color: #0066cc; }
+    .toc { margin: 1.5rem 0; padding: 1rem; background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%); border-left: 4px solid #0066cc; border-radius: 8px; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc li { margin: 0.35rem 0; }
+    .toc a { text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    /* Command blocks */
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; padding: 0; margin: 1rem 0; overflow: hidden; }
+    .command-block.setup { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-color: #2196f3; }
+    .command-block.verify { background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-color: #4caf50; }
+    .command-block.advance { background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); border-color: #ff9800; }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-type { font-weight: bold; color: var(--code-text); }
+    .command-header-buttons { display: flex; gap: 8px; }
+    .copy-button, .copy-button-template { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; font-weight: bold; transition: all 0.3s ease; }
+    .copy-button { background: #0066cc; color: white; }
+    .copy-button:hover { background: #0052a3; }
+    .copy-button-template { background: #6c757d; color: white; }
+    .copy-button-template:hover { background: #5a6268; }
+    .copy-button.copied, .copy-button-template.copied { background: #28a745; }
+    .command-parameters { padding: 15px; background: rgba(255,255,255,0.5); border-bottom: 1px solid rgba(0,0,0,0.1); }
+    .command-parameters h5 { margin: 0 0 12px 0; font-size: 0.9em; color: #333; font-weight: bold; }
+    .parameter-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .parameter-group.single { grid-template-columns: 1fr; }
+    .parameter-input label { font-size: 0.8em; color: #555; font-weight: 600; }
+    .parameter-input input { padding: 8px 12px; border: 2px solid #ddd; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9em; }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: var(--code-text); }
+    .command-single-line { padding: 12px 15px; background: var(--code-bg); border-top: 1px solid var(--code-border); border-radius: 0 0 8px 8px; }
+    .command-single-line-label { font-size: 0.8em; color: #666; margin-bottom: 4px; }
+    .command-single-line code { background: var(--code-bg); color: var(--code-text); padding: 4px 8px; border: 1px solid var(--code-border); }
+    @media (max-width: 768px) { body { padding: 10px; } .parameter-group { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Liturgy Days – Tenant Relation Fixes &amp; Production Replication</h1>
+    <p>This document describes the fixes applied so that <strong>Liturgical Calendar – Day</strong> entries are correctly linked to a tenant and visible to editors in Content Manager. It also provides guidelines to replicate the same setup in production.</p>
+
+    <nav class="toc" aria-label="Table of Contents">
+      <h2 id="toc">Table of Contents</h2>
+      <ul>
+        <li><a href="#overview">1. Overview of the problem and fixes</a></li>
+        <li><a href="#fix-import">2. Fix 1 – Import script (tenant relation + DB fallback)</a></li>
+        <li><a href="#fix-verify">3. Fix 2 – Verify script (same filter as Content Manager)</a></li>
+        <li><a href="#fix-delete">4. Fix 3 – Delete script (same filter)</a></li>
+        <li><a href="#relationship">5. Tenant ↔ Liturgical Calendar relationship</a></li>
+        <li><a href="#production">6. Production replication guidelines</a></li>
+        <li><a href="#production-cloud">7. Import liturgy days into production (Strapi Cloud)</a></li>
+        <li><a href="#malayalam-excel">8. Update Malayalam headings from Excel</a></li>
+        <li><a href="#translation-workflow">9. Translation workflow: PDF to Malayalam (Google Nana Banana)</a></li>
+        <li><a href="#related">10. Related documentation</a></li>
+      </ul>
+    </nav>
+
+    <h2 id="overview">1. Overview of the problem and fixes</h2>
+    <div class="section-intro">
+      <p>After importing liturgy days with <code class="script-name">import-liturgy-days-from-pdf.js</code>, the script reported “Created N liturgy days for tenant X”, but <code class="script-name">verify-editor-tenant-liturgy.js</code> showed <strong>Liturgy days for this tenant: 0</strong>, and editors saw no entries in Content Manager. The root causes were:</p>
+      <ul>
+        <li><strong>Document Service</strong> (Strapi 5) may not persist the <code>tenant</code> manyToOne relation on <code>documents(...).create()</code> when the relation is passed as part of the payload.</li>
+        <li><strong>Filter mismatch</strong>: The verify and delete scripts filtered by <code>tenant: tenant.id</code> only, while the Content Manager uses <code>$or: [{ tenant: tenant.id }, { tenant: { documentId: tenant.documentId } }]</code>. If the relation is stored by <code>documentId</code> in the document layer, filtering by numeric <code>id</code> alone returns no results.</li>
+      </ul>
+      <p>Three fixes were applied so that created liturgy days are linked to the tenant and all scripts and the Content Manager see the same set of records.</p>
+    </div>
+
+    <h2 id="fix-import">2. Fix 1 – Import script (tenant relation + DB fallback)</h2>
+    <div class="section-container">
+      <div class="section-header">Import script – tenant link and DB fallback</div>
+      <p><strong>Script:</strong> <code class="script-name">import-liturgy-days-from-pdf.js</code></p>
+      <p><strong>Changes:</strong></p>
+      <ul>
+        <li>Use <code class="code-highlight">tenant: tenant.id</code> (numeric) in the create payload, matching the seed script and the way the entity table stores the relation.</li>
+        <li>After each successful <code>documents(...).create()</code>, call <code>db.query('api::liturgy-day.liturgy-day').update({ where: { documentId: createdDoc.documentId }, data: { tenant: tenant.id } })</code> so the tenant relation is set on the entity table even if the Document Service did not persist it.</li>
+      </ul>
+      <p>This ensures that every created liturgy day has its <code>tenant_id</code> (or equivalent) set in the database, so document API filters find it.</p>
+    </div>
+
+    <h2 id="fix-verify">3. Fix 2 – Verify script (same filter as Content Manager)</h2>
+    <div class="section-container">
+      <div class="section-header">Verify script – filter alignment</div>
+      <p><strong>Script:</strong> <code class="script-name">verify-editor-tenant-liturgy.js</code></p>
+      <p><strong>Change:</strong> When counting liturgy days per tenant, use the <strong>same filter</strong> as the content-manager extension:</p>
+      <pre><code>filters: tenant.documentId != null
+  ? { $or: [{ tenant: tenant.id }, { tenant: { documentId: tenant.documentId } }] }
+  : { tenant: tenant.id }</code></pre>
+      <p>So “Liturgy days for this tenant” matches exactly what the editor sees in the Content Manager list.</p>
+    </div>
+
+    <h2 id="fix-delete">4. Fix 3 – Delete script (same filter)</h2>
+    <div class="section-container">
+      <div class="section-header">Delete script – filter alignment</div>
+      <p><strong>Script:</strong> <code class="script-name">delete-liturgy-days.js</code></p>
+      <p><strong>Change:</strong> When resolving document IDs to delete for a tenant, use the same <code>$or</code> filter (by <code>tenant.id</code> and <code>tenant.documentId</code>) so the delete script removes the same set of documents that the verify script counts and the editor sees.</p>
+    </div>
+
+    <h2 id="relationship">5. Tenant ↔ Liturgical Calendar relationship</h2>
+    <div class="section-container">
+      <div class="section-header">How tenant and liturgy days are related</div>
+      <ul>
+        <li><strong>Content type:</strong> <code>api::liturgy-day.liturgy-day</code> (Liturgical Calendar – Day) has a <strong>manyToOne</strong> relation to <code>api::tenant.tenant</code>.</li>
+        <li><strong>Storage:</strong> The relation is stored in the entity table (e.g. <code>liturgy_days.tenant_id</code> or via document engine link). Strapi 5 may store or query by numeric <code>id</code> or by <code>documentId</code>; the content-manager and scripts use <code>$or</code> so both are matched.</li>
+        <li><strong>Editor visibility:</strong> The content-manager extension restricts the list view for editors (role <code>strapi-editor</code>) to the tenant assigned in <strong>Editor Tenant Assignment</strong> (<code>api::editor-tenant.editor-tenant</code>). Only liturgy days whose <code>tenant</code> matches that assignment are shown.</li>
+        <li><strong>Assigning editors:</strong> Run <code class="script-name">assign-editor-to-directory-tenant.js</code> with the editor’s email and the tenant ID so that editor sees that tenant’s liturgy days. After assignment, the editor must log out and log back in.</li>
+      </ul>
+      <div class="parameters-list">
+        <p><strong>Scripts involved:</strong></p>
+        <ul>
+          <li><code class="script-name">import-liturgy-days-from-pdf.js</code> – creates liturgy days and sets tenant (including via DB fallback).</li>
+          <li><code class="script-name">verify-editor-tenant-liturgy.js</code> – shows editor → tenant and liturgy-day count per tenant (same filter as CM).</li>
+          <li><code class="script-name">delete-liturgy-days.js</code> – deletes liturgy days for a tenant or all (same filter).</li>
+          <li><code class="script-name">assign-editor-to-directory-tenant.js</code> – maps an editor email to a tenant so they see that tenant’s data in CM.</li>
+          <li><code class="script-name">update-liturgy-days-malayalam-from-excel.js</code> – updates only <code>dayHeadingMalylm</code> on existing liturgy days from an Excel file (date + dayHeadingMalylm columns).</li>
+        </ul>
+      </div>
+    </div>
+
+    <h2 id="production">6. Production replication guidelines</h2>
+    <p>To replicate the same tenant–liturgy setup in production, follow these steps in order.</p>
+
+    <div class="section-container usage">
+      <div class="section-header usage">Step 1 – Ensure tenant exists</div>
+      <p>Create the production tenant in Strapi Admin (Content Manager → Tenant) if it does not exist. Note its <code>tenantId</code> (e.g. <code>tenant_production_001</code>).</p>
+    </div>
+
+    <div class="section-container usage">
+      <div class="section-header usage">Step 2 – (Optional) Delete existing liturgy days for that tenant</div>
+      <p>If you are re-importing, run the delete script so you do not duplicate entries. Stop the Strapi server before running.</p>
+      <div class="command-block setup" data-command-base="node scripts/delete-liturgy-days.js" data-template-command="node scripts/delete-liturgy-days.js --tenant-id=tenant_production_001">
+        <div class="command-header">
+          <span class="command-type">Delete liturgy days for tenant</span>
+          <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-prod-delete')" title="Copy template">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'cmd-prod-delete')" title="Copy command">📋 Copy</button>
+          </div>
+        </div>
+        <div class="command-parameters">
+          <h5>🔧 Customize parameters</h5>
+          <div class="parameter-group single">
+            <div class="parameter-input">
+              <label for="cmd-prod-delete-tenant">Tenant ID (production):</label>
+              <input type="text" id="cmd-prod-delete-tenant" placeholder="tenant_production_001" value="tenant_production_001" oninput="updateCommand('cmd-prod-delete', 'tenant', this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="command-content" id="cmd-prod-delete">node scripts/delete-liturgy-days.js --tenant-id=tenant_production_001</div>
+        <div class="command-single-line">
+          <div class="command-single-line-label">Windows single-line:</div>
+          <code id="cmd-prod-delete-single-code">node scripts/delete-liturgy-days.js --tenant-id=tenant_production_001</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-container usage">
+      <div class="section-header usage">Step 3 – Import liturgy days for the production tenant</div>
+      <p>Place the PDFs in <code>documentation/lectionary_calendar/</code> (or set <code>--en-pdf</code> and <code>--ml-pdf</code>). Run the import with the production tenant ID and year. Strapi server must be stopped.</p>
+      <div class="command-block setup" data-command-base="node scripts/import-liturgy-days-from-pdf.js" data-template-command="node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_production_001 --year=2026">
+        <div class="command-header">
+          <span class="command-type">Import liturgy days</span>
+          <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-prod-import')" title="Copy template">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'cmd-prod-import')" title="Copy command">📋 Copy</button>
+          </div>
+        </div>
+        <div class="command-parameters">
+          <h5>🔧 Customize parameters</h5>
+          <div class="parameter-group">
+            <div class="parameter-input">
+              <label for="cmd-prod-import-tenant">Tenant ID (production):</label>
+              <input type="text" id="cmd-prod-import-tenant" value="tenant_production_001" oninput="updateCommand('cmd-prod-import', 'tenant', this.value)">
+            </div>
+            <div class="parameter-input">
+              <label for="cmd-prod-import-year">Year (e.g. 2026):</label>
+              <input type="text" id="cmd-prod-import-year" value="2026" oninput="updateCommand('cmd-prod-import', 'year', this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="command-content" id="cmd-prod-import">node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_production_001 --year=2026</div>
+        <div class="command-single-line">
+          <div class="command-single-line-label">Windows single-line:</div>
+          <code id="cmd-prod-import-single-code">node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_production_001 --year=2026</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-container usage">
+      <div class="section-header usage">Step 4 – Assign editors to the production tenant</div>
+      <p>For each editor who should see this tenant’s liturgy days, run the assign script with their login email and the same tenant ID. Use the two-argument form for Windows (no env vars):</p>
+      <div class="command-block advance" data-command-base="node scripts/assign-editor-to-directory-tenant.js" data-template-command="node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_production_001">
+        <div class="command-header">
+          <span class="command-type">Assign editor to tenant</span>
+          <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-prod-assign')" title="Copy template">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'cmd-prod-assign')" title="Copy command">📋 Copy</button>
+          </div>
+        </div>
+        <div class="command-parameters">
+          <h5>🔧 Customize parameters</h5>
+          <div class="parameter-group">
+            <div class="parameter-input">
+              <label for="cmd-prod-assign-email">Editor email:</label>
+              <input type="text" id="cmd-prod-assign-email" placeholder="editor@example.com" oninput="updateCommand('cmd-prod-assign', 'email', this.value)">
+            </div>
+            <div class="parameter-input">
+              <label for="cmd-prod-assign-tenant">Tenant ID (production):</label>
+              <input type="text" id="cmd-prod-assign-tenant" value="tenant_production_001" oninput="updateCommand('cmd-prod-assign', 'tenant', this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="command-content" id="cmd-prod-assign">node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_production_001</div>
+        <div class="command-single-line">
+          <div class="command-single-line-label">Windows single-line:</div>
+          <code id="cmd-prod-assign-single-code">node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_production_001</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-container verify">
+      <div class="section-header output">Step 5 – Verify tenant and liturgy counts</div>
+      <p>Run the verify script with an editor’s email to confirm their tenant and liturgy-day count. Strapi server must be stopped.</p>
+      <div class="command-block verify" data-command-base="node scripts/verify-editor-tenant-liturgy.js" data-template-command="node scripts/verify-editor-tenant-liturgy.js editor@example.com">
+        <div class="command-header">
+          <span class="command-type">Verify editor tenant and liturgy</span>
+          <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-prod-verify')" title="Copy template">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'cmd-prod-verify')" title="Copy command">📋 Copy</button>
+          </div>
+        </div>
+        <div class="command-parameters">
+          <h5>🔧 Customize parameters</h5>
+          <div class="parameter-group single">
+            <div class="parameter-input">
+              <label for="cmd-prod-verify-email">Editor email:</label>
+              <input type="text" id="cmd-prod-verify-email" placeholder="editor@example.com" oninput="updateCommand('cmd-prod-verify', 'email', this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="command-content" id="cmd-prod-verify">node scripts/verify-editor-tenant-liturgy.js editor@example.com</div>
+        <div class="command-single-line">
+          <div class="command-single-line-label">Windows single-line:</div>
+          <code id="cmd-prod-verify-single-code">node scripts/verify-editor-tenant-liturgy.js editor@example.com</code>
+        </div>
+      </div>
+      <p>Expect “Liturgy days for this tenant” to be greater than zero after a successful import. If the editor still sees 0 in Content Manager, have them <strong>log out and log back in</strong>.</p>
+    </div>
+
+    <div class="success">
+      <strong>✅ Production checklist</strong>
+      <ul>
+        <li>Tenant exists in Strapi (Content Manager → Tenant).</li>
+        <li>Strapi server stopped before running delete/import/verify.</li>
+        <li>Delete (optional) run for the target tenant before re-import.</li>
+        <li>Import run with <code class="code-highlight">--tenant-id=&lt;production-tenant-id&gt;</code> and <code class="code-highlight">--year=YYYY</code>.</li>
+        <li>Optionally run <code class="script-name">update-liturgy-days-malayalam-from-excel.js</code> to fill <code>dayHeadingMalylm</code> from an Excel file (see <a href="#malayalam-excel">section 7</a>).</li>
+        <li>Each editor assigned via <code class="script-name">assign-editor-to-directory-tenant.js</code> with email and tenant ID.</li>
+        <li>Verify script shows non-zero liturgy days for that tenant.</li>
+        <li>Editors log out and log back in after assignment.</li>
+      </ul>
+    </div>
+
+    <h2 id="production-cloud">7. Import liturgy days into production (Strapi Cloud)</h2>
+    <div class="section-intro">
+      <p>To get your local <strong>Liturgical Calendar – Day</strong> data (Content Manager) into production Strapi Cloud, use one of the options below. Ensure <code class="code-highlight">STRAPI_CLOUD_URL</code> and <code class="code-highlight">STRAPI_CLOUD_API_TOKEN</code> (Full Access token) are set in <code>.env</code> (see <code>.env.example</code>).</p>
+    </div>
+    <div class="section-container parameters">
+      <div class="section-header parameters">Verify .env</div>
+      <ul>
+        <li><code class="code-highlight">STRAPI_CLOUD_URL</code> – Production base URL (e.g. <code>https://YOUR-PROJECT.strapiapp.com</code>), no trailing slash.</li>
+        <li><code class="code-highlight">STRAPI_CLOUD_API_TOKEN</code> – Full Access API token from Cloud (Settings → API Tokens).</li>
+        <li>Same pattern is used by <code class="script-name">rest_api_push_to_cloud.js</code>, <code class="script-name">fix_production_tenant_and_dates.js</code>, and <code class="script-name">clear_cloud_data.js</code>.</li>
+      </ul>
+    </div>
+    <div class="section-container">
+      <div class="section-header">Option A – Full export + REST push (existing process)</div>
+      <p>Use when production is <strong>empty</strong> or you want to push <strong>all</strong> content (including liturgy days) from local to Cloud. Liturgy days are included in the export and pushed after tenants so the tenant relation can be linked.</p>
+      <ol>
+        <li>Stop local Strapi. Create export: <code class="code-highlight">npm run strapi export -- --no-encrypt -f my-export</code> → <code>my-export.tar.gz</code>.</li>
+        <li>Push to Cloud: <code class="code-highlight">npm run push:rest-to-cloud -- my-export.tar.gz</code>. Env: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code>.</li>
+        <li>Liturgy days are pushed in dependency order (tenants first, then <code>liturgy-days</code>). Phase 2 restores the <code>tenant</code> relation on each liturgy day.</li>
+      </ol>
+      <p>If Cloud already has data, consider Option C to push only liturgy days and avoid re-pushing everything.</p>
+    </div>
+    <div class="section-container">
+      <div class="section-header">Option B – Strapi transfer</div>
+      <p>Use when production is <strong>empty</strong> and you want to stream the full database and assets from local to Cloud (WebSocket-based).</p>
+      <ol>
+        <li>In Cloud Admin: Settings → Transfer Tokens → Create token (type <strong>Push</strong> or Full Access). Copy the token.</li>
+        <li>On your machine (local Strapi running): <code class="code-highlight">npm run strapi transfer -- --to https://YOUR-PROJECT.strapiapp.com/admin --to-token YOUR_TOKEN --force</code>.</li>
+        <li>Confirm when prompted. Transfer replaces Cloud data and assets with local. Liturgy days are included.</li>
+      </ol>
+      <p>If transfer fails (e.g. WebSocket closure), use Option A (REST push) instead; see <code>documentation/strapi5_export_import_transfer.html</code>.</p>
+    </div>
+    <div class="section-container usage">
+      <div class="section-header usage">Option C – Liturgy-only push (recommended when Cloud already has data)</div>
+      <p>Use when production <strong>already has tenants and other content</strong> and you only want to add or sync <strong>liturgy days</strong>. The script reads from the local database and POSTs each liturgy day to the Cloud Content API, resolving the tenant by <code>tenantId</code> so the correct Cloud tenant is linked.</p>
+      <p><strong>Script:</strong> <code class="script-name">push-liturgy-days-to-cloud.js</code></p>
+      <ol>
+        <li>Ensure the same tenant(s) exist on Cloud (e.g. <code>tenant_production_001</code> in Content Manager → Tenant).</li>
+        <li>Stop local Strapi. Run: <code class="code-highlight">node scripts/push-liturgy-days-to-cloud.js</code> (pushes all local liturgy days) or <code class="code-highlight">node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_production_001</code> to push only that tenant’s days.</li>
+        <li>Use <code class="code-highlight">DRY_RUN=1</code> to log count and first entry without sending requests.</li>
+      </ol>
+      <div class="command-block setup" data-command-base="node scripts/push-liturgy-days-to-cloud.js" data-template-command="node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_production_001">
+        <div class="command-header">
+          <span class="command-type">Push liturgy days to Cloud</span>
+          <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-push-cloud')" title="Copy template">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'cmd-push-cloud')" title="Copy command">📋 Copy</button>
+          </div>
+        </div>
+        <div class="command-parameters">
+          <h5>🔧 Customize parameters</h5>
+          <div class="parameter-group single">
+            <div class="parameter-input">
+              <label for="cmd-push-cloud-tenant">Tenant ID (optional; omit to push all):</label>
+              <input type="text" id="cmd-push-cloud-tenant" placeholder="tenant_production_001 or leave empty" oninput="updateCommand('cmd-push-cloud', 'tenant', this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="command-content" id="cmd-push-cloud">node scripts/push-liturgy-days-to-cloud.js</div>
+        <div class="command-single-line">
+          <div class="command-single-line-label">Windows single-line:</div>
+          <code id="cmd-push-cloud-single-code">node scripts/push-liturgy-days-to-cloud.js</code>
+        </div>
+      </div>
+    </div>
+
+    <h2 id="malayalam-excel">8. Update Malayalam headings from Excel</h2>
+    <div class="section-intro">
+      <p>After importing liturgy days from the English (and optionally Malayalam) PDFs, you can <strong>overwrite only the Malayalam day heading</strong> (<code>dayHeadingMalylm</code>) using an Excel file. The script does not create new records; it finds existing liturgy days by <strong>date</strong> for the given tenant and updates that single field. UTF-8 / Malayalam encoding is preserved when writing to Strapi.</p>
+    </div>
+    <div class="section-container parameters">
+      <div class="section-header parameters">What we did</div>
+      <ul>
+        <li>Added script <code class="script-name">update-liturgy-days-malayalam-from-excel.js</code>.</li>
+        <li>Input: Excel file with two columns – <code>date</code> and <code>dayHeadingMalylm</code> (e.g. <code>documentation/lectionary_calendar/Liturgy-Days-Malayalam-2026.xlsx</code>).</li>
+        <li>For each row, the script finds liturgy-day document(s) for that <strong>date</strong> and <strong>tenant</strong>, then updates only <code>dayHeadingMalylm</code>.</li>
+        <li>Dates in Excel can be Date type, Excel serial number, or string (e.g. <code>YYYY-MM-DD</code> or <code>DD/MM/YYYY</code>). Column names are matched case-insensitively.</li>
+      </ul>
+    </div>
+    <div class="section-container usage">
+      <div class="section-header usage">Run the Malayalam update (Strapi stopped)</div>
+      <p>Required: <code class="code-highlight">--tenant-id=XXX</code>. Optional: <code class="code-highlight">--excel=path</code> (default: <code>documentation/lectionary_calendar/Liturgy-Days-Malayalam-2026.xlsx</code>), <code class="code-highlight">DRY_RUN=1</code> to preview without writing.</p>
+      <div class="command-block setup" data-command-base="node scripts/update-liturgy-days-malayalam-from-excel.js" data-template-command="node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001">
+        <div class="command-header">
+          <span class="command-type">Update Malayalam headings from Excel</span>
+          <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-prod-malayalam')" title="Copy template">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'cmd-prod-malayalam')" title="Copy command">📋 Copy</button>
+          </div>
+        </div>
+        <div class="command-parameters">
+          <h5>🔧 Customize parameters</h5>
+          <div class="parameter-group single">
+            <div class="parameter-input">
+              <label for="cmd-prod-malayalam-tenant">Tenant ID:</label>
+              <input type="text" id="cmd-prod-malayalam-tenant" placeholder="tenant_production_001" value="tenant_production_001" oninput="updateCommand('cmd-prod-malayalam', 'tenant', this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="command-content" id="cmd-prod-malayalam">node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001</div>
+        <div class="command-single-line">
+          <div class="command-single-line-label">Windows single-line:</div>
+          <code id="cmd-prod-malayalam-single-code">node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001</code>
+        </div>
+      </div>
+    </div>
+
+    <h2 id="translation-workflow">9. Translation workflow: PDF to Malayalam (Google Nana Banana)</h2>
+    <div class="section-intro">
+      <p>To produce the Malayalam Excel used in <a href="#malayalam-excel">section 7</a>, we used <strong>Google Nana Banana</strong> (or similar AI tool) to translate the English text from the PDF into Malayalam. The steps we followed:</p>
+    </div>
+    <div class="section-container output">
+      <div class="section-header output">Steps to get Malayalam text and generate the Excel</div>
+      <ol>
+        <li><strong>Copy the text from the PDF file</strong> – Extract or copy the English liturgical day headings (and any other text you want translated) from the source PDF.</li>
+        <li><strong>Paste the text into Google Nana Banana</strong> with the instruction: <code class="code-highlight">Decode the text to malayalam language</code> – The tool translated the content to Malayalam. You can also provide an image of the PDF page if the tool supports image input; we gave it the image and it translated everything for us.</li>
+        <li><strong>Generate the Excel sheet</strong> – Create a spreadsheet with two columns: <code>date</code> (YYYY-MM-DD or equivalent) and <code>dayHeadingMalylm</code>. Paste the translated Malayalam text into <code>dayHeadingMalylm</code>, one row per liturgy day. Save as <code>documentation/lectionary_calendar/Liturgy-Days-Malayalam-2026.xlsx</code> (or your chosen path) with UTF-8 / Unicode so Malayalam characters are preserved.</li>
+      </ol>
+      <p>Using this workflow, we had everything translated from the PDF into Malayalam via the tool, then generated the Excel sheet and ran <code class="script-name">update-liturgy-days-malayalam-from-excel.js</code> to update only the <code>dayHeadingMalylm</code> field in the Strapi database.</p>
+    </div>
+
+    <h2 id="related">10. Related documentation</h2>
+    <ul>
+      <li><a href="lectionary-bulk-import-guide.html">Lectionary Bulk Import from PDFs</a> – delete/import scripts, options, troubleshooting.</li>
+      <li><a href="liturgy-calendar-api-reference.html">Liturgy Day API Reference</a> – frontend integration and API usage.</li>
+      <li><a href="liturgical-calendar-strapi-server.html">Liturgical Calendar – Strapi Server Specification</a> – content model and schema.</li>
+      <li><a href="lectionary-pdf-to-excel-and-import.html">PDF to Excel and Import</a> – PDF paths, mapping, and export.</li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid #ddd; margin: 2rem 0;">
+    <p style="font-size: 0.875rem; color: #666;">Liturgy Days – Tenant Relation Fixes &amp; Production Replication. Part of <code>documentation/lectionary_calendar/</code>. Styling follows the project HTML documentation guide.</p>
+  </main>
+
+  <script>
+    const commandParams = {};
+    function updateCommand(commandId, paramName, paramValue) {
+      if (!commandParams[commandId]) commandParams[commandId] = {};
+      commandParams[commandId][paramName] = paramValue;
+      const el = document.getElementById(commandId);
+      const block = el && el.closest('.command-block');
+      if (!block || !el) return;
+      const base = block.getAttribute('data-command-base');
+      let cmd = base;
+      const p = commandParams[commandId] || {};
+      if (commandId === 'cmd-prod-delete') {
+        if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
+      } else if (commandId === 'cmd-prod-import') {
+        if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
+        if (p.year) cmd += ' --year=' + p.year;
+      } else if (commandId === 'cmd-prod-assign') {
+        if (p.email) cmd += ' ' + p.email;
+        if (p.tenant) cmd += ' ' + p.tenant;
+        cmd = cmd.trim();
+      } else if (commandId === 'cmd-prod-verify') {
+        if (p.email) cmd += ' ' + p.email;
+        cmd = cmd.trim();
+      } else if (commandId === 'cmd-prod-malayalam') {
+        if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
+      } else if (commandId === 'cmd-push-cloud') {
+        if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
+      }
+      el.textContent = cmd;
+      const single = document.getElementById(commandId + '-single-code');
+      if (single) single.textContent = cmd;
+    }
+    function copyCommand(button, commandId) {
+      const el = document.getElementById(commandId);
+      if (!el) return;
+      const text = el.textContent.trim();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          button.classList.add('copied');
+          button.textContent = '✓ Copied!';
+          setTimeout(function() { button.classList.remove('copied'); button.textContent = '📋 Copy'; }, 2000);
+        });
+      }
+    }
+    function copyTemplateCommand(button, commandId) {
+      const el = document.getElementById(commandId);
+      const block = el && el.closest('.command-block');
+      let text = block ? block.getAttribute('data-template-command') : '';
+      if (text) text = text.replace(/&quot;/g, '"');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          button.classList.add('copied');
+          button.textContent = '✓ Copied!';
+          setTimeout(function() { button.classList.remove('copied'); button.textContent = '📄 Template'; }, 2000);
+        });
+      }
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      ['cmd-prod-delete', 'cmd-prod-import', 'cmd-prod-assign', 'cmd-prod-verify', 'cmd-prod-malayalam', 'cmd-push-cloud'].forEach(function(id) {
+        var block = document.getElementById(id) && document.getElementById(id).closest('.command-block');
+        if (!block) return;
+        var tenantIn = block.querySelector('input[id$="-tenant"]');
+        var emailIn = block.querySelector('input[id$="-email"]');
+        var yearIn = block.querySelector('input[id$="-year"]');
+        if (tenantIn && tenantIn.value) updateCommand(id, 'tenant', tenantIn.value);
+        if (emailIn && emailIn.value) updateCommand(id, 'email', emailIn.value);
+        if (yearIn && yearIn.value) updateCommand(id, 'year', yearIn.value);
+      });
+    });
+  </script>
+</body>
+</html>
