@@ -273,6 +273,10 @@ async function fetchWithRetry(url, options, logPrefix) {
       return text ? JSON.parse(text) : {};
     } catch (err) {
       lastErr = err;
+      // Do not retry on validation errors (400) – they won't succeed on retry
+      if (/HTTP 400\b/.test(err.message)) {
+        throw err;
+      }
       if (attempt < RETRY_LIMIT) {
         const delay = RETRY_DELAY_MS * Math.pow(2, attempt);
         console.warn(`${logPrefix} retry ${attempt + 1}/${RETRY_LIMIT} in ${delay}ms: ${err.message}`);
@@ -780,6 +784,8 @@ async function main() {
     ...typeList.filter(t => PUSH_FIRST.includes(typeToPlural[t])),
     ...typeList.filter(t => !PUSH_FIRST.includes(typeToPlural[t])),
   ];
+  // Slug -> documentId cache for this push (avoids duplicate slug within same run; key = plural:normalizedSlug)
+  const slugToDocId = new Map();
   for (const type of typesOrder) {
     const list = entitiesByType[type];
     const plural = typeToPlural[type];
@@ -804,11 +810,21 @@ async function main() {
         if (DELAY_BETWEEN_REQUESTS_MS > 0 && i > 0) await sleep(DELAY_BETWEEN_REQUESTS_MS);
         const { ref, plain, id: exportId } = batch[i];
         const payload = sanitizeForApi(plain);
-        // Avoid duplicate entries (e.g. same category with different slug casing): reuse existing by normalized slug.
+        const slugKey = payload.slug ? `${plural}:${normalizeSlug(payload.slug)}` : null;
+        // Reuse if we already created/found a document for this slug in this run (avoids duplicate-slug 400)
+        if (slugKey && slugToDocId.has(slugKey)) {
+          const existingId = slugToDocId.get(slugKey);
+          setDocIdMap(ref, exportId, existingId);
+          ok++;
+          console.warn(`[${plural}] Duplicate slug in export: reusing documentId for slug "${payload.slug}" (ref ${ref}). Fix locally and re-export for unique slugs.`);
+          continue;
+        }
+        // Avoid duplicate entries (e.g. same category with different slug casing): reuse existing on Cloud by normalized slug.
         if (payload.slug) {
           const existingId = await findExistingBySlugCaseInsensitive(CLOUD_URL, plural, payload.slug);
           if (existingId) {
             setDocIdMap(ref, exportId, existingId);
+            if (slugKey) slugToDocId.set(slugKey, existingId);
             ok++;
             continue;
           }
@@ -820,6 +836,7 @@ async function main() {
           }, `${plural} batch ${batchNum} entry ${i + 1}`);
           const newId = res?.data?.documentId;
           setDocIdMap(ref, exportId, newId);
+          if (slugKey && newId) slugToDocId.set(slugKey, newId);
           ok++;
         } catch (err) {
           const isUniqueError = /unique|must be unique/i.test(err.message);
@@ -828,6 +845,7 @@ async function main() {
               || await findExistingBySlugCaseInsensitive(CLOUD_URL, plural, payload.slug);
             if (existingId) {
               setDocIdMap(ref, exportId, existingId);
+              if (slugKey) slugToDocId.set(slugKey, existingId);
               ok++;
             } else {
               console.error(`✖ ${plural} batch ${batchNum} entry ${i + 1} (ref ${ref}):`, err.message);

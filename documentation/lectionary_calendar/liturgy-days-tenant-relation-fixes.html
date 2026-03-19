@@ -404,8 +404,8 @@
       <div class="section-header">Option A – Full export + REST push (existing process)</div>
       <p>Use when production is <strong>empty</strong> or you want to push <strong>all</strong> content (including liturgy days) from local to Cloud. Liturgy days are included in the export and pushed after tenants so the tenant relation can be linked.</p>
       <ol>
-        <li>Stop local Strapi. Create export: <code class="code-highlight">npm run strapi export -- --no-encrypt -f my-export</code> → <code>my-export.tar.gz</code>.</li>
-        <li>Push to Cloud: <code class="code-highlight">npm run push:rest-to-cloud -- my-export.tar.gz</code>. Env: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code>.</li>
+        <li>Stop local Strapi. Create export: <code class="code-highlight">npm run strapi export -- --no-encrypt -f my-export</code> → <code>my-export.tar.gz</code> (if export reports 403 on assets, the archive is still valid).</li>
+        <li>Push to Cloud: <code class="code-highlight">npm run push:rest-to-cloud -- my-export-4.tar.gz --uploads=local</code>. Images are read from <code class="code-highlight">public/uploads</code> and uploaded to Cloud — recommended when export could not bundle asset bytes. Env: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code>. See <a href="../strapi5_export_import_transfer.html#push-rest-local-images">Push to Cloud with images from local</a> in the main transfer doc for the full command block and details.</li>
         <li>Liturgy days are pushed in dependency order (tenants first, then <code>liturgy-days</code>). Phase 2 restores the <code>tenant</code> relation on each liturgy day.</li>
       </ol>
       <p>If Cloud already has data, consider Option C to push only liturgy days and avoid re-pushing everything.</p>
@@ -422,13 +422,27 @@
     </div>
     <div class="section-container usage">
       <div class="section-header usage">Option C – Liturgy-only push (recommended when Cloud already has data)</div>
-      <p>Use when production <strong>already has tenants and other content</strong> and you only want to add or sync <strong>liturgy days</strong>. The script reads from the local database and POSTs each liturgy day to the Cloud Content API, resolving the tenant by <code>tenantId</code> so the correct Cloud tenant is linked.</p>
+      <p>Use when production already has (or should have) content and you want to add or sync <strong>liturgy days</strong>. The script:</p>
+      <ul>
+        <li><strong>Resolves tenant</strong> from the local entity table so <code>tenantId</code> is never undefined (fixes “tenant undefined not found on Cloud”).</li>
+        <li><strong>Creates missing tenants on Cloud</strong> – if a tenant (e.g. <code>tenant_demo_002</code>) does not exist on Cloud, it is created from local data so no entries are skipped.</li>
+        <li><strong>Upsert</strong> – for each liturgy day: if a record for the same date and tenant already exists on Cloud, it is updated (PUT); otherwise a new one is created (POST).</li>
+        <li><strong>Follow-up PUT for tenant relation</strong> – after each create (POST), the script sends a PUT with <code>tenant</code> so the relation is set even if the Content API did not persist it on create. This ensures editors (who are filtered by tenant) see the entries.</li>
+      </ul>
       <p><strong>Script:</strong> <code class="script-name">push-liturgy-days-to-cloud.js</code></p>
       <ol>
-        <li>Ensure the same tenant(s) exist on Cloud (e.g. <code>tenant_production_001</code> in Content Manager → Tenant).</li>
-        <li>Stop local Strapi. Run: <code class="code-highlight">node scripts/push-liturgy-days-to-cloud.js</code> (pushes all local liturgy days) or <code class="code-highlight">node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_production_001</code> to push only that tenant’s days.</li>
-        <li>Use <code class="code-highlight">DRY_RUN=1</code> to log count and first entry without sending requests.</li>
+        <li>Stop local Strapi. Run: <code class="code-highlight">node scripts/push-liturgy-days-to-cloud.js</code> (all local liturgy days) or <code class="code-highlight">node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code> for one tenant.</li>
+        <li>Use <code class="code-highlight">DRY_RUN=1</code> to log count and resolved tenantId without sending requests.</li>
+        <li><strong>Editor Tenant Assignment on Cloud:</strong> So that editors see liturgy days in Content Manager, create an <strong>Editor Tenant Assignment</strong> in <strong>Cloud Admin</strong>: Content Manager → Editor Tenant Assignment → Create new entry → set <code>adminUserEmail</code> to the editor’s login email (e.g. <code>mosc.regular.user@keleno.com</code>) and <code>tenant</code> to the same tenant (e.g. the one with <code>tenantId</code> <code>tenant_demo_002</code>). Save, then have the editor log out and log back in on the Cloud admin URL.</li>
       </ol>
+      <div class="warning">
+        <strong>If editors still don’t see liturgy days (admin sees 166, editor sees 0):</strong> The tenant relation may not have been set on the created records. <strong>Delete liturgy days on Cloud and reimport:</strong>
+        <ol>
+          <li>Delete on Cloud: <code class="code-highlight">node scripts/clear_cloud_data.js --remote --types=liturgy-days</code> (uses <code>STRAPI_CLOUD_URL</code> and <code>STRAPI_CLOUD_API_TOKEN</code>). Optional: <code class="code-highlight">--dry-run</code> to list count first.</li>
+          <li>Re-run push: <code class="code-highlight">node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code>. The script now does a follow-up PUT after each create to set the tenant relation.</li>
+          <li>On Cloud Admin, ensure <strong>Editor Tenant Assignment</strong> exists for the editor’s email and the same tenant, then have the editor log out and log back in.</li>
+        </ol>
+      </div>
       <div class="command-block setup" data-command-base="node scripts/push-liturgy-days-to-cloud.js" data-template-command="node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_production_001">
         <div class="command-header">
           <span class="command-type">Push liturgy days to Cloud</span>

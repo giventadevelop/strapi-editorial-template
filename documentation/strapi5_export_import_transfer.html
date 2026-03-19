@@ -45,6 +45,31 @@
     td code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; font-family: 'Courier New', monospace; border: 1px solid #b8d4e3; }
     .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1); }
     .section-intro code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; border: 1px solid #b8d4e3; }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3); }
+    .section-container { background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1); }
+    .section-container.usage { background: linear-gradient(135deg, #f0e6ff 0%, #e6ccff 100%); border-left-color: #9c27b0; }
+    .section-header { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; padding: 12px 20px; margin: -20px -20px 20px -20px; border-radius: 8px 8px 0 0; font-size: 1.2em; font-weight: bold; }
+    .section-header.usage { background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; padding: 0; margin: 1rem 0; overflow: hidden; }
+    .command-block.setup { background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-color: #2196f3; }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-type { font-weight: bold; color: #0d3b66; }
+    .command-header-buttons { display: flex; gap: 8px; }
+    .copy-button, .copy-button-template { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; font-weight: bold; transition: all 0.3s ease; }
+    .copy-button { background: #0066cc; color: white; }
+    .copy-button:hover { background: #0052a3; }
+    .copy-button-template { background: #6c757d; color: white; }
+    .copy-button-template:hover { background: #5a6268; }
+    .copy-button.copied, .copy-button-template.copied { background: #28a745; }
+    .command-parameters { padding: 15px; background: rgba(255,255,255,0.5); border-bottom: 1px solid rgba(0,0,0,0.1); }
+    .command-parameters h5 { margin: 0 0 12px 0; font-size: 0.9em; color: #333; font-weight: bold; }
+    .parameter-group.single { display: block; margin-bottom: 10px; }
+    .parameter-input label { font-size: 0.8em; color: #555; font-weight: 600; display: block; margin-bottom: 4px; }
+    .parameter-input input { padding: 8px 12px; border: 2px solid #ddd; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9em; width: 100%; max-width: 320px; }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
+    .command-single-line { padding: 12px 15px; background: #e8f4f8; border-top: 1px solid #b8d4e3; }
+    .command-single-line-label { font-size: 0.8em; color: #666; margin-bottom: 4px; }
+    .command-single-line code { background: #e8f4f8; color: #0d3b66; padding: 4px 8px; border: 1px solid #b8d4e3; }
     @media (max-width: 768px) { body { padding: 10px; } }
   </style>
 </head>
@@ -79,6 +104,9 @@
       <li><a href="#quickref">Quick reference</a></li>
       <li><a href="#docs">Official documentation</a></li>
       <li><a href="#rest-push-summary">REST push – summary and helper scripts</a></li>
+      <li><a href="#push-rest-local-images">Push to Cloud with images from local (recommended)</a></li>
+      <li><a href="#duplicate-slug">Duplicate slug (ValidationError: must be unique)</a></li>
+      <li><a href="#editors-see-no-data">Why editors see no data (only superadmin sees content)</a></li>
       <li><a href="#export-strip-uploads">Export: exclude upload.file entities (strip script)</a></li>
       <li><a href="REST_PUSH_ISSUES_AND_PROMPT.html">REST push – issues, fixes, docs &amp; effective prompt</a></li>
     </ol>
@@ -654,20 +682,19 @@ GET /admin/transfer/runner/push (1233 ms) 200
   </ul>
 
   <h4>Run the script</h4>
+  <div class="info">
+    <strong>You don’t need to create the tenant or Editor Tenant Assignment on Cloud before the push.</strong> The push script creates them from your export: it pushes tenants first, then Editor Tenant Assignment entries, and Phase 2 links each assignment to the correct tenant. Ensure the Cloud admin user who will act as the editor already exists (matching is by email); admin users are not pushed.
+  </div>
   <p>From the project root, create an export and push it to Cloud:</p>
   <ol>
     <li>Create an export (if you don’t have one):
       <pre><code>npm run strapi export -- --no-encrypt -f my-export</code></pre>
       This creates <code>my-export.tar.gz</code> in the project root.
     </li>
-    <li>Set environment variables and run the push script:
+    <li>Set environment variables and run the push script. To push content and images (reading images from <code>public/uploads</code>), use <code>--uploads=local</code> — see <a href="#push-rest-local-images">Push to Cloud with images from local</a> for the recommended command block.
       <pre><code>set STRAPI_CLOUD_URL=https://YOUR-PROJECT.strapiapp.com
 set STRAPI_CLOUD_API_TOKEN=your-full-access-api-token
-node scripts/rest_api_push_to_cloud.js my-export.tar.gz</code></pre>
-      Or with npm (pass the export file as an argument):
-      <pre><code>set STRAPI_CLOUD_URL=https://YOUR-PROJECT.strapiapp.com
-set STRAPI_CLOUD_API_TOKEN=your-full-access-api-token
-npm run push:rest-to-cloud -- my-export.tar.gz</code></pre>
+npm run push:rest-to-cloud -- my-export-4.tar.gz --uploads=local</code></pre>
       On Linux/macOS use <code>export STRAPI_CLOUD_URL=...</code> instead of <code>set</code>.
     </li>
     <li>Optional env: <code>REST_PUSH_BATCH_SIZE=20</code>, <code>REST_PUSH_RETRY_LIMIT=3</code> (or use flag <code>--retry=N</code>, e.g. <code>--retry=1</code> for no retries), <code>REST_PUSH_DELAY_MS=100</code> (delay between requests to avoid rate limits), <code>REST_PUSH_DRY_RUN=1</code> to only parse the export and log without sending requests. <code>REST_PUSH_INCLUDE_UPLOADS=0</code> skips Phase 0 (no media push; cover will stay empty).</li>
@@ -704,8 +731,36 @@ npm run push:rest-to-cloud -- my-export.tar.gz</code></pre>
   <p><strong>Start fresh:</strong> Clear all collection data on Cloud, then re-run the push so relations are applied correctly (dependency order + phase 2). Use the clear script (same env as push):</p>
   <pre><code>set STRAPI_CLOUD_URL=https://YOUR-PROJECT.strapiapp.com
 set STRAPI_CLOUD_API_TOKEN=your-token
-npm run clear:cloud-data</code></pre>
+npm run clear:cloud-data -- --remote</code></pre>
   <p>Then run <code>npm run push:rest-to-cloud -- your-export.tar.gz</code> again. Optionally use <code>--dry-run</code> with the clear script to only list what would be deleted.</p>
+
+  <h4 id="duplicate-slug">Duplicate slug (ValidationError: This attribute must be unique)</h4>
+  <p>If the push fails with <code>HTTP 400</code> and <code>"path":["slug"],"message":"This attribute must be unique"</code>, your export contains two or more articles (or other content with <code>slug</code>) that share the same slug. Strapi requires <code>slug</code> to be unique per content type; it is used for URLs (e.g. <code>/article/my-article</code>), SEO, and as a stable human-readable identifier.</p>
+  <p><strong>Fix locally first:</strong> Run the fix script against your <strong>local</strong> Strapi so all article slugs are unique, then re-export and push:</p>
+  <pre><code>set STRAPI_LOCAL_URL=http://localhost:1337
+set STRAPI_LOCAL_API_TOKEN=your-full-access-token
+node scripts/fix-duplicate-article-slugs.js</code></pre>
+  <p>Use <code>--dry-run</code> to list duplicates and the new slugs that would be applied (e.g. <code>my-slug</code> → <code>my-slug-2</code>, <code>my-slug-3</code>). Then run without <code>--dry-run</code>, create a new export, and push again.</p>
+  <p><strong>Push script behavior:</strong> The push script does <strong>not</strong> retry on HTTP 400 (validation errors do not succeed on retry), so you will see one error per duplicate instead of three retries. If a duplicate slug is detected within the same run, the script reuses the documentId already created for that slug and logs a warning — but fixing slugs locally and re-exporting is the right long-term fix so each entry keeps its own content.</p>
+
+  <h4 id="editors-see-no-data">Why editors see no data (only superadmin sees content)</h4>
+  <p>After a successful push, <strong>superadmin</strong> sees all content (no tenant filter). <strong>Editors</strong> only see entries whose <code>tenant</code> relation matches their Editor Tenant Assignment. If editors see empty lists while superadmin sees everything, the cause is usually one of these:</p>
+  <ol>
+    <li><strong>Tenant relation not set on content</strong> – Phase 2 of the push script should set <code>tenant</code> (and category, author, cover) on each document via PUT with <code>connect</code>. If relation links from the export were not merged (low &quot;links matched&quot; count), or the tenant’s Cloud <code>documentId</code> was not in the map, Phase 2 skips the tenant link and the document ends up with no tenant. The content-manager then filters by <code>tenant = editor’s tenant</code>, so those documents are hidden from the editor.</li>
+    <li><strong>Editor Tenant Assignment on Cloud</strong> – The assignment must exist <strong>on the Cloud instance</strong> (Content Manager → Editor Tenant Assignment) with <code>adminUserEmail</code> equal to the editor’s <strong>exact</strong> login email and <code>tenant</code> set to the same tenant (e.g. MOSC / <code>tenant_demo_002</code>). Matching is by email; the Cloud admin user must have that email. If you created the assignment before the push, ensure it was created in <strong>Cloud Admin</strong>, not only locally. After changing the assignment, have the editor log out and log back in.</li>
+  </ol>
+  <p><strong>What to check:</strong></p>
+  <ul>
+    <li>Re-run the push and look at the log: <code>Merged … relation links … X links matched entities</code>. If X is 0 or very low, tenant (and other relations) are not being merged from the export, so Phase 2 has nothing to patch. Also look for <code>[Phase 2] … field "tenant" target(s) not in map</code> – that means the tenant’s ref was not in <code>docIdMap</code> (e.g. tenant not pushed first or ref mismatch).</li>
+    <li>In Cloud Admin, open an article (or liturgy day) that the editor should see and check if <strong>Tenant</strong> is set. If it is empty, the tenant relation was not applied during push.</li>
+    <li>In Cloud Admin → Editor Tenant Assignment: confirm one entry with the editor’s email and tenant MOSC. If the push also created editor-tenant entries, there may be duplicates; ensure the entry that has <code>tenant</code> linked to the correct tenant is the one used (list is matched by email).</li>
+  </ul>
+  <p><strong>Fixes:</strong></p>
+  <ul>
+    <li>If tenant is missing on content: clear Cloud collection data and re-push (with dependency order so tenants exist before articles/liturgy-days). Ensure the push log shows a healthy &quot;links matched&quot; count and no &quot;target(s) not in map&quot; for tenant.</li>
+    <li>For <strong>articles</strong> only: you can run <code class="script-name">fix_production_tenant_and_dates.js</code> (requires the migration endpoint deployed on Cloud) to set tenant and optionally <code>publishedAt</code> on existing Cloud articles.</li>
+    <li>For <strong>liturgy days</strong>: use <code>node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code>; that script does a follow-up PUT to set the tenant relation after each create. See <a href="lectionary_calendar/liturgy-days-tenant-relation-fixes.html">liturgy-days-tenant-relation-fixes.html</a>.</li>
+  </ul>
 
   <h3 id="rest-push-summary">10.1.6 REST push – summary and helper scripts</h3>
   <p>This subsection summarizes the REST API push flow, upload behavior, relation handling, and the helper scripts used with it.</p>
@@ -718,6 +773,42 @@ npm run clear:cloud-data</code></pre>
     <li><strong>Phase 2 (relations)</strong> – Restores category, tenant, author, cover, diocese, and other relation fields via PUT with <code>connect</code>. Relation data comes from the export’s <code>links/</code> (and any relations embedded in entity rows); links are merged into entity meta so patches run for all entities that have relations.</li>
   </ul>
 
+  <h4 id="push-rest-local-images">Push to Cloud with images from local (recommended)</h4>
+  <div class="section-intro">
+    <p>When <code>strapi export</code> finishes but reports <strong>403</strong> during the assets phase, the export archive is still valid (schemas, entities, links, and upload <em>metadata</em> are included). The script cannot fetch image bytes from S3 or private URLs, so <strong>the only reliable way to push content and images to Cloud is to pass <code class="code-highlight">--uploads=local</code></strong>. The script then reads each referenced media file from <code class="code-highlight">public/uploads</code> (by filename) and POSTs it to Cloud <code>/api/upload</code>, then links <code>cover</code> and other media in Phase 2.</p>
+    <p><strong>When to use:</strong> Export got 403 on assets; or you use S3 with private URLs; or you have the same files in <code class="code-highlight">public/uploads</code>. Ensure your export filename matches the archive you created (e.g. <code class="code-highlight">my-export-4.tar.gz</code>).</p>
+  </div>
+  <div class="section-container usage">
+    <div class="section-header usage">Push to Cloud (content + images from local)</div>
+    <p>Script: <code class="script-name">rest_api_push_to_cloud.js</code>. Set <code class="code-highlight">STRAPI_CLOUD_URL</code> and <code class="code-highlight">STRAPI_CLOUD_API_TOKEN</code> in the environment (or <code class="code-highlight">.env</code>).</p>
+    <div class="info">
+      <strong>Images:</strong> With <code class="code-highlight">--uploads=local</code>, the script looks up each referenced file (e.g. article <code>cover</code>) under <code class="code-highlight">public/uploads</code> by filename and uploads from disk to Cloud. This is the recommended option when export could not bundle asset bytes (403) or when using private S3 URLs.
+    </div>
+    <div class="command-block setup" data-command-base="npm run push:rest-to-cloud --" data-template-command="npm run push:rest-to-cloud -- my-export-4.tar.gz --uploads=local">
+      <div class="command-header">
+        <span class="command-type">Push export to Cloud (local images)</span>
+        <div class="command-header-buttons">
+          <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-push-rest-cloud')" title="Copy template">📄 Template</button>
+          <button class="copy-button" onclick="copyCommand(this, 'cmd-push-rest-cloud')" title="Copy command">📋 Copy</button>
+        </div>
+      </div>
+      <div class="command-parameters">
+        <h5>🔧 Customize parameters</h5>
+        <div class="parameter-group single">
+          <div class="parameter-input">
+            <label for="cmd-push-rest-cloud-exportfile">Export file (e.g. my-export-4.tar.gz):</label>
+            <input type="text" id="cmd-push-rest-cloud-exportfile" placeholder="my-export-4.tar.gz" value="my-export-4.tar.gz" oninput="updatePushRestCommand()">
+          </div>
+        </div>
+      </div>
+      <div class="command-content" id="cmd-push-rest-cloud">npm run push:rest-to-cloud -- my-export-4.tar.gz --uploads=local</div>
+      <div class="command-single-line">
+        <div class="command-single-line-label">Windows single-line:</div>
+        <code id="cmd-push-rest-cloud-single-code">npm run push:rest-to-cloud -- my-export-4.tar.gz --uploads=local</code>
+      </div>
+    </div>
+  </div>
+
   <h4>Helper scripts (same env: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code>)</h4>
   <table>
     <thead>
@@ -726,7 +817,7 @@ npm run clear:cloud-data</code></pre>
     <tbody>
       <tr>
         <td>Clear data (remote or local)</td>
-        <td><code>npm run clear:cloud-data</code> or <code>npm run clear:cloud-data -- --local</code></td>
+        <td><code>npm run clear:cloud-data -- --remote</code> or <code>npm run clear:cloud-data -- --local</code></td>
         <td>Deletes all collection-type documents. Default: <strong>remote</strong> (STRAPI_CLOUD_URL). Use <code>--local</code> for local Strapi (STRAPI_LOCAL_URL, STRAPI_LOCAL_API_TOKEN). Options: <code>--types=articles,parishes</code>, <code>--dry-run</code>.</td>
       </tr>
       <tr>
@@ -736,7 +827,7 @@ npm run clear:cloud-data</code></pre>
       </tr>
       <tr>
         <td>REST push</td>
-        <td><code>npm run push:rest-to-cloud -- my-export.tar.gz</code></td>
+        <td><code>npm run push:rest-to-cloud -- my-export.tar.gz</code> or with local images: <code>npm run push:rest-to-cloud -- my-export.tar.gz --uploads=local</code></td>
         <td>Pushes export content to Cloud via the Content API (phases 0–2). Options: <code>--retry=0</code> / <code>--retry=1</code>; <code>--uploads=local</code> to read media from <code>public/uploads</code>. Env: <code>REST_PUSH_INCLUDE_UPLOADS=1</code> (default) or <code>0</code>; <code>REST_PUSH_UPLOAD_SOURCE=local</code> for local uploads.</td>
       </tr>
       <tr>
@@ -750,8 +841,8 @@ npm run clear:cloud-data</code></pre>
   <h4>Typical order of operations</h4>
   <ol>
     <li>Optional: <code>npm run cloud:keep-five</code> or <code>npm run cloud:keep-five -- --local</code> to keep only 5 records per type (parish, diocese, bishops, priests, articles) on remote or local.</li>
-    <li>Optional: <code>npm run clear:cloud-data</code> or <code>npm run clear:cloud-data -- --local</code> to remove all collection data before a full re-push (remote or local).</li>
-    <li><code>npm run push:rest-to-cloud -- my-export-3-prod.tar.gz</code> (or your export filename).</li>
+    <li>Optional: <code>npm run clear:cloud-data -- --remote</code> or <code>npm run clear:cloud-data -- --local</code> to remove all collection data before a full re-push. You must pass <code>--remote</code> or <code>--local</code>.</li>
+    <li><code>npm run push:rest-to-cloud -- my-export-3-prod.tar.gz</code> (or your export filename). <strong>No need to create tenant or Editor Tenant Assignment on Cloud first</strong> — the push creates them from the export.</li>
   </ol>
   <p><strong>Target:</strong> With no flag (or <code>--remote</code>), scripts use <code>STRAPI_CLOUD_URL</code> and <code>STRAPI_CLOUD_API_TOKEN</code>. With <code>--local</code>, they use <code>STRAPI_LOCAL_URL</code> (default <code>http://localhost:1337</code>) and <code>STRAPI_LOCAL_API_TOKEN</code> (create a Full Access API token in local admin → Settings → API Tokens).</p>
 
@@ -834,8 +925,8 @@ npm run clear:cloud-data</code></pre>
       <tr><td>Avoid KnexTimeoutError during import (SQLite)</td><td>Add <code>DATABASE_CONNECTION_TIMEOUT=600000</code> to <code>.env</code> before import (see §7.3.1)</td></tr>
       <tr><td>Deploy to Strapi Cloud</td><td><code>npx strapi login</code> then <code>npx strapi deploy</code></td></tr>
       <tr><td>Transfer into Strapi Cloud</td><td>Create Push token in Cloud admin; on self-hosted: <code>strapi transfer --to https://your-project.strapiapp.com/admin</code></td></tr>
-      <tr><td>REST push to Cloud (bypass WebSocket)</td><td>Set <code>STRAPI_CLOUD_URL</code> and <code>STRAPI_CLOUD_API_TOKEN</code>; then <code>npm run push:rest-to-cloud -- my-export.tar.gz</code>. Optional: <code>--retry=0</code>, <code>--retry=1</code>, <code>--uploads=local</code> (read media from <code>public/uploads</code>). See §10.1.5 and §10.1.6.</td></tr>
-      <tr><td>Clear collection data (remote or local)</td><td><code>npm run clear:cloud-data</code> (remote) or <code>npm run clear:cloud-data -- --local</code> (local). Optional: <code>--dry-run</code>, <code>--types=articles,parishes</code></td></tr>
+      <tr><td>REST push to Cloud (bypass WebSocket)</td><td>Set <code>STRAPI_CLOUD_URL</code> and <code>STRAPI_CLOUD_API_TOKEN</code>; then <code>npm run push:rest-to-cloud -- my-export-4.tar.gz --uploads=local</code> to push content and images from <code>public/uploads</code>. See <a href="#push-rest-local-images">Push to Cloud with images from local</a> and §10.1.5–10.1.6.</td></tr>
+      <tr><td>Clear collection data (remote or local)</td><td><code>npm run clear:cloud-data -- --remote</code> (Cloud/prod) or <code>--local</code>. Required: one of <code>--remote</code> or <code>--local</code>. Optional: <code>--dry-run</code>, <code>--types=articles,parishes</code></td></tr>
       <tr><td>Keep 5 records per type (remote or local)</td><td><code>npm run cloud:keep-five</code> (remote) or <code>npm run cloud:keep-five -- --local</code> (local). Optional: <code>--dry-run</code></td></tr>
       <tr><td>Strip upload.file entities from export</td><td><code>npm run export:strip-uploads -- my-export.tar.gz</code> → produces <code>my-export.no-uploads.tar.gz</code> (see §10.1.7)</td></tr>
     </tbody>
@@ -854,6 +945,7 @@ npm run clear:cloud-data</code></pre>
   <script>
     (function() {
       document.querySelectorAll('pre').forEach(function(pre) {
+        if (pre.closest('.command-block')) return;
         var wrap = document.createElement('div');
         wrap.className = 'command-wrap';
         var btn = document.createElement('button');
@@ -900,6 +992,47 @@ npm run clear:cloud-data</code></pre>
           }, 2000);
         } catch (e) {}
         document.body.removeChild(ta);
+      }
+
+      function updatePushRestCommand() {
+        var input = document.getElementById('cmd-push-rest-cloud-exportfile');
+        var exportFile = (input && input.value.trim()) ? input.value.trim() : 'my-export-4.tar.gz';
+        var cmd = 'npm run push:rest-to-cloud -- ' + exportFile + ' --uploads=local';
+        var el = document.getElementById('cmd-push-rest-cloud');
+        var single = document.getElementById('cmd-push-rest-cloud-single-code');
+        if (el) el.textContent = cmd;
+        if (single) single.textContent = cmd;
+      }
+      function copyCommand(button, commandId) {
+        var el = document.getElementById(commandId);
+        if (!el) return;
+        var text = el.textContent.trim();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(function() {
+            button.classList.add('copied');
+            button.textContent = '✓ Copied!';
+            setTimeout(function() {
+              button.classList.remove('copied');
+              button.textContent = '📋 Copy';
+            }, 2000);
+          }).catch(function() { fallbackCopy(text, button); });
+        } else { fallbackCopy(text, button); }
+      }
+      function copyTemplateCommand(button, commandId) {
+        var block = button.closest('.command-block');
+        var template = block ? block.getAttribute('data-template-command') : '';
+        if (!template) return;
+        template = template.replace(/&quot;/g, '"');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(template).then(function() {
+            button.classList.add('copied');
+            button.textContent = '✓ Copied!';
+            setTimeout(function() {
+              button.classList.remove('copied');
+              button.textContent = '📄 Template';
+            }, 2000);
+          }).catch(function() { fallbackCopy(template, button); });
+        } else { fallbackCopy(template, button); }
       }
     })();
   </script>

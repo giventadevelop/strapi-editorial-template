@@ -8,15 +8,15 @@
  * tenant, author) or media (cover) are empty, and you want to start fresh and
  * re-push from export.
  *
- * Target:
+ * Target (required – pass exactly one):
  *   --local   Use local Strapi (STRAPI_LOCAL_URL, STRAPI_LOCAL_API_TOKEN). Default URL: http://localhost:1337
- *   --remote  Use remote/Cloud (STRAPI_CLOUD_URL, STRAPI_CLOUD_API_TOKEN). This is the default if no flag.
+ *   --remote  Use remote/Cloud/production (STRAPI_CLOUD_URL, STRAPI_CLOUD_API_TOKEN)
  *
- * Usage (remote/Cloud):
+ * Usage (remote/Cloud/production):
  *   set STRAPI_CLOUD_URL=https://YOUR-PROJECT.strapiapp.com
  *   set STRAPI_CLOUD_API_TOKEN=your-token
- *   node scripts/clear_cloud_data.js
- *   Or: npm run clear:cloud-data
+ *   node scripts/clear_cloud_data.js --remote
+ *   Or: npm run clear:cloud-data -- --remote
  *
  * Usage (local):
  *   set STRAPI_LOCAL_URL=http://localhost:1337
@@ -37,7 +37,19 @@ const path = require('path');
 
 const USE_LOCAL = process.argv.includes('--local');
 const USE_REMOTE = process.argv.includes('--remote');
-const target = USE_LOCAL ? 'local' : (USE_REMOTE ? 'remote' : 'remote');
+
+if (USE_LOCAL && USE_REMOTE) {
+  console.error('Error: Pass only one of --local or --remote.');
+  process.exit(1);
+}
+if (!USE_LOCAL && !USE_REMOTE) {
+  console.error('Error: Target required. Pass --local or --remote.');
+  console.error('  --local  = clear data on local Strapi');
+  console.error('  --remote = clear data on remote/Cloud (production)');
+  process.exit(1);
+}
+
+const target = USE_LOCAL ? 'local' : 'remote';
 
 const CLOUD_URL = (process.env.STRAPI_CLOUD_URL || '').replace(/\/$/, '');
 const CLOUD_TOKEN = process.env.STRAPI_CLOUD_API_TOKEN || '';
@@ -55,7 +67,7 @@ if (!BASE_URL || !API_TOKEN) {
   if (target === 'local') {
     console.error('For --local set STRAPI_LOCAL_URL (default http://localhost:1337) and STRAPI_LOCAL_API_TOKEN (Full Access token from local Strapi admin).');
   } else {
-    console.error('Set STRAPI_CLOUD_URL and STRAPI_CLOUD_API_TOKEN (or use --local for local instance).');
+    console.error('For --remote set STRAPI_CLOUD_URL and STRAPI_CLOUD_API_TOKEN.');
   }
   process.exit(1);
 }
@@ -89,6 +101,7 @@ function loadTypeToPluralAndSingleTypes() {
 /** Delete order: types that reference others first (e.g. articles), then base types. Single types (abouts, globals, homepages) are skipped. */
 const DELETE_ORDER = [
   'articles', 'flash-news-items', 'sidebar-promotional-blocks', 'advertisement-slots',
+  'liturgy-days',
   'directory-entries', 'bishops', 'diocesan-bishops', 'retired-bishops', 'catholicos-entries',
   'church-dignitaries', 'managing-committees', 'working-committees', 'pilgrim-centres',
   'seminaries', 'spiritual-organisations', 'institutions', 'parishes',
@@ -136,14 +149,14 @@ async function main() {
     ? DELETE_ORDER.filter(p => ONLY_TYPES.has(p) && collectionPlurals.includes(p))
     : DELETE_ORDER.filter(p => collectionPlurals.includes(p));
   const rest = collectionPlurals.filter(p => !inOrder.includes(p));
-  const order = [...inOrder, ...rest];
+  const order = ONLY_TYPES ? inOrder : [...inOrder, ...rest];
 
   if (order.length === 0) {
     console.log('No collection types to clear (or --types= did not match any).');
     return;
   }
 
-  console.log('Target:', target === 'local' ? 'LOCAL' : 'REMOTE (Cloud)', '-', BASE_URL);
+  console.log('Target:', target === 'local' ? 'LOCAL' : 'REMOTE (production/Cloud)', '-', BASE_URL);
   console.log(DRY_RUN ? '[DRY RUN] Would clear types:' : 'Clearing collection types (delete order):', order.join(', '));
   console.log('');
 
