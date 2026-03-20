@@ -45,9 +45,9 @@
   },
   "dependencies": {
     "@strapi/plugin-cloud": "^5.9.0",
-    "@strapi/plugin-users-permissions": "5.34.0",
-    "@strapi/provider-upload-aws-s3": "^5.36.0",
-    "@strapi/strapi": "5.34.0",
+    "@strapi/plugin-users-permissions": "^5.39.0",
+    "@strapi/provider-upload-aws-s3": "^5.35.0",
+    "@strapi/strapi": "^5.39.0",
     "better-sqlite3": "11.3.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
@@ -64,7 +64,10 @@
     "xlsx-js-style": "^1.2.0"
   },
   "engines": {
-    "node": ">=18.0.0 <=22.x.x",
+    "node": ">=20.0.0 <=22.x.x",
     "npm": ">=6.0.0"
+  },
+  "optionalDependencies": {
+    "@img/sharp-win32-arm64": "^0.34.5"
   }
 }
