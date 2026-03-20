@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Strapi directory: Diocese, Parish, Priest relations, link tables, tenant scoping, API examples, and how to verify data.">
+  <title>Directory: Priest, Parish &amp; Diocese mapping (Strapi)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      color: #333;
+    }
+    h1 {
+      font-size: 2.5em;
+      border-bottom: 3px solid #0066cc;
+      padding-bottom: 0.5rem;
+      margin-top: 0;
+    }
+    h2 {
+      font-size: 1.8em;
+      border-left: 4px solid #0066cc;
+      padding-left: 15px;
+      margin-top: 2rem;
+    }
+    h3 { font-size: 1.4em; color: #333; }
+    h4 { font-size: 1.2em; color: #555; }
+
+    .toc {
+      background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+      border-left: 4px solid #0066cc;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1);
+    }
+    .toc h2 { margin-top: 0; border: none; padding-left: 0; font-size: 1.3em; }
+    .toc ul { margin: 0; padding-left: 1.25rem; }
+    .toc a { color: #0052a3; font-weight: 600; }
+
+    .section-intro {
+      background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%);
+      border-left: 4px solid #0066cc;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1);
+    }
+    .section-intro code,
+    .section-intro .code-highlight {
+      background-color: #e8f4f8;
+      color: #0d3b66;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid #b8d4e3;
+    }
+
+    .section-container {
+      background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%);
+      border-left: 4px solid #0066cc;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1);
+    }
+    .section-header {
+      background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
+      color: white;
+      padding: 12px 20px;
+      margin: -20px -20px 20px -20px;
+      border-radius: 8px 8px 0 0;
+      font-size: 1.2em;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .section-container.parameters .section-header.parameters {
+      background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    }
+    .section-container.parameters {
+      background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+      border-left-color: #ff9800;
+    }
+    .section-container.output .section-header.output {
+      background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+    }
+    .section-container.output {
+      background: linear-gradient(135deg, #e6ffe6 0%, #ccffcc 100%);
+      border-left-color: #28a745;
+    }
+    .section-container.usage .section-header.usage {
+      background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);
+    }
+    .section-container.usage {
+      background: linear-gradient(135deg, #f0e6ff 0%, #e6ccff 100%);
+      border-left-color: #9c27b0;
+    }
+
+    .parameters-list {
+      background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%);
+      border-left: 4px solid #ff9800;
+      border-radius: 8px;
+      padding: 15px 20px;
+      margin: 15px 0;
+    }
+    .parameters-list strong { color: #ff9800; font-weight: bold; }
+    .parameters-list code {
+      background-color: #e8f4f8;
+      color: #0d3b66;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid #b8d4e3;
+      font-family: 'Courier New', monospace;
+    }
+
+    .script-name {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      display: inline-block;
+      box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+    }
+
+    .info {
+      background: #d1ecf1;
+      border-left: 4px solid #0c5460;
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+    .info code, .info .code-highlight {
+      background-color: #e8f4f8;
+      color: #0d3b66;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid #b8d4e3;
+      font-family: 'Courier New', monospace;
+    }
+    .warning {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+    .warning code, .warning .code-highlight {
+      background-color: #e8f4f8;
+      color: #0d3b66;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid #b8d4e3;
+      font-family: 'Courier New', monospace;
+    }
+    .success {
+      background: #d4edda;
+      border-left: 4px solid #28a745;
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+      border-radius: 4px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 15px 0;
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+    }
+    th {
+      background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%);
+      color: white;
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 0.9em;
+      letter-spacing: 0.5px;
+    }
+    tr:nth-child(even) { background-color: #f8f9fa; }
+    tr:hover { background-color: #e3f2fd; transition: background-color 0.2s ease; }
+    td code {
+      background-color: #e8f4f8;
+      color: #0d3b66;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid #b8d4e3;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    .code-block, pre, pre code {
+      background-color: #e8f4f8;
+      color: #0d3b66;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #b8d4e3;
+      overflow-x: auto;
+      margin: 15px 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.95em;
+    }
+    pre { margin: 0; }
+    pre code { padding: 0; border: none; background: transparent; }
+
+    code {
+      background-color: #e8f4f8;
+      color: #0d3b66;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid #b8d4e3;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    /* Command blocks */
+    .command-block {
+      border: 2px solid #2196f3;
+      border-radius: 8px;
+      margin: 20px 0;
+      overflow: hidden;
+      background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    }
+    .command-block.verify {
+      border-color: #4caf50;
+      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    }
+    .command-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 15px;
+      background: rgba(255,255,255,0.6);
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+    .command-type { font-weight: bold; color: #333; }
+    .command-header-buttons { display: flex; gap: 8px; }
+    .copy-button, .copy-button-template {
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85em;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+    .copy-button { background-color: #0066cc; }
+    .copy-button:hover { background-color: #0052a3; }
+    .copy-button-template { background-color: #6c757d; }
+    .copy-button-template:hover { background-color: #5a6268; }
+    .copy-button.copied, .copy-button-template.copied { background-color: #28a745; }
+
+    .command-parameters {
+      padding: 15px;
+      background: rgba(255, 255, 255, 0.5);
+      border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+    .command-parameters h5 { margin: 0 0 12px 0; font-size: 0.9em; color: #333; font-weight: bold; }
+    .parameter-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .parameter-group.single { grid-template-columns: 1fr; }
+    .parameter-input { display: flex; flex-direction: column; gap: 4px; }
+    .parameter-input label { font-size: 0.8em; color: #555; font-weight: 600; }
+    .parameter-input input {
+      padding: 8px 12px;
+      border: 2px solid #ddd;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+    .parameter-input input:focus {
+      outline: none;
+      border-color: #0066cc;
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+    }
+    @media (max-width: 768px) {
+      .parameter-group { grid-template-columns: 1fr; }
+    }
+
+    .command-content {
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      word-break: break-all;
+      color: #0d3b66;
+    }
+    .command-single-line {
+      padding: 12px 15px;
+      background: #e8f4f8;
+      border-top: 1px solid #b8d4e3;
+    }
+    .command-single-line-label { font-size: 0.75em; color: #666; margin-bottom: 6px; font-weight: 600; }
+    .command-single-line code {
+      display: block;
+      white-space: pre-wrap;
+      word-break: break-all;
+      background: transparent;
+      border: none;
+      padding: 0;
+      color: #0d3b66;
+    }
+
+    a:focus, button:focus { outline: 2px solid #0066cc; outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <h1>Directory: Priest, Parish &amp; Diocese mapping</h1>
+  <p><strong>Strapi 5</strong> — how diocese, parish, and priest content types relate; how data is stored (including SQLite link tables); tenant scoping; API examples; and how to verify rows in the database.</p>
+  <p>Companion: <a href="content_type_mapping.html">content_type_mapping.html</a> (portal sections → content types).</p>
+
+  <nav class="toc" aria-label="Table of contents">
+    <h2>Table of contents</h2>
+    <ul>
+      <li><a href="#overview">1. Overview</a></li>
+      <li><a href="#entities">2. Entities &amp; relations (logical model)</a></li>
+      <li><a href="#fields">3. Fields per content type</a></li>
+      <li><a href="#storage">4. Strapi 5 storage (SQLite link tables)</a></li>
+      <li><a href="#tenant">5. Tenant scoping</a></li>
+      <li><a href="#api">6. REST API examples (frontend)</a></li>
+      <li><a href="#verify">7. Verifying data in the database</a></li>
+      <li><a href="#related">8. Related documentation</a></li>
+    </ul>
+  </nav>
+
+  <section id="overview" aria-labelledby="overview-heading">
+    <div class="section-intro">
+      <h2 id="overview-heading" style="margin-top:0;font-size:1.5em;border-bottom:2px solid #0066cc;padding-bottom:0.35rem;">1. Overview</h2>
+      <p>The directory uses three main collection types: <code class="code-highlight">Directory – Dioceses</code> (<code class="code-highlight">diocese</code>), <code class="code-highlight">Directory – Parishes</code> (<code class="code-highlight">parish</code>), and <code class="code-highlight">Directory – Priests</code> (<code class="code-highlight">priest</code>). Each priest and parish is tied to exactly one diocese. A priest may be linked as <strong>vicar</strong> of at most one parish (one-to-one with the parish’s <code class="code-highlight">vicar</code> field). All three types also relate to <code class="code-highlight">Tenant</code> for multi-site isolation.</p>
+    </div>
+  </section>
+
+  <div class="section-container" id="entities">
+    <div class="section-header">2. Entities &amp; relations (logical model)</div>
+    <p>The following table summarizes <strong>who relates to whom</strong> in the Strapi schema (not the physical DB table names).</p>
+    <table>
+      <thead>
+        <tr>
+          <th>From</th>
+          <th>Relation</th>
+          <th>To</th>
+          <th>Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>Parish</code></td>
+          <td>manyToOne (required)</td>
+          <td><code>Diocese</code></td>
+          <td>Every parish belongs to one diocese. Inverse: <code>Diocese.parishes</code> (oneToMany).</td>
+        </tr>
+        <tr>
+          <td><code>Priest</code></td>
+          <td>manyToOne (required)</td>
+          <td><code>Diocese</code></td>
+          <td>Every priest is allocated to one diocese. Inverse: <code>Diocese.priests</code> (oneToMany).</td>
+        </tr>
+        <tr>
+          <td><code>Parish</code></td>
+          <td>oneToOne (optional)</td>
+          <td><code>Priest</code> (<code>vicar</code>)</td>
+          <td>Current vicar of the parish. Inverse: <code>Priest.parish</code> (<code>mappedBy: vicar</code>).</td>
+        </tr>
+        <tr>
+          <td><code>Diocese</code>, <code>Parish</code>, <code>Priest</code></td>
+          <td>manyToOne</td>
+          <td><code>Tenant</code></td>
+          <td>All directory entries for a site share the same tenant; filter APIs by <code class="code-highlight">tenant.tenantId</code>.</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="info">
+      <strong>Frontend use cases:</strong> List priests for a diocese → filter <code class="code-highlight">priests</code> by <code class="code-highlight">diocese</code> and <code class="code-highlight">tenant</code>. List parishes for a diocese → filter <code class="code-highlight">parishes</code> by <code class="code-highlight">diocese</code>. Show where a priest is serving as vicar → <code class="code-highlight">populate=parish</code> on priest (or <code class="code-highlight">populate=vicar</code> on parish).
+    </div>
+  </div>
+
+  <div class="section-container parameters" id="fields">
+    <div class="section-header parameters">3. Fields per content type (high level)</div>
+    <p>UIDs: <code>api::diocese.diocese</code>, <code>api::parish.parish</code>, <code>api::priest.priest</code>, <code>api::tenant.tenant</code>.</p>
+
+    <h3>Directory – Dioceses</h3>
+    <table>
+      <thead>
+        <tr><th>Field</th><th>Type / relation</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>string (required)</td><td>Display name</td></tr>
+        <tr><td><code>slug</code></td><td>uid</td><td>From name; use in API filters</td></tr>
+        <tr><td><code>address</code>, <code>email</code>, <code>phones</code>, <code>website</code>, <code>description</code></td><td>text / string</td><td>Contact &amp; copy</td></tr>
+        <tr><td><code>image</code></td><td>media (single)</td><td>Optional image</td></tr>
+        <tr><td><code>parishes</code></td><td>oneToMany → Parish</td><td><code>mappedBy: diocese</code></td></tr>
+        <tr><td><code>priests</code></td><td>oneToMany → Priest</td><td><code>mappedBy: diocese</code></td></tr>
+        <tr><td><code>tenant</code></td><td>manyToOne → Tenant</td><td>Hidden in Content Manager; auto-assigned for editors</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Directory – Parishes</h3>
+    <table>
+      <thead>
+        <tr><th>Field</th><th>Type / relation</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>name</code>, <code>slug</code></td><td>string, uid</td><td>Required</td></tr>
+        <tr><td><code>diocese</code></td><td>manyToOne → Diocese (required)</td><td><code>inversedBy: parishes</code></td></tr>
+        <tr><td><code>vicar</code></td><td>oneToOne → Priest (optional)</td><td>Current vicar; pairs with <code>Priest.parish</code></td></tr>
+        <tr><td><code>address</code>, <code>email</code>, <code>phones</code>, address lines, <code>city</code>, <code>state</code>, <code>postalCode</code>, <code>country</code></td><td>text / string</td><td>Contact &amp; location</td></tr>
+        <tr><td><code>image</code></td><td>media</td><td>Optional</td></tr>
+        <tr><td><code>tenant</code></td><td>manyToOne → Tenant</td><td>Hidden in Content Manager</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Directory – Priests</h3>
+    <table>
+      <thead>
+        <tr><th>Field</th><th>Type / relation</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>name</code>, <code>slug</code></td><td>string, uid</td><td>Required</td></tr>
+        <tr><td><code>title</code></td><td>string</td><td>e.g. Fr., Vicar</td></tr>
+        <tr><td><code>diocese</code></td><td>manyToOne → Diocese (required)</td><td><code>inversedBy: priests</code></td></tr>
+        <tr><td><code>parish</code></td><td>oneToOne → Parish (optional)</td><td><code>mappedBy: vicar</code> — parish where this priest is vicar</td></tr>
+        <tr><td><code>address</code>, <code>email</code>, <code>phones</code></td><td>text / string</td><td>Contact</td></tr>
+        <tr><td><code>image</code></td><td>media</td><td>Optional</td></tr>
+        <tr><td><code>tenant</code></td><td>manyToOne → Tenant</td><td>Hidden in Content Manager</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-container output" id="storage">
+    <div class="section-header output">4. Strapi 5 storage (SQLite link tables)</div>
+    <p>On <strong>SQLite</strong>, Strapi 5 does <strong>not</strong> store relations as <code class="code-highlight">diocese_id</code> columns on <code class="code-highlight">priests</code> or <code class="code-highlight">parishes</code>. It uses <strong>link tables</strong> named <code class="code-highlight">*_lnk</code>.</p>
+    <table>
+      <thead>
+        <tr><th>Link table</th><th>Columns (conceptual)</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>priests_diocese_lnk</code></td><td><code>priest_id</code>, <code>diocese_id</code>, <code>priest_ord</code></td><td>Priest ↔ Diocese</td></tr>
+        <tr><td><code>parishes_diocese_lnk</code></td><td><code>parish_id</code>, <code>diocese_id</code>, <code>parish_ord</code></td><td>Parish ↔ Diocese</td></tr>
+        <tr><td><code>parishes_vicar_lnk</code></td><td><code>parish_id</code>, <code>priest_id</code></td><td>Parish ↔ Vicar (Priest)</td></tr>
+        <tr><td><code>priests_tenant_lnk</code></td><td><code>priest_id</code>, <code>tenant_id</code>, …</td><td>Priest ↔ Tenant</td></tr>
+        <tr><td><code>parishes_tenant_lnk</code></td><td><code>parish_id</code>, <code>tenant_id</code>, …</td><td>Parish ↔ Tenant</td></tr>
+        <tr><td><code>dioceses_tenant_lnk</code></td><td><code>diocese_id</code>, <code>tenant_id</code>, …</td><td>Diocese ↔ Tenant</td></tr>
+      </tbody>
+    </table>
+    <div class="warning">
+      <strong>Sample database note:</strong> A typical seeded dev database may have many rows in <code class="code-highlight">priests_diocese_lnk</code> and <code class="code-highlight">parishes_diocese_lnk</code> but <strong>zero</strong> rows in <code class="code-highlight">parishes_vicar_lnk</code> until vicars are assigned in Admin. That is expected if imports only set diocese, not vicar.
+    </div>
+  </div>
+
+  <div class="section-container" id="tenant">
+    <div class="section-header">5. Tenant scoping</div>
+    <p>Per project rules (<code class="code-highlight">.cursor/rules/multi-tenant-assignment.mdc</code>): editors do not pick a tenant in the UI; <code class="code-highlight">tenant</code> is auto-assigned from <strong>Editor Tenant Assignment</strong>. Public or frontend API calls should always filter by the programmatic tenant id:</p>
+    <div class="parameters-list">
+      <p><strong>Filter pattern:</strong> <code>filters[tenant][tenantId][$eq]=&lt;yourTenantId&gt;</code></p>
+    </div>
+  </div>
+
+  <div class="section-container usage" id="api">
+    <div class="section-header usage">6. REST API examples (frontend)</div>
+    <p>Replace <code class="code-highlight">STRAPI_URL</code>, <code class="code-highlight">YOUR_TENANT_ID</code>, and slug/id as needed. Use <code class="code-highlight">populate</code> to load nested diocese, parish, or vicar.</p>
+
+    <div class="command-block verify"
+         data-command-type="verify"
+         data-command-base="curl -s &quot;STRAPI_URL/api/priests?filters[tenant][tenantId][$eq]=YOUR_TENANT_ID&amp;filters[diocese][slug][$eq]=diocese-slug&amp;populate[0]=diocese&amp;populate[1]=parish&quot;"
+         data-template-command="curl -s &quot;http://localhost:1337/api/priests?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[diocese][slug][$eq]=diocese-of-calcutta&amp;populate[0]=diocese&amp;populate[1]=parish&quot;">
+      <div class="command-header">
+        <span class="command-type">Verify / API — List priests in a diocese (with parish)</span>
+        <div class="command-header-buttons">
+          <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-priests-diocese')" title="Copy template command">📄 Template</button>
+          <button type="button" class="copy-button" onclick="copyCommand(this, 'cmd-priests-diocese')" title="Copy customized command">📋 Copy</button>
+        </div>
+      </div>
+      <div class="command-parameters">
+        <h5>🔧 Customize Parameters:</h5>
+        <div class="parameter-group">
+          <div class="parameter-input">
+            <label for="cmd-priests-diocese-strapi">STRAPI_URL (no trailing slash)</label>
+            <input type="text" id="cmd-priests-diocese-strapi" placeholder="http://localhost:1337" value="http://localhost:1337" oninput="updateCommandPriestsDiocese()">
+          </div>
+          <div class="parameter-input">
+            <label for="cmd-priests-diocese-tenant">YOUR_TENANT_ID</label>
+            <input type="text" id="cmd-priests-diocese-tenant" placeholder="tenant_demo_002" value="tenant_demo_002" oninput="updateCommandPriestsDiocese()">
+          </div>
+        </div>
+        <div class="parameter-group single">
+          <div class="parameter-input">
+            <label for="cmd-priests-diocese-slug">Diocese slug</label>
+            <input type="text" id="cmd-priests-diocese-slug" placeholder="diocese-of-calcutta" value="diocese-of-calcutta" oninput="updateCommandPriestsDiocese()">
+          </div>
+        </div>
+      </div>
+      <div class="command-content" id="cmd-priests-diocese">curl -s &quot;http://localhost:1337/api/priests?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[diocese][slug][$eq]=diocese-of-calcutta&amp;populate[0]=diocese&amp;populate[1]=parish&quot;</div>
+      <div class="command-single-line">
+        <div class="command-single-line-label">Windows single-line</div>
+        <code id="cmd-priests-diocese-single-code">curl -s &quot;http://localhost:1337/api/priests?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[diocese][slug][$eq]=diocese-of-calcutta&amp;populate[0]=diocese&amp;populate[1]=parish&quot;</code>
+      </div>
+    </div>
+
+    <div class="command-block verify"
+         data-command-type="verify"
+         data-command-base="curl -s &quot;STRAPI_URL/api/parishes?filters[tenant][tenantId][$eq]=YOUR_TENANT_ID&amp;filters[diocese][slug][$eq]=diocese-slug&amp;populate[0]=diocese&amp;populate[1]=vicar&quot;"
+         data-template-command="curl -s &quot;http://localhost:1337/api/parishes?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[diocese][slug][$eq]=diocese-of-calcutta&amp;populate[0]=diocese&amp;populate[1]=vicar&quot;">
+      <div class="command-header">
+        <span class="command-type">Verify / API — Parishes in a diocese (with vicar)</span>
+        <div class="command-header-buttons">
+          <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-parishes-diocese')" title="Copy template command">📄 Template</button>
+          <button type="button" class="copy-button" onclick="copyCommand(this, 'cmd-parishes-diocese')" title="Copy customized command">📋 Copy</button>
+        </div>
+      </div>
+      <div class="command-parameters">
+        <h5>🔧 Customize Parameters:</h5>
+        <div class="parameter-group">
+          <div class="parameter-input">
+            <label for="cmd-parishes-diocese-strapi">STRAPI_URL</label>
+            <input type="text" id="cmd-parishes-diocese-strapi" placeholder="http://localhost:1337" value="http://localhost:1337" oninput="updateCommandParishesDiocese()">
+          </div>
+          <div class="parameter-input">
+            <label for="cmd-parishes-diocese-tenant">YOUR_TENANT_ID</label>
+            <input type="text" id="cmd-parishes-diocese-tenant" placeholder="tenant_demo_002" value="tenant_demo_002" oninput="updateCommandParishesDiocese()">
+          </div>
+        </div>
+        <div class="parameter-group single">
+          <div class="parameter-input">
+            <label for="cmd-parishes-diocese-slug">Diocese slug</label>
+            <input type="text" id="cmd-parishes-diocese-slug" placeholder="diocese-of-calcutta" value="diocese-of-calcutta" oninput="updateCommandParishesDiocese()">
+          </div>
+        </div>
+      </div>
+      <div class="command-content" id="cmd-parishes-diocese">curl -s &quot;http://localhost:1337/api/parishes?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[diocese][slug][$eq]=diocese-of-calcutta&amp;populate[0]=diocese&amp;populate[1]=vicar&quot;</div>
+      <div class="command-single-line">
+        <div class="command-single-line-label">Windows single-line</div>
+        <code id="cmd-parishes-diocese-single-code">curl -s &quot;http://localhost:1337/api/parishes?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[diocese][slug][$eq]=diocese-of-calcutta&amp;populate[0]=diocese&amp;populate[1]=vicar&quot;</code>
+      </div>
+    </div>
+
+    <div class="info">
+      <strong>Permissions:</strong> Ensure the role used by the frontend (e.g. Public) has <code class="code-highlight">find</code> / <code class="code-highlight">findOne</code> on <code class="code-highlight">priest</code>, <code class="code-highlight">parish</code>, and <code class="code-highlight">diocese</code>, with populate allowed for the relations you need.
+    </div>
+  </div>
+
+  <div class="section-container" id="verify">
+    <div class="section-header">7. Verifying data in the database</div>
+    <p>From the repository root, run the inspection script (uses <code class="code-highlight">better-sqlite3</code> from the project). It prints counts for link tables and sample joined rows.</p>
+    <p>Script: <code class="script-name">inspect-directory-relationships-sample.js</code></p>
+
+    <div class="command-block setup"
+         data-command-type="setup"
+         data-command-base="node scripts/inspect-directory-relationships-sample.js"
+         data-template-command="node scripts/inspect-directory-relationships-sample.js db_backup\data.db">
+      <div class="command-header">
+        <span class="command-type">Setup / inspect script</span>
+        <div class="command-header-buttons">
+          <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-inspect-db')" title="Copy template command">📄 Template</button>
+          <button type="button" class="copy-button" onclick="copyCommand(this, 'cmd-inspect-db')" title="Copy customized command">📋 Copy</button>
+        </div>
+      </div>
+      <div class="command-parameters">
+        <h5>🔧 Customize Parameters:</h5>
+        <div class="parameter-group single">
+          <div class="parameter-input">
+            <label for="cmd-inspect-db-dbpath">Optional: path to SQLite file (leave empty for default <code class="code-highlight">.tmp/data.db</code>)</label>
+            <input type="text" id="cmd-inspect-db-dbpath" placeholder="db_backup\data.db" value="" oninput="updateCommandInspectDb()">
+          </div>
+        </div>
+      </div>
+      <div class="command-content" id="cmd-inspect-db">node scripts/inspect-directory-relationships-sample.js</div>
+      <div class="command-single-line">
+        <div class="command-single-line-label">Windows single-line</div>
+        <code id="cmd-inspect-db-single-code">node scripts/inspect-directory-relationships-sample.js</code>
+      </div>
+    </div>
+
+    <div class="success">
+      <strong>What to expect:</strong> Non-zero counts for <code class="code-highlight">priests_diocese_lnk</code> and <code class="code-highlight">parishes_diocese_lnk</code> when data is imported. <code class="code-highlight">parishes_vicar_lnk</code> may be <code class="code-highlight">0</code> until vicars are set in Admin.
+    </div>
+
+    <h3>Raw SQL (sqlite3 CLI)</h3>
+    <div class="code-block">
+<pre><code>SELECT COUNT(*) FROM priests_diocese_lnk;
+SELECT COUNT(*) FROM parishes_diocese_lnk;
+SELECT COUNT(*) FROM parishes_vicar_lnk;
+
+SELECT pr.name AS priest, d.name AS diocese
+FROM priests pr
+JOIN priests_diocese_lnk l ON l.priest_id = pr.id
+JOIN dioceses d ON d.id = l.diocese_id
+LIMIT 10;</code></pre>
+    </div>
+  </div>
+
+  <div class="section-container" id="related">
+    <div class="section-header">8. Related documentation</div>
+    <ul>
+      <li><a href="content_type_mapping.html">content_type_mapping.html</a> — portal sections → Strapi types</li>
+      <li><a href="../catholicatenews_strapi_content_mapping.md">catholicatenews_strapi_content_mapping.md</a> — news portal API patterns (tenant filter examples)</li>
+      <li>Project rule: <code class="code-highlight">.cursor/rules/multi-tenant-assignment.mdc</code> — tenant assignment for editors</li>
+      <li>Project rule: <code class="code-highlight">.cursor/rules/html_documentation_styling_guide.mdc</code> — HTML doc styling</li>
+    </ul>
+  </div>
+
+  <p style="margin-top: 2rem; font-size: 0.9em; color: #555;">Last updated: documentation reflects Strapi 5 schema and SQLite link-table layout as researched in project development.</p>
+
+  <script>
+    const commandParams = {};
+
+    function fallbackCopy(text, button) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'absolute';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        button.classList.add('copied');
+        const orig = button.textContent;
+        button.textContent = '✓ Copied!';
+        setTimeout(function () {
+          button.classList.remove('copied');
+          button.textContent = orig;
+        }, 2000);
+      } catch (e) {
+        console.error(e);
+      }
+      document.body.removeChild(ta);
+    }
+
+    function copyCommand(button, commandId) {
+      var el = document.getElementById(commandId);
+      if (!el) return;
+      var text = el.textContent.trim();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          button.classList.add('copied');
+          var orig = button.textContent;
+          button.textContent = '✓ Copied!';
+          setTimeout(function () {
+            button.classList.remove('copied');
+            button.textContent = orig;
+          }, 2000);
+        }).catch(function () { fallbackCopy(text, button); });
+      } else {
+        fallbackCopy(text, button);
+      }
+    }
+
+    function copyTemplateCommand(button, commandId) {
+      var block = button.closest('.command-block');
+      if (!block) return;
+      var templateCommand = block.getAttribute('data-template-command');
+      if (!templateCommand) {
+        var commandElement = document.getElementById(commandId);
+        if (!commandElement) return;
+        templateCommand = commandElement.textContent.trim();
+      }
+      templateCommand = templateCommand.replace(/&quot;/g, '"');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(templateCommand).then(function () {
+          button.classList.add('copied');
+          var orig = button.textContent;
+          button.textContent = '✓ Copied!';
+          setTimeout(function () {
+            button.classList.remove('copied');
+            button.textContent = orig;
+          }, 2000);
+        }).catch(function () { fallbackCopy(templateCommand, button); });
+      } else {
+        fallbackCopy(templateCommand, button);
+      }
+    }
+
+    function setCommandText(commandId, text) {
+      var el = document.getElementById(commandId);
+      var single = document.getElementById(commandId + '-single-code');
+      if (el) el.textContent = text;
+      if (single) single.textContent = text;
+    }
+
+    function updateCommandInspectDb() {
+      var pathInput = document.getElementById('cmd-inspect-db-dbpath');
+      var extra = pathInput && pathInput.value ? pathInput.value.trim() : '';
+      var base = 'node scripts/inspect-directory-relationships-sample.js';
+      var cmd = extra ? base + ' ' + extra : base;
+      setCommandText('cmd-inspect-db', cmd);
+    }
+
+    function updateCommandPriestsDiocese() {
+      var u = (document.getElementById('cmd-priests-diocese-strapi') || {}).value || 'http://localhost:1337';
+      var t = (document.getElementById('cmd-priests-diocese-tenant') || {}).value || 'YOUR_TENANT_ID';
+      var s = (document.getElementById('cmd-priests-diocese-slug') || {}).value || 'diocese-slug';
+      u = u.replace(/\/$/, '');
+      var cmd = 'curl -s "' + u + '/api/priests?filters[tenant][tenantId][$eq]=' + encodeURIComponent(t) + '&filters[diocese][slug][$eq]=' + encodeURIComponent(s) + '&populate[0]=diocese&populate[1]=parish"';
+      setCommandText('cmd-priests-diocese', cmd);
+    }
+
+    function updateCommandParishesDiocese() {
+      var u = (document.getElementById('cmd-parishes-diocese-strapi') || {}).value || 'http://localhost:1337';
+      var t = (document.getElementById('cmd-parishes-diocese-tenant') || {}).value || 'YOUR_TENANT_ID';
+      var s = (document.getElementById('cmd-parishes-diocese-slug') || {}).value || 'diocese-slug';
+      u = u.replace(/\/$/, '');
+      var cmd = 'curl -s "' + u + '/api/parishes?filters[tenant][tenantId][$eq]=' + encodeURIComponent(t) + '&filters[diocese][slug][$eq]=' + encodeURIComponent(s) + '&populate[0]=diocese&populate[1]=vicar"';
+      setCommandText('cmd-parishes-diocese', cmd);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      updateCommandInspectDb();
+      updateCommandPriestsDiocese();
+      updateCommandParishesDiocese();
+    });
+  </script>
+</body>
+</html>
