@@ -1,0 +1,1006 @@
+---
+description: Rules for implementing mobile payment flow (Apple Pay/Google Pay PRB), success handling, and QR generation without duplicates
+globs: src/**/*
+alwaysApply: false
+---
+
+- **Main Points in Bold**
+  - Use Payment Intent (pi_) for mobile PRB; redirect with `?pi=` and support it everywhere
+  - Create PI only on button click; use idempotency; sync PaymentRequest total to PI amount
+  - Webhooks must create transactions on `payment_intent.succeeded`; `tenantId` injected
+  - Success flow must poll/backoff and treat empty QR as not-ready; mobile redirects to `ticket-qr`
+  - Avoid duplicate QR/emails with singleton/poll guards and `skip_qr=true`
+  - Follow AWS Amplify env rules; use `getAppUrl()` for absolute URLs
+
+# Mobile Payment Flow Architecture
+
+This document outlines the comprehensive mobile payment flow architecture for the MCEFEE event management application, detailing the critical differences between mobile and desktop payment processing.
+
+## Overview
+
+The mobile payment flow is fundamentally different from the desktop flow due to Stripe's mobile wallet limitations, browser behavior differences, and the need for optimal user experience on mobile devices.
+
+## Payment Intent vs Session ID Usage
+
+### Why Payment Intent is Preferred for Mobile
+
+**Key Architectural Decision**: Mobile flows primarily use Payment Intent IDs (`pi_`) instead of Checkout Session IDs (`cs_`) due to technical limitations and optimal user experience requirements.
+
+#### Technical Reasons:
+
+1. **Stripe Mobile Wallet Limitations**:
+   - Payment Request Button (PRB) for Apple Pay/Google Pay returns Payment Intent IDs
+   - Checkout Session IDs are not directly available in mobile wallet flows
+   - Mobile wallets complete payments via `stripe.confirmCardPayment()` which works with Payment Intents
+
+2. **Browser Redirect Behavior**:
+   - Mobile browsers handle redirects differently than desktop
+   - Payment Intent provides more granular status tracking
+   - Avoids potential session timeout issues on mobile devices
+
+3. **Wallet API Integration**:
+   ```typescript
+   // Mobile wallet payment completion
+   const { error, paymentIntent } = await stripe.confirmCardPayment(secret, {
+     payment_method: ev.paymentMethod.id,
+     receipt_email: ev.payerEmail || email,
+   });
+
+   // Redirect using Payment Intent ID
+   const piId = paymentIntent?.id;
+   window.location.href = piId ? `/event/success?pi=${encodeURIComponent(piId)}` : '/event/success';
+   ```
+
+#### Implementation Details:
+
+**Payment Intent Creation** ([route](mdc:src/app/api/stripe/payment-intent/route.ts)):
+- Creates Payment Intent with `automatic_payment_methods: { enabled: true }`
+- Includes metadata for cart, eventId, and discountCodeId
+- Uses idempotency keys to prevent duplicate intents
+- Returns `clientSecret` for mobile wallet confirmation
+
+**Payment Intent Processing** ([ApiServerActions](mdc:src/app/event/success/ApiServerActions.ts)):
+- `findTransactionByPaymentIntentId()` - Looks up existing transactions
+- Handles conversion from Payment Intent to Session ID when needed
+- Backend lookups use `stripePaymentIntentId.equals` parameter
+
+## Mobile Device Detection Methods
+
+### Client-Side Detection
+
+The application uses multiple methods to reliably detect mobile devices:
+
+#### 1. User Agent Detection
+```typescript
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+```
+
+#### 2. Screen Width Detection
+```typescript
+const isMobileWidth = window.innerWidth <= 768;
+```
+
+#### 3. Combined Detection Logic
+```typescript
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                 window.innerWidth <= 768;
+```
+
+### Server-Side Detection
+
+#### CloudFront Headers (AWS Deployment)
+```typescript
+const cloudFrontHeaders = {
+  isDesktopViewer: headers['cloudfront-is-desktop-viewer'],
+  isMobileViewer: headers['cloudfront-is-mobile-viewer'],
+  isIosViewer: headers['cloudfront-is-ios-viewer'],
+  isAndroidViewer: headers['cloudfront-is-android-viewer'],
+  isTabletViewer: headers['cloudfront-is-tablet-viewer']
+};
+```
+
+#### Debug Endpoint (`/api/debug/mobile`)
+Provides comprehensive device detection debugging:
+- User agent analysis
+- CloudFront header inspection
+- Request parameter logging
+- Device capability detection
+
+## Payment Request Button (PRB) Mobile Flow
+
+### Why Separate Mobile Flow for PRB
+
+**Critical Architectural Decision**: The Payment Request Button requires a completely separate flow from traditional Stripe Checkout due to fundamental differences in wallet APIs.
+
+#### Key Differences:
+
+1. **Payment Method**:
+   - **Desktop Checkout**: Uses Stripe Checkout Sessions with hosted payment page
+   - **Mobile PRB**: Uses native wallet APIs (Apple Pay/Google Pay) with Payment Request API
+
+2. **User Experience**:
+   - **Desktop**: Multi-step form → Stripe hosted page → redirect
+   - **Mobile**: Single tap → native wallet sheet → immediate completion
+
+3. **Technical Implementation**:
+   - **Desktop**: Session-based flow with server-side session creation
+   - **Mobile**: Client-side Payment Intent creation and confirmation
+
+### PRB Implementation Details
+
+#### Component Structure ([StripePaymentRequestButton.tsx](mdc:src/components/StripePaymentRequestButton.tsx))
+
+**Eligibility Detection**:
+```typescript
+pr.canMakePayment().then((result) => {
+  console.log('[PRB] Payment methods available:', {
+    applePay: result.applePay || (result as any).apple_pay,
+    googlePay: result.googlePay || (result as any).google_pay,
+    link: (result as any).link
+  });
+
+  if (result) {
+    setEligible(true);
+    setReady(true);
+  }
+});
+```
+
+**Payment Processing Flow**:
+1. Create fresh Payment Intent on each payment attempt
+2. Update Payment Request total to match PI amount (prevents amount_mismatch)
+3. Confirm payment using `stripe.confirmCardPayment()`
+4. Handle Apple Pay immediate completion to prevent sheet timeout
+5. Redirect to success page with Payment Intent ID
+
+**Critical Synchronization**:
+```typescript
+// CRITICAL: Ensure Payment Request total matches PI amount before confirm
+if (typeof data.amount === 'number' && pr) {
+  try {
+    pr.update({ total: { label: 'Tickets', amount: data.amount } });
+    console.log('[PRB] Updated Payment Request total to match PI');
+  } catch (updateErr) {
+    console.warn('[PRB] Failed to update Payment Request total:', updateErr);
+  }
+}
+```
+
+#### Mobile Wallet Specific Handling
+
+**Apple Pay on iOS/Safari**:
+- Immediate `ev.complete('success')` to prevent sheet timeout
+- Handle WebKit-specific behaviors
+- Safari security restrictions for payment processing
+
+**Google Pay on Android/Chrome**:
+- Minimum amount requirements ($0.50)
+- Google account signin requirements
+- Saved card requirements
+- Chrome browser optimization
+
+## Mobile vs Desktop Flow Comparison
+
+### Desktop Flow
+```
+User fills form →
+Stripe Checkout Session created →
+Hosted payment page →
+Payment completion →
+Redirect to /event/success?session_id=cs_xxx →
+SuccessClient detects desktop →
+Stays on success page →
+Fetches transaction data + QR inline
+```
+
+### Mobile Flow
+```
+User taps PRB →
+Native wallet sheet opens →
+Payment Intent created →
+Payment confirmed with PI →
+Redirect to /event/success?pi=pi_xxx →
+SuccessClient detects mobile →
+Shows brief success (2 seconds) →
+Redirect to /event/ticket-qr?pi=pi_xxx →
+Dedicated QR page with singleton fetch
+```
+
+**CRITICAL Mobile Redirection Path**:
+- **Entry Point**: `/event/success?pi=pi_xxx` (from Stripe payment completion)
+- **Mobile Detection**: Client-side detection in `SuccessClient.tsx` using user agent + screen width
+- **Redirect Target**: `/event/ticket-qr?pi=pi_xxx` (dedicated mobile QR page)
+- **Redirect Timing**: 2 seconds delay to show brief success message
+- **Redirect Method**: `router.replace()` (not `push`) to prevent back button issues
+- **Session Storage**: Payment Intent ID stored in `sessionStorage` as fallback if URL params lost
+
+**Implementation** (`src/app/event/success/SuccessClient.tsx`):
+```typescript
+// Mobile detection and redirect logic
+const [isMobileDevice, setIsMobileDevice] = useState<boolean | null>(null);
+
+useEffect(() => {
+  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent) ||
+                   window.innerWidth <= 768;
+  setIsMobileDevice(isMobile);
+
+  if (isMobile && payment_intent) {
+    // Store in sessionStorage as fallback
+    sessionStorage.setItem('stripe_payment_intent', payment_intent);
+
+    // Show brief success, then redirect
+    setTimeout(() => {
+      router.replace(`/event/ticket-qr?pi=${payment_intent}`);
+    }, 2000);
+  }
+}, [payment_intent]);
+```
+
+## Critical Mobile Optimizations
+
+### 1. Duplicate Email Prevention
+
+**Problem**: Mobile flow was triggering QR endpoint twice (causing duplicate emails)
+
+**Solution**:
+- `skip_qr=true` parameter in mobile API calls
+- Single QR fetch via TicketQrClient singleton
+- API route skips QR generation when `skip_qr=true`
+
+```typescript
+// Mobile client prevents API route QR fetch
+queryParams.set('skip_qr', 'true');
+
+// API route respects skip_qr parameter
+const skipQr = searchParams.get('skip_qr') === 'true';
+if (!skipQr && transaction.id && eventDetails?.id) {
+  // Only fetch QR if not mobile request
+  qrCodeData = await fetchTransactionQrCode(eventDetails.id, transaction.id);
+}
+```
+
+### 2. Session Storage Persistence
+
+Mobile browsers can lose URL parameters during redirects, so critical data is stored:
+
+```typescript
+// Store for mobile ticket-qr page access
+if (session_id) {
+  sessionStorage.setItem('stripe_session_id', session_id);
+} else if (payment_intent) {
+  sessionStorage.setItem('stripe_payment_intent', payment_intent);
+}
+```
+
+### 3. QR Code Singleton Pattern
+
+Prevents duplicate QR API calls that trigger multiple emails:
+
+```typescript
+class QrFetchSingleton {
+  private static instance: QrFetchSingleton;
+  private fetchInProgress = false;
+  private fetchedTransactions = new Set<string>();
+  private qrResults = new Map<string, any>();
+
+  async fetchQrCodeOnce(eventId: number, transactionId: number): Promise<any> {
+    const key = `${eventId}-${transactionId}`;
+
+    // Return cached result if available
+    if (this.qrResults.has(key)) {
+      return this.qrResults.get(key);
+    }
+
+    // Prevent duplicate calls
+    if (this.fetchedTransactions.has(key) || this.fetchInProgress) {
+      return { error: 'QR fetch already attempted' };
+    }
+
+    // Single API call with caching
+    this.fetchedTransactions.add(key);
+    this.fetchInProgress = true;
+    // ... API call logic
+  }
+}
+```
+
+## API Endpoint Adjustments
+
+### 1. Success Processing Route ([route](mdc:src/app/api/event/success/process/route.ts))
+
+**GET Method**:
+- Looks up existing transactions only
+- Respects `skip_qr` parameter for mobile
+- Supports both `session_id` and `pi` parameters
+- Handles Payment Intent to Session ID conversion
+
+**POST Method**:
+- Creates new transactions from Stripe data
+- Processes both session IDs and payment intents
+- Includes mobile-specific optimizations
+
+### 2. QR Code Proxy Route ([SuccessClient](mdc:src/app/event/success/SuccessClient.tsx))
+
+**Enhanced Logging**:
+```typescript
+console.log('[QR Code Proxy] Backend API call:', {
+  eventId: id,
+  transactionId: transactionId,
+  emailHostUrlPrefix: decodedEmailHostUrlPrefix,
+  encodedEmailHostUrlPrefix: emailHostUrlPrefix,
+  backendUrl: apiUrl
+});
+```
+
+**Email Context Handling**:
+- Base64 encodes `emailHostUrlPrefix` for backend compatibility
+- Maintains consistent email template URL generation
+- Supports both localhost and production domains
+
+### 3. Transaction Lookup Optimization
+
+**Multiple Lookup Methods**:
+```typescript
+// Primary lookup by session ID
+existingTransaction = await findTransactionBySessionId(session_id);
+
+// Fallback lookup by payment intent
+if (!existingTransaction && pi) {
+  existingTransaction = await findTransactionByPaymentIntentId(pi);
+}
+
+// Handle mismatched parameters (session_id containing pi_)
+if (session_id?.startsWith('pi_')) {
+  existingTransaction = await findTransactionByPaymentIntentId(session_id);
+}
+```
+
+## Development Testing
+
+### Mobile Flow Testing
+
+**Test Mobile Page** (`/test-mobile`):
+- Device detection verification
+- Payment scenario simulation
+- User agent spoofing capabilities
+
+**Debug Endpoints**:
+- `/api/debug/mobile` - Comprehensive device analysis
+- `/api/test-mobile` - Payment flow testing
+
+### Testing Commands
+
+```bash
+# Mobile flow testing
+curl -H "User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)" \
+     http://localhost:3000/api/debug/mobile
+
+# Payment Intent testing
+curl -X POST http://localhost:3000/api/event/success/process \
+     -H "Content-Type: application/json" \
+     -d '{"pi":"pi_test_123","skip_qr":true}'
+```
+
+## Security Considerations
+
+### 1. Payment Validation
+
+- All amounts validated server-side against backend prices
+- Idempotency keys prevent duplicate payment processing
+- JWT authentication for backend API calls
+- Tenant ID isolation for multi-tenant security
+
+### 2. Mobile-Specific Security
+
+- HTTPS required for Payment Request API
+- Secure origin validation for wallet APIs
+- XSS prevention in mobile redirect flows
+- CSRF protection on API endpoints
+
+## Performance Optimizations
+
+### 1. Mobile-Specific Caching
+
+- Payment Request caching to prevent recreation
+- Transaction data caching with singleton pattern
+- Image optimization for mobile bandwidth
+- Lazy loading of non-critical components
+
+### 2. Network Optimization
+
+- Reduced API calls for mobile flows
+- Combined data fetching where possible
+- Compressed response handling
+- Connection timeout adjustments for mobile networks
+
+## Monitoring and Debugging
+
+### 1. Enhanced Logging
+
+All mobile flows include comprehensive logging:
+```typescript
+console.log('[MOBILE FLOW]', {
+  userAgent: navigator.userAgent,
+  windowWidth: window.innerWidth,
+  paymentMethod: 'PRB',
+  identifier: session_id || payment_intent,
+  timestamp: new Date().toISOString()
+});
+```
+
+### 2. Error Tracking
+
+- Specific mobile error codes and messages
+- Payment failure reason tracking
+- Device capability limitations logging
+- Performance metric collection
+
+## Critical Mobile Browser Authentication Fixes
+
+### 1. Payment Success API Routes Must Be Public
+
+**CRITICAL**: Payment success processing routes (`/api/event/success/process`) **MUST** be added to Clerk middleware's `publicRoutes` and `ignoredRoutes` to prevent 401 errors on mobile browsers.
+
+**Problem**: Mobile browsers were getting 401 Unauthorized errors when accessing `/api/event/success/process` because:
+- Mobile browsers may not have Clerk session available
+- Payment success flow should work for anyone who completed payment (guest or authenticated)
+- Desktop works because users might be logged in, but mobile fails without session
+
+**Solution**: Add to `src/middleware.ts`:
+
+```typescript
+export default authMiddleware({
+  publicRoutes: [
+    // ... other routes ...
+    '/api/event/success(.*)',  // Public payment success processing (no auth required - uses Payment Intent/Session ID)
+  ],
+
+  ignoredRoutes: [
+    // ... other routes ...
+    '/api/event/success/(.*)',  // CRITICAL: Ignore payment success processing (mobile browser compatibility)
+  ],
+});
+```
+
+**Why This Route Should Be Public**:
+- Payment Success Flow is Public: Anyone who completes payment should be able to view their ticket
+- Works for both authenticated and guest users
+- Authorization is via Payment Intent ID or Session ID (not user session)
+- Route validates Payment Intent ID or Session ID from Stripe
+- Only returns transaction data for valid payment intents
+- No sensitive user data exposed without payment verification
+
+**Security**: The route is secure because it validates Payment Intent ID or Session ID with Stripe and only returns data for valid, completed payments.
+
+### 2. Duplicate Transaction Prevention
+
+**CRITICAL**: Always check for existing transactions before creating new ones to prevent duplicate records for the same Payment Intent ID.
+
+**Problem**: Duplicate `event_ticket_transaction` records were being created because:
+- Webhook handler created transactions without checking for existing ones
+- Success process route fallback created transactions without checking
+- Direct payment intent creation function had no duplicate check
+- Race conditions between webhook and fallback route
+
+**Solution**: Add duplicate prevention checks in all three code paths:
+
+#### A. Webhook Handler (`src/app/api/webhooks/stripe/route.ts`)
+
+```typescript
+// CRITICAL: Check if transaction already exists before creating (prevent duplicates)
+const { findTransactionByPaymentIntentId } = await import('@/app/event/success/ApiServerActions');
+const existingTransaction = await findTransactionByPaymentIntentId(pi.id);
+
+if (existingTransaction) {
+  console.log('[STRIPE-WEBHOOK] Transaction already exists for Payment Intent:', {
+    paymentIntentId: pi.id,
+    existingTransactionId: existingTransaction.id,
+    existingQrCodeUrl: existingTransaction.qrCodeImageUrl || 'NULL',
+    timestamp: now
+  });
+
+  // If QR code is missing, we might want to trigger QR generation, but don't create duplicate transaction
+  if (!existingTransaction.qrCodeImageUrl) {
+    console.log('[STRIPE-WEBHOOK] Existing transaction has no QR code URL - QR generation should happen separately');
+  }
+
+  // Skip transaction creation - already exists
+  break;
+}
+
+// Only create transaction if it doesn't exist
+const created = await createEventTicketTransactionServer(withTenantId(txPayload as any) as any);
+```
+
+#### B. Success Process Route Fallback (`src/app/api/event/success/process/route.ts`)
+
+```typescript
+// CRITICAL: Check if transaction already exists before creating (prevent duplicates)
+const { findTransactionByPaymentIntentId } = await import('@/app/event/success/ApiServerActions');
+const existingTransaction = await findTransactionByPaymentIntentId(paymentIntentId);
+
+if (existingTransaction) {
+  console.log('[API POST FALLBACK] Transaction already exists for Payment Intent:', {
+    paymentIntentId,
+    existingTransactionId: existingTransaction.id,
+    existingQrCodeUrl: existingTransaction.qrCodeImageUrl || 'NULL',
+    timestamp: new Date().toISOString()
+  });
+
+  // Use existing transaction instead of creating duplicate
+  result = { transaction: existingTransaction, userProfile: null };
+} else {
+  // No existing transaction, proceed with creation
+  // ... existing creation logic ...
+}
+```
+
+#### C. Direct Payment Intent Creation (`src/app/event/success/ApiServerActions.ts`)
+
+```typescript
+export async function createTransactionFromPaymentIntent(
+  paymentIntentId: string,
+  eventId: number,
+  customerEmail: string,
+  cart: { ticketTypeId: number; quantity: number }[],
+  amountPaid: number
+): Promise<EventTicketTransactionDTO> {
+  // CRITICAL: Check if transaction already exists before creating (prevent duplicates)
+  const existingTransaction = await findTransactionByPaymentIntentId(paymentIntentId);
+  if (existingTransaction) {
+    console.log('[createTransactionFromPaymentIntent] Transaction already exists for Payment Intent:', {
+      paymentIntentId,
+      existingTransactionId: existingTransaction.id,
+      existingQrCodeUrl: existingTransaction.qrCodeImageUrl || 'NULL',
+      timestamp: new Date().toISOString()
+    });
+
+    // Return existing transaction instead of creating duplicate
+    return existingTransaction;
+  }
+
+  // ... rest of creation logic ...
+}
+```
+
+**Transaction Lookup Function**:
+```typescript
+export async function findTransactionByPaymentIntentId(
+  paymentIntentId: string,
+): Promise<EventTicketTransactionDTO | null> {
+  const tenantId = getTenantId();
+  const params = new URLSearchParams({
+    'stripePaymentIntentId.equals': paymentIntentId,
+    'tenantId.equals': tenantId,
+  });
+  const response = await fetchWithJwtRetry(
+    `${getAppUrl()}/api/proxy/event-ticket-transactions?${params.toString()}`,
+  );
+  if (!response.ok) return null;
+  const items: EventTicketTransactionDTO[] = await response.json();
+  return items.length > 0 ? items[0] : null;
+}
+```
+
+**Key Points**:
+- Always check for existing transaction before creating
+- Use `findTransactionByPaymentIntentId()` with tenant ID filter
+- Return existing transaction if found, don't create duplicate
+- Log existing transaction details for debugging
+- Handle QR code NULL scenarios without creating duplicates
+
+## Webhook Backend Forwarding with JWT Authentication
+
+### CRITICAL: Webhook Route Must Include JWT Authentication
+
+**Problem**: Stripe webhook forwarding to backend was getting `401 Unauthorized` errors because webhook route was forwarding requests **without JWT authentication**.
+
+**Solution**: Webhook route (`src/app/api/webhooks/stripe/route.ts`) **MUST** include JWT token in Authorization header when forwarding to backend.
+
+**Implementation**:
+```typescript
+import { getCachedApiJwt, generateApiJwt } from '@/lib/api/jwt';
+
+// CRITICAL: Get JWT token for backend authentication
+// According to cursor rules: Webhooks must use JWT for backend calls
+let jwt = await getCachedApiJwt();
+if (!jwt) {
+  console.log('[STRIPE-WEBHOOK] No cached JWT, generating new one...');
+  jwt = await generateApiJwt();
+}
+
+// Forward raw body and signature to backend with JWT authentication
+// CRITICAL: Backend requires JWT authentication (per cursor rules)
+const backendResponse = await fetch(backendWebhookUrl, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Stripe-Signature': signature || '', // Forward Stripe signature header
+    'Authorization': `Bearer ${jwt}`, // CRITICAL: JWT authentication required
+  },
+  body: rawBody, // Send raw body as-is (Buffer)
+});
+```
+
+**Why This Is Required**:
+- Backend API requires JWT authentication for all requests
+- Webhook forwarding is a backend API call (not a proxy route)
+- Without JWT, backend returns `401 Unauthorized`
+- Webhook processing fails, transactions never created
+
+**Cursor Rule Compliance**: See `.cursor/rules/nextjs_api_routes.mdc` lines 440-449 for webhook REST API call pattern requiring JWT authentication.
+
+## Mobile Transaction Polling with POST Fallback
+
+### CRITICAL: POST Fallback Must Trigger on Final Attempt
+
+**Problem**: Mobile payment flow was polling 15 times but **never attempting POST fallback** to create transaction, resulting in "Transaction not found after maximum polling attempts" error.
+
+**Root Cause**: POST fallback condition was inside an `else` block that only executes when `pollAttempt >= MAX_POLL_ATTEMPTS`, but the condition required `pollAttempt < MAX_POLL_ATTEMPTS`, so POST fallback **never triggered** on final attempt.
+
+**Solution**: POST fallback must trigger:
+- After 3 attempts (attempts 3-14): Try POST fallback
+- On final attempt (attempt 15): **ALSO try POST fallback** (critical fix)
+
+**Implementation** (`src/app/event/ticket-qr/TicketQrClient.tsx`):
+```typescript
+// CRITICAL: Try POST fallback after 3 attempts OR on final attempt
+// This ensures we attempt transaction creation even if webhook failed
+const shouldTryPost = (pollAttempt >= 3 && pollAttempt < MAX_POLL_ATTEMPTS) || pollAttempt === MAX_POLL_ATTEMPTS;
+
+if (shouldTryPost && !cancelled) {
+  console.log('[MOBILE QR DEBUG] Transaction not found after polling, attempting POST to create transaction');
+
+  const postBody = session_id ? { session_id, skip_qr: true } : { pi: payment_intent, skip_qr: true };
+  const postRes = await fetch('/api/event/success/process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(postBody),
+  });
+
+  if (postRes.ok) {
+    const postData = await postRes.json();
+    if (postData.transaction) {
+      // Transaction created successfully - exit polling loop
+      setResult(postData);
+      setLoading(false);
+      fetchQrCodeViaSingleton(postData);
+      return; // Success!
+    }
+  }
+}
+```
+
+**Polling Flow**:
+1. **Attempts 1-2**: Poll GET endpoint only (wait for webhook to process)
+2. **Attempts 3-14**: Poll GET, then try POST fallback if no transaction found
+3. **Attempt 15**: Poll GET, then try POST fallback (final attempt)
+
+**Why POST Fallback Is Critical**:
+- Webhook may fail (network issues, backend errors, JWT issues)
+- POST fallback ensures transaction is created even if webhook fails
+- Final attempt coverage ensures transaction creation is attempted even on last poll
+- Better UX: Users get their tickets even if webhook processing fails
+
+## Best Practices for Mobile Implementation
+
+### 1. Always Use Payment Intent for Mobile Wallets
+- Never rely on session IDs for mobile wallet flows
+- Create fresh Payment Intent for each payment attempt
+- Validate Payment Request totals match Payment Intent amounts
+
+### 2. Implement Proper Mobile Detection
+- Use multiple detection methods (user agent + screen width)
+- Test on actual mobile devices, not just browser dev tools
+- Consider tablet behavior separately from phones
+
+### 3. Handle Mobile Browser Limitations
+- Store critical data in sessionStorage
+- Implement singleton patterns to prevent duplicate API calls
+- Use appropriate timeouts for mobile network conditions
+- **CRITICAL**: Make payment success API routes public in middleware
+
+### 4. Prevent Duplicate Transactions
+- **ALWAYS** check for existing transaction before creating
+- Use `findTransactionByPaymentIntentId()` with tenant ID filter
+- Handle webhook retries gracefully (skip if transaction exists)
+- Handle fallback route race conditions (use existing transaction)
+
+### 5. Optimize for Mobile UX
+- Show immediate feedback for payment actions
+- Use native payment sheets when available
+- Minimize redirect chains and form steps
+
+### 6. Debug Mobile Flows Thoroughly
+- Test with actual mobile devices and wallets
+- Verify email delivery doesn't duplicate
+- Check payment completion across different network conditions
+- Validate session persistence across mobile browser behavior
+- Verify no 401 errors on payment success routes
+- Check for duplicate transactions in database
+- **CRITICAL**: Verify webhook forwarding includes JWT authentication
+- **CRITICAL**: Verify POST fallback triggers on final polling attempt
+
+## React Hydration Issues and Solutions
+
+### Critical Hydration Fixes for Mobile Success Pages
+
+Mobile browsers are particularly sensitive to React hydration mismatches. The following issues were encountered and fixed:
+
+#### Issue 1: Dynamic Debug Banners Causing Hydration Mismatch
+**Problem**: Debug banners with dynamic server/client values (e.g., `{pi || 'N/A'}`) caused hydration failures.
+
+**Solution**: Remove all debug banners from server components. Use logging instead:
+```typescript
+// ❌ BAD - Causes hydration mismatch
+<div style={{ padding: '20px', background: 'yellow' }}>
+  <p>PI: {pi || 'N/A'} | Session: {session_id || 'N/A'}</p>
+</div>
+
+// ✅ GOOD - Use console logging
+console.log('[QR PAGE SERVER] Search params:', { pi, session_id });
+```
+
+#### Issue 2: Next.js Image Component Optimization Differences
+**Problem**: Next.js `Image` component has different optimization behavior between SSR and client, causing hydration failures.
+
+**Solution**: Use standard `<img>` tags in mobile success/loading pages:
+```typescript
+// ❌ BAD - Causes hydration mismatch
+import Image from "next/image";
+<Image src={heroImageUrl || "/default.jpg"} width={1200} height={400} />
+
+// ✅ GOOD - Use standard img tag
+<img
+  src={heroImageUrl}
+  alt="Event Hero"
+  style={{ width: '100%', height: 'auto', objectFit: 'cover' }}
+/>
+```
+
+#### Issue 3: dangerouslySetInnerHTML Style Injection
+**Problem**: Injecting styles via `dangerouslySetInnerHTML` during hydration can cause timing mismatches.
+
+**Solution**: Use inline styles or external CSS files:
+```typescript
+// ❌ BAD - Timing issues during hydration
+<style dangerouslySetInnerHTML={{__html: `
+  .hero-image { width: 100%; }
+`}} />
+
+// ✅ GOOD - Inline styles or Tailwind classes
+<img className="w-full h-auto object-cover" />
+```
+
+#### Issue 4: Early Return Pattern Causing Different DOM
+**Problem**: Returning different content on server vs client causes hydration mismatch.
+
+**Solution**: Always render same base structure, use conditional rendering for progressive enhancement:
+```typescript
+// ❌ BAD - Different server/client DOM
+const [mounted, setMounted] = useState(false);
+useEffect(() => setMounted(true), []);
+
+if (!mounted) {
+  return <div>Loading...</div>; // Simple DOM on server
+}
+return <ComplexUI />; // Complex DOM on client
+
+// ✅ GOOD - Same base structure, conditional content
+return (
+  <div className="min-h-screen bg-gray-100 flex flex-col">
+    {mounted && <HeroSection />} {/* Progressive enhancement */}
+    <LoadingContent /> {/* Always rendered */}
+  </div>
+);
+```
+
+#### Issue 5: Mount Guard Pattern for Client-Only Features
+**Problem**: Client-only features (like hero image fetching) run on server causing errors.
+
+**Solution**: Use mount guard with proper state initialization:
+```typescript
+const [mounted, setMounted] = useState(false);
+const [heroImageUrl, setHeroImageUrl] = useState<string>("/images/default.jpeg"); // Default value
+
+useEffect(() => {
+  console.log('Component mounted on client');
+  setMounted(true);
+}, []);
+
+useEffect(() => {
+  // Client-only code runs ONLY after mount
+  if (sessionId && mounted) {
+    fetchHeroImage();
+  }
+}, [sessionId, mounted]);
+
+// Render with conditional enhancement
+return (
+  <div>
+    {mounted && <div>Client-only content</div>}
+    <div>Always rendered content</div>
+  </div>
+);
+```
+
+#### Issue 6: Desktop Data Fetching Interfering with Mobile Redirect
+**Problem**: Desktop transaction fetching useEffect runs simultaneously with mobile redirect logic, causing 404 errors and "Error: null" pages.
+
+**Solution**: Use state coordination to prevent desktop fetch on mobile:
+```typescript
+// Track mobile detection state
+const [isMobileDevice, setIsMobileDevice] = useState<boolean | null>(null);
+
+// Mobile detection sets state immediately
+useEffect(() => {
+  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent) ||
+                   window.innerWidth <= 768;
+  setIsMobileDevice(isMobile); // Prevents desktop fetch
+
+  if (isMobile) {
+    // Show brief success, then redirect
+    setTimeout(() => router.replace(`/event/ticket-qr?pi=${pi}`), 2000);
+  }
+}, []);
+
+// Desktop fetch waits for mobile detection and skips if mobile
+useEffect(() => {
+  if (isMobileDevice === null) return; // Wait for detection
+  if (isMobileDevice === true) return; // Skip for mobile
+
+  // Only desktop users reach here
+  fetchTransactionData();
+}, [session_id, isMobileDevice]); // Include isMobileDevice in deps
+```
+
+### Hydration Debugging Best Practices
+
+1. **Add Extensive Logging**: Use checkmark emojis (✅) for visibility in mobile browser console
+```typescript
+console.log('[MOBILE QR DEBUG] ✅✅✅ SUCCESS! Transaction loaded:', data.id);
+```
+
+2. **Use MobileDebugConsole Component**: Intercepts console.log and displays on-screen for mobile debugging
+```typescript
+import MobileDebugConsole from '@/components/MobileDebugConsole';
+
+// Add to layout or page component
+<MobileDebugConsole />
+```
+
+3. **Test Hydration in Production Build**: Development mode can hide hydration issues
+```bash
+npm run build && npm start
+```
+
+4. **Monitor CloudWatch Logs**: Compare SSR logs vs client-side logs to identify where hydration fails
+
+### Files Affected by Hydration Fixes
+
+- `src/app/event/ticket-qr/page.tsx` - Removed debug banner
+- `src/app/event/success/LoadingTicket.tsx` - Replaced Image, removed dangerouslySetInnerHTML, added mount guard
+- `src/app/event/ticket-qr/TicketQrClient.tsx` - Added mount guard, enhanced logging
+- `src/app/event/success/SuccessClient.tsx` - Fixed desktop/mobile fetch coordination
+- `src/components/MobileDebugConsole.tsx` - On-screen console for mobile debugging
+
+## Lessons Learned and Critical Fixes
+
+### 1. Webhook 401 Unauthorized Error Fix
+
+**Issue**: Webhook forwarding to backend was getting `401 Unauthorized` errors.
+
+**Root Cause**: Webhook route (`src/app/api/webhooks/stripe/route.ts`) was forwarding requests without JWT authentication.
+
+**Fix**: Added JWT authentication to webhook forwarding request:
+```typescript
+// Get JWT token for backend authentication
+let jwt = await getCachedApiJwt();
+if (!jwt) {
+  jwt = await generateApiJwt();
+}
+
+// Forward webhook with JWT authentication
+const backendResponse = await fetch(backendWebhookUrl, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Stripe-Signature': signature || '',
+    'Authorization': `Bearer ${jwt}`, // CRITICAL: Required for backend authentication
+  },
+  body: rawBody,
+});
+```
+
+**Lesson**: All backend API calls (including webhook forwarding) require JWT authentication. Never forward webhook events without JWT token. See `.cursor/rules/nextjs_api_routes.mdc` lines 440-449 for webhook REST API call pattern.
+
+### 2. Mobile Polling POST Fallback Logic Bug Fix
+
+**Issue**: Mobile payment flow was polling 15 times but never attempting POST fallback, resulting in "Transaction not found after maximum polling attempts" error.
+
+**Root Cause**: POST fallback condition was inside an `else` block that only executes when `pollAttempt >= MAX_POLL_ATTEMPTS`, but the condition required `pollAttempt < MAX_POLL_ATTEMPTS`, so POST fallback never triggered on final attempt.
+
+**Fix**: Changed POST fallback to trigger:
+- After 3 attempts (attempts 3-14): Try POST fallback
+- On final attempt (attempt 15): **ALSO try POST fallback**
+
+```typescript
+// CRITICAL: Try POST fallback after 3 attempts OR on final attempt
+const shouldTryPost = (pollAttempt >= 3 && pollAttempt < MAX_POLL_ATTEMPTS) || pollAttempt === MAX_POLL_ATTEMPTS;
+
+if (shouldTryPost && !cancelled) {
+  const postBody = session_id ? { session_id, skip_qr: true } : { pi: payment_intent, skip_qr: true };
+  const postRes = await fetch('/api/event/success/process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(postBody),
+  });
+  // Handle response...
+}
+```
+
+**Lesson**: Always test edge cases (final attempt, max attempts) to ensure fallback logic triggers correctly. Use inclusive conditions (`|| pollAttempt === MAX_POLL_ATTEMPTS`) to ensure final attempt coverage.
+
+### 3. Mobile Redirection Path Verification
+
+**Critical Path**:
+1. Payment completion → `/event/success?pi=pi_xxx`
+2. Mobile detection → `SuccessClient.tsx` detects mobile device (user agent + screen width)
+3. Brief success display → 2 seconds delay
+4. Redirect → `/event/ticket-qr?pi=pi_xxx` using `router.replace()` (not `push`)
+5. Transaction polling → `TicketQrClient.tsx` polls for transaction (15 attempts, 2s intervals)
+6. POST fallback → If polling fails, attempt POST to create transaction
+
+**Key Points**:
+- Use `router.replace()` (not `push`) to prevent back button issues
+- Store Payment Intent ID in `sessionStorage` as fallback if URL params lost
+- Mobile detection must happen immediately on mount
+- Redirect timing: 2 seconds delay for better UX
+- Redirect URL format: `/event/ticket-qr?pi=pi_xxx` or `/event/ticket-qr?session_id=cs_xxx`
+
+**Implementation** (`src/app/event/success/SuccessClient.tsx`):
+```typescript
+// Mobile detection and redirect logic
+const [isMobileDevice, setIsMobileDevice] = useState<boolean | null>(null);
+
+useEffect(() => {
+  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent) ||
+                   window.innerWidth <= 768;
+  setIsMobileDevice(isMobile);
+
+  if (isMobile && payment_intent) {
+    // Store in sessionStorage as fallback
+    sessionStorage.setItem('stripe_payment_intent', payment_intent);
+
+    // Show brief success, then redirect
+    setTimeout(() => {
+      router.replace(`/event/ticket-qr?pi=${payment_intent}`);
+    }, 2000);
+  }
+}, [payment_intent]);
+```
+
+### 4. Webhook vs POST Fallback Architecture
+
+**Primary Path**: Webhook creates transaction
+- Stripe sends webhook event → Frontend forwards to backend with JWT → Backend creates transaction
+- Fastest path, happens automatically
+- Requires JWT authentication in webhook forwarding
+
+**Fallback Path**: POST creates transaction if webhook fails
+- Frontend polls for transaction → If not found after 3 attempts → POST to create
+- Ensures transaction is created even if webhook fails
+- Critical for mobile flows where webhook may be delayed or fail
+
+**Best Practice**: Always implement both paths:
+1. Webhook handler (primary, automatic) - **MUST include JWT authentication**
+2. POST fallback (secondary, manual trigger) - **MUST trigger on final polling attempt**
+3. Idempotency checks (prevent duplicates) - **MUST check before creating**
+
+**Why Both Paths Are Critical**:
+- Webhook may fail (network issues, backend errors, JWT issues)
+- POST fallback ensures transaction is created even if webhook fails
+- Final attempt coverage ensures transaction creation is attempted even on last poll
+- Better UX: Users get their tickets even if webhook processing fails
+
+This architecture ensures optimal mobile payment experience while maintaining security, reliability, and proper email delivery for the MCEFEE event management system.

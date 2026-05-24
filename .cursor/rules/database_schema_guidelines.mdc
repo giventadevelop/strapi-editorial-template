@@ -1,0 +1,85 @@
+---
+description: Database schema guidelines for PostgreSQL tables in this system; follow the conventions in the canonical schema file.
+globs: code_html_template/SQLS/**/*.sql, **/migrations/**/*.sql
+alwaysApply: false
+---
+
+# Database Schema Guidelines
+
+This rule defines the standard patterns for adding or modifying PostgreSQL tables in this project. The **canonical reference** is [Latest_Schema_Post__Blob_Claude_12.sql](mdc:code_html_template/SQLS/Current_Sqls/Latest_Schema_Post__Blob_Claude_12.sql).
+
+## **ID and Primary Key**
+
+- **Primary key column:** Always name the column `id`.
+- **Type:** Use `bigint` (or `int8`) for all application table primary keys. Do **not** use `SERIAL` or `BIGSERIAL` directly; use the shared sequence.
+- **Definition:**
+  ```sql
+  id bigint DEFAULT nextval('public.sequence_generator'::regclass) NOT NULL,
+  CONSTRAINT <table_name>_pkey PRIMARY KEY (id)
+  ```
+- **Rationale:** All application tables that use the shared `sequence_generator` must use `bigint` so the sequence stays consistent across tables and duplicate key errors are avoided.
+
+## **Multi-Tenancy**
+
+- **Tenant column:** Include `tenant_id` on all tenant-scoped tables.
+- **Type:** `character varying(255)` or `varchar(255)`; allow `NULL` only when the table is global (e.g. `databasechangelog`).
+- **Unique constraints:** When a business key is unique per tenant, use a unique constraint on `(tenant_id, <other_columns>)`.
+
+## **Timestamps**
+
+- **Created/Updated:** Use `created_at` and `updated_at` for audit timestamps.
+- **Type:** `timestamp without time zone DEFAULT now() NOT NULL` (or `timestamp DEFAULT now() NOT NULL`).
+- **Trigger:** For tables that need automatic `updated_at` on row update, add a trigger that calls `public.update_updated_at_column()`.
+
+## **Adding New Tables to the Schema File**
+
+- **Do not use ALTER statements** to add new tables in the canonical schema file. Use **CREATE TABLE** only. New tables are added as full definitions.
+- **DROP order at top:** Add `DROP TABLE IF EXISTS public.<table_name> CASCADE;` in the "DROP EXISTING TABLES" section at the top of the file. Drop in **reverse dependency order**: child tables first, then parents (e.g. drop `news_article_category` before `news_article` and `news_category`).
+- **CREATE order:** Create parent tables before tables that reference them (e.g. `news_category` and `user_profile` exist before `news_article`; then `news_article_category` after `news_article` and `news_category`).
+- **Sequence initialization:** For any new table that uses `sequence_generator` for `id`, add that table to the `setval('public.sequence_generator', GREATEST(..., COALESCE((SELECT MAX(id) FROM public.<new_table>), 0), ...))` block at the end of the file so the sequence stays ahead of existing data.
+
+## **Shared Sequence Generator Rules (Mandatory)**
+
+- **Never leave a hardcoded shared sequence value** for `public.sequence_generator` when schema evolves (for example `setval(..., 4000, true)` only).
+- Use `GREATEST(...)` with `COALESCE(MAX(id), 0)` for all tables using `DEFAULT nextval('public.sequence_generator'::regclass)`.
+- When introducing a new table that uses `sequence_generator`, add its `MAX(id)` entry immediately in the consolidated sequence block.
+- **Required pattern:**
+  ```sql
+  SELECT pg_catalog.setval(
+                 'public.sequence_generator',
+                 GREATEST(
+                     COALESCE((SELECT MAX(id) FROM public.user_profile), 0),
+                     COALESCE((SELECT MAX(id) FROM public.<new_table>), 0),
+                     1
+                 ),
+                 true
+         );
+  ```
+- **Why this is required:** it prevents duplicate key errors in mixed environments where data may be preloaded from multiple tables.
+
+## **Foreign Keys**
+
+- **Naming:** `CONSTRAINT fk_<short_name> FOREIGN KEY (column_id) REFERENCES public.<parent_table>(id) ON DELETE SET NULL` (or `ON DELETE CASCADE` where appropriate).
+- **Column type:** Use `bigint` for foreign key columns referencing `id` (e.g. `author_id bigint`, `news_article_id bigint`).
+
+## **Naming Conventions**
+
+- **Tables:** `snake_case` (e.g. `news_article`, `news_section_display_config`).
+- **Columns:** `snake_case`.
+- **Constraints:** `tablename_pkey` for primary key; `ux_*` or `uq_*` for unique; `fk_*` for foreign key; `check_*` for check constraints.
+
+## **Reference Implementation**
+
+- **Schema file:** [code_html_template/SQLS/Current_Sqls/Latest_Schema_Post__Blob_Claude_12.sql](mdc:code_html_template/SQLS/Current_Sqls/Latest_Schema_Post__Blob_Claude_12.sql)
+- **News portal PRD (table list):** [documentation/news_portal/backend_prd.html](mdc:documentation/news_portal/backend_prd.html) and [documentation/news_portal/generic_prd.html](mdc:documentation/news_portal/generic_prd.html)
+
+## **Summary Checklist for New Tables**
+
+- [ ] `id bigint DEFAULT nextval('public.sequence_generator'::regclass) NOT NULL` and `PRIMARY KEY (id)`
+- [ ] `tenant_id character varying(255)` (if tenant-scoped)
+- [ ] `created_at` and `updated_at` with `DEFAULT now() NOT NULL` where applicable
+- [ ] DROP TABLE added at top in reverse dependency order
+- [ ] CREATE TABLE added in dependency order (parents before children)
+- [ ] Table added to `sequence_generator` setval GREATEST list
+- [ ] No stale hardcoded `sequence_generator` value left without `MAX(id)` protection for newly-added tables
+- [ ] No ALTER used; only CREATE TABLE for new tables

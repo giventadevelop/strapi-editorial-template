@@ -1,0 +1,787 @@
+---
+description: Rules for implementing mobile browser payment flow (Apple Pay/Google Pay PRB), membership subscription success handling, and QR generation without duplicates. Includes Stripe API lookup, cancellation of existing subscriptions, and complete success page UI matching desktop flow.
+globs: src/**/*
+alwaysApply: false
+---
+
+- **Main Points in Bold**
+  - Mobile flow uses Payment Request Button (PRB) for Apple Pay/Google Pay native wallet payment
+  - Mobile flow redirects to dedicated QR page (`/membership/qr`) after payment completion
+  - Mobile flow uses GET polling + POST fallback pattern for subscription creation
+  - **CRITICAL**: Mobile flow must filter out CANCELLED/EXPIRED subscriptions when looking up existing subscriptions
+  - **CRITICAL**: Mobile flow must check Stripe API for existing active subscriptions and cancel them before creating new ones
+  - **CRITICAL**: Mobile success page UI must match desktop flow (plan features, additional details, styled buttons)
+  - Mobile workflow is completely separate from desktop workflow - uses different entry points and detection methods
+
+# Mobile Browser Membership Subscription Payment Flow Architecture
+
+This document outlines the comprehensive mobile browser payment flow architecture for membership subscriptions in the MCEFEE event management application, detailing how mobile payments differ from desktop payments and how subscriptions are persisted.
+
+## Overview
+
+The mobile payment flow is fundamentally different from the desktop flow due to:
+- Different payment methods (Payment Request Button vs Stripe Checkout/Elements)
+- Different user experience (native wallet sheet vs hosted payment page/inline form)
+- Different transaction persistence strategy (GET polling + POST fallback vs immediate GET creation)
+- Different success page handling (dedicated QR page vs inline display)
+
+## Mobile vs Desktop Flow Comparison
+
+### Mobile Flow
+```
+User taps PRB →
+Native wallet sheet opens →
+Payment Intent created →
+Payment confirmed with PI →
+Redirect to /membership/success?pi=pi_xxx →
+SuccessClient detects mobile →
+Shows brief success (2 seconds) →
+Redirect to /membership/qr?pi=pi_xxx →
+Dedicated QR page with GET polling →
+If subscription not found after 3 attempts →
+POST /api/membership/success/process →
+Subscription created via POST endpoint →
+Display success page with subscription details
+```
+
+### Desktop Flow (Separate - Unchanged)
+```
+User fills form →
+Payment Intent created →
+Stripe Elements rendered inline →
+Payment completion →
+Redirect to /membership/success?pi=pi_xxx →
+SuccessClient detects desktop →
+Stays on success page →
+GET /api/membership/success/process →
+If subscription not found →
+Create subscription immediately via GET endpoint →
+Display success page with subscription details
+```
+
+**CRITICAL**: Mobile and desktop flows are completely separate:
+- **Mobile**: Uses GET polling + POST fallback pattern (via `/membership/qr` page)
+- **Desktop**: Uses GET endpoint with immediate subscription creation fallback
+- **Entry Points**: Different API routes and client components
+- **Mobile workflow files**: `/membership/qr` page and `MembershipQrClient.tsx` are mobile-specific
+
+## Mobile Browser Detection Methods
+
+### Client-Side Detection (`MembershipSuccessClient.tsx`)
+
+The application uses multiple methods to reliably detect mobile browsers:
+
+#### 1. User Agent Detection (Primary)
+```typescript
+const mobileRegexMatch = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS|FxiOS|EdgiOS/i.test(userAgent);
+const platformMatch = /iPhone|iPad|iPod|Android|BlackBerry|Windows Phone/i.test(platform);
+```
+
+#### 2. Screen Width Detection (Secondary)
+```typescript
+const narrowScreenMatch = window.innerWidth <= 768;
+const isMobile = mobileRegexMatch || narrowScreenMatch;
+```
+
+#### 3. Combined Detection Logic
+```typescript
+// CRITICAL: Mobile detection - Consider mobile if:
+// 1. User agent indicates mobile (primary method), OR
+// 2. Narrow screen (secondary method)
+const isMobile = mobileRegexMatch || narrowScreenMatch;
+```
+
+**Key Points**:
+- Mobile detection happens immediately on component mount
+- Mobile browsers redirect to `/membership/qr` page after 2 seconds
+- Desktop browsers stay on `/membership/success` page
+
+### Server-Side Detection (`/api/membership/success/process/route.ts`)
+
+Server-side detection for logging and routing decisions:
+
+#### CloudFront Headers (AWS Deployment)
+```typescript
+const cloudfrontMobile = req.headers.get('cloudfront-is-mobile-viewer') === 'true';
+const cloudfrontAndroid = req.headers.get('cloudfront-is-android-viewer') === 'true';
+const cloudfrontIOS = req.headers.get('cloudfront-is-ios-viewer') === 'true';
+```
+
+#### User Agent Analysis
+```typescript
+const mobileRegexMatch = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS|FxiOS|EdgiOS/i.test(userAgent);
+const platformMatch = /iPhone|iPad|iPod|Android|BlackBerry|Windows Phone/i.test(userAgent);
+const isMobile = mobileRegexMatch || platformMatch || cloudfrontMobile || cloudfrontAndroid || cloudfrontIOS;
+```
+
+**Server-Side Detection Purpose**:
+- CloudWatch logging for debugging
+- Route decision making (mobile vs desktop subscription creation)
+- Request routing and validation
+
+## Mobile Payment Flow Architecture
+
+### Payment Processing Entry Points
+
+#### 1. Payment Request Button Flow (Mobile Only)
+```
+User taps PRB →
+Native wallet sheet opens →
+Payment Intent created via /api/stripe/membership-payment-intent →
+Apple Pay/Google Pay shown natively →
+User selects payment method and completes payment →
+Payment confirmed via stripe.confirmPayment() →
+Redirect to /membership/success?pi=pi_xxx →
+SuccessClient detects mobile →
+Shows brief success (2 seconds) →
+Redirect to /membership/qr?pi=pi_xxx →
+Dedicated QR page with GET polling →
+If subscription not found after 3 attempts →
+POST /api/membership/success/process →
+Subscription created via POST endpoint →
+Display success page with subscription details
+```
+
+**When to Use Payment Request Button:**
+- Mobile devices (iOS Safari, Android Chrome)
+- Native wallet payment experience
+- Better UX - no redirect, native payment sheet
+- Example: Membership subscribe page (`/membership/subscribe/[planId]`)
+
+**Components:**
+- `MembershipMobileCheckout` - For membership subscriptions on mobile
+
+**CRITICAL: Membership Subscription Flow Differences:**
+- Creates Stripe Subscription for recurring billing (not just one-time Payment Intent)
+- Stores `stripeSubscriptionId`, `stripeCustomerId`, and `stripePaymentIntentId` in database
+- Creates Stripe Product/Price on the fly if plan doesn't have `stripePriceId`
+- Filters out CANCELLED/EXPIRED subscriptions when looking up existing subscriptions
+- Checks Stripe API for existing active subscriptions and cancels them before creating new ones
+- Uses `payment_behavior: 'default_incomplete'` to allow subscription creation without immediate payment method
+
+### Mobile Subscription Persistence Flow
+
+**CRITICAL**: Mobile flow uses GET polling + POST fallback pattern for subscription creation.
+
+#### GET Polling Pattern (`MembershipQrClient.tsx`)
+
+**When GET Polling Triggers**:
+1. User arrives at `/membership/qr` page after payment
+2. Payment Intent ID (`pi`) or Session ID (`session_id`) is provided
+3. Component mounts and starts polling GET endpoint
+
+**GET Polling Process**:
+```typescript
+const MAX_POLL_ATTEMPTS = 15;
+const POLL_INTERVAL_MS = 2000;
+
+for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt++) {
+  const response = await fetch(`/api/membership/success/process?pi=${pi}&_poll=${attempt}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+  });
+
+  if (response.ok) {
+    const data = await response.json();
+    if (data.subscription) {
+      // CRITICAL: Only accept ACTIVE or TRIAL subscriptions
+      const subscriptionStatus = data.subscription.subscriptionStatus;
+      if (subscriptionStatus === 'ACTIVE' || subscriptionStatus === 'TRIAL') {
+        setSubscription(data.subscription);
+        setPlan(data.plan || null);
+        setLoading(false);
+        return; // Success - exit polling
+      } else {
+        // Continue polling - don't set subscription if it's CANCELLED/EXPIRED
+        console.warn('[MEMBERSHIP-QR] Subscription found but status is not ACTIVE/TRIAL');
+      }
+    }
+  }
+
+  // Wait before next poll
+  await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+}
+```
+
+**Key Points**:
+- Mobile polls GET endpoint up to 15 times with 2-second intervals
+- Only accepts ACTIVE or TRIAL subscriptions (filters out CANCELLED/EXPIRED)
+- Continues polling if subscription is CANCELLED/EXPIRED
+- Exits polling loop when active subscription is found
+
+#### POST Fallback Pattern (`MembershipQrClient.tsx`)
+
+**When POST Fallback Triggers**:
+1. GET polling reaches attempt 3 OR final attempt (15)
+2. Subscription still not found after GET polling
+3. Webhook may have failed or subscription creation delayed
+
+**POST Fallback Process**:
+```typescript
+// CRITICAL: Try POST fallback after 3 attempts OR on final attempt
+const shouldTryPost = (pollAttemptRef.current >= 3 && pollAttemptRef.current < MAX_POLL_ATTEMPTS) || pollAttemptRef.current === MAX_POLL_ATTEMPTS;
+
+if (shouldTryPost && !cancelledRef.current) {
+  console.log(`[MEMBERSHIP-QR] Transaction not found after ${attempt} polling attempts, attempting POST to create subscription`);
+
+  const postBody = session_id ? { session_id, skip_qr: true } : { pi: payment_intent || identifier, skip_qr: true };
+  const postRes = await fetch('/api/membership/success/process', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(postBody),
+    cache: 'no-store',
+  });
+
+  if (postRes.ok) {
+    const postData = await postRes.json();
+    if (postData.subscription) {
+      // CRITICAL: Only accept ACTIVE or TRIAL subscriptions
+      const subscriptionStatus = postData.subscription.subscriptionStatus;
+      if (subscriptionStatus === 'ACTIVE' || subscriptionStatus === 'TRIAL') {
+        console.log('[MEMBERSHIP-QR] ✅✅✅ POST FALLBACK SUCCESS! Active subscription created');
+        setSubscription(postData.subscription);
+        setPlan(postData.plan || null); // Ensure plan is set
+        setLoading(false);
+        return; // Success - exit polling
+      }
+    }
+  }
+}
+```
+
+**Key Points**:
+- POST fallback triggers after 3 GET attempts OR on final attempt
+- POST endpoint creates subscription if webhook failed
+- Only accepts ACTIVE or TRIAL subscriptions from POST response
+- Ensures plan details are included in response
+
+## Stripe API Lookup and Cancellation
+
+### CRITICAL: Stripe API is Source of Truth
+
+**Problem**: When users upgraded to a new plan, the system was creating duplicate subscriptions instead of cancelling the old one first. Additionally, Stripe API was the source of truth but database could be out of sync.
+
+**Root Cause**:
+1. System was only checking database for existing subscriptions
+2. Stripe API could have active subscriptions that weren't reflected in database
+3. No cancellation of existing active subscriptions before creating new ones
+4. Plan switch detection wasn't cancelling old subscriptions properly
+
+**Solution**: Check Stripe API for existing active subscriptions BEFORE creating new ones, and cancel any existing active subscriptions (except the current one being created).
+
+**Implementation** (`src/app/membership/success/ApiServerActions.ts`):
+```typescript
+// CRITICAL: Check Stripe API for existing active subscriptions BEFORE creating new one
+// Stripe API is the source of truth - database may be out of sync
+if (stripeCustomerId && !existingSubscription) {
+  try {
+    console.log('[MEMBERSHIP-SUCCESS] 🔍 Checking Stripe API for existing active subscriptions for customer:', stripeCustomerId);
+    const stripeSubscriptions = await stripe().subscriptions.list({
+      customer: stripeCustomerId,
+      status: 'active', // Only look for active subscriptions
+      limit: 10, // Limit to a reasonable number
+    });
+
+    if (stripeSubscriptions.data.length > 0) {
+      console.log('[MEMBERSHIP-SUCCESS] Found existing active Stripe subscriptions:', stripeSubscriptions.data.length);
+      for (const sub of stripeSubscriptions.data) {
+        if (sub.id !== stripeSubscriptionId) { // Don't cancel the current one if it's already active
+          console.log('[MEMBERSHIP-SUCCESS] Cancelling existing active Stripe subscription:', sub.id);
+          await stripe().subscriptions.cancel(sub.id);
+          console.log('[MEMBERSHIP-SUCCESS] Cancelled Stripe subscription:', sub.id);
+
+          // Also update our database to reflect cancellation
+          const existingDbSubscription = await findSubscriptionByStripeSubscriptionId(sub.id);
+          if (existingDbSubscription && existingDbSubscription.subscriptionStatus !== 'CANCELLED') {
+            console.log('[MEMBERSHIP-SUCCESS] Updating database subscription to CANCELLED:', existingDbSubscription.id);
+            await updateSubscription(existingDbSubscription.id, { subscriptionStatus: 'CANCELLED' });
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[MEMBERSHIP-SUCCESS] Error checking/cancelling Stripe subscriptions (non-fatal):', error);
+    // Continue - will still create new subscription
+  }
+}
+```
+
+**Key Points**:
+- Stripe API is the source of truth - check it before creating new subscriptions
+- Cancel all existing active subscriptions except the current one
+- Update database to reflect Stripe cancellations
+- Handle errors gracefully (non-fatal) - continue with subscription creation even if cancellation fails
+
+## CANCELLED Subscription Filtering
+
+### CRITICAL: Filter Out CANCELLED/EXPIRED Subscriptions
+
+**Problem**: When a user made a new payment after cancelling a subscription, the system was returning the old cancelled subscription instead of creating a new one.
+
+**Root Cause**: Backend queries were returning CANCELLED subscriptions even with `subscriptionStatus.in=ACTIVE,TRIAL` filter, especially when expanded relations (membershipPlan, userProfile) were included.
+
+**Solution**: Filter out CANCELLED/EXPIRED subscriptions IMMEDIATELY after lookup, before any processing.
+
+**Implementation** (`src/app/api/membership/success/process/route.ts` - POST handler):
+```typescript
+if (existingSubscription) {
+  // CRITICAL: Filter out CANCELLED/EXPIRED subscriptions IMMEDIATELY after lookup
+  // Backend queries may return CANCELLED subscriptions with expanded relations (membershipPlan, userProfile)
+  // We must reject these and create a new subscription instead
+  const subscriptionStatus = existingSubscription.subscriptionStatus;
+  if (subscriptionStatus === 'CANCELLED' || subscriptionStatus === 'EXPIRED') {
+    console.log('[MEMBERSHIP-PROCESS POST] ⚠️⚠️⚠️ CRITICAL: Found CANCELLED/EXPIRED subscription - REJECTING and will create new one');
+    // CRITICAL: Reset to null so we proceed to create a new subscription
+    existingSubscription = null;
+  } else if (subscriptionStatus !== 'ACTIVE' && subscriptionStatus !== 'TRIAL') {
+    console.error('[MEMBERSHIP-PROCESS POST] ⚠️⚠️⚠️ CRITICAL: Subscription found but status is not ACTIVE/TRIAL');
+    existingSubscription = null;
+  }
+}
+
+// CRITICAL: Final safety check before returning response
+if (existingSubscription && (existingSubscription.subscriptionStatus === 'CANCELLED' || existingSubscription.subscriptionStatus === 'EXPIRED')) {
+  console.error('[MEMBERSHIP-PROCESS POST] ⚠️⚠️⚠️ CRITICAL: Attempted to return CANCELLED/EXPIRED subscription - REJECTING');
+  existingSubscription = null;
+}
+```
+
+**Client-Side Filtering** (`MembershipQrClient.tsx`):
+```typescript
+if (data.subscription) {
+  // CRITICAL: Only accept ACTIVE or TRIAL subscriptions
+  // If subscription is CANCELLED or EXPIRED, continue polling or show warning
+  const subscriptionStatus = data.subscription.subscriptionStatus;
+  if (subscriptionStatus === 'ACTIVE' || subscriptionStatus === 'TRIAL') {
+    console.log('[MEMBERSHIP-QR] ✅✅✅ SUCCESS! Active subscription found');
+    setSubscription(data.subscription);
+    setPlan(data.plan || null);
+    setLoading(false);
+    return; // Success - exit polling
+  } else {
+    console.warn('[MEMBERSHIP-QR] ⚠️ Subscription found but status is not ACTIVE/TRIAL');
+    // Continue polling - don't set subscription if it's CANCELLED/EXPIRED
+  }
+}
+```
+
+**Key Points**:
+- Filter CANCELLED/EXPIRED subscriptions immediately after lookup
+- Backend filters may not work correctly with expanded relations
+- Final safety check before returning response
+- Client-side also filters CANCELLED/EXPIRED subscriptions
+- Set `existingSubscription = null` to force creation of new subscription
+
+## Plan Details in Response
+
+### CRITICAL: Ensure Plan Details Are Included
+
+**Problem**: Mobile success page was not displaying plan details (features, max events, max attendees, billing info) because plan was not included in API response.
+
+**Root Cause**: POST endpoint was not ensuring plan details were included in response, especially for existing subscriptions.
+
+**Solution**: Ensure plan details are always included in response, with fallback to fetch plan directly if missing.
+
+**Implementation** (`src/app/api/membership/success/process/route.ts` - POST handler):
+```typescript
+// CRITICAL: Ensure plan is included in response for mobile flow
+let planDetails = details?.plan;
+if (!planDetails && existingSubscription.membershipPlanId) {
+  // Fallback: Fetch plan directly if not included in details
+  try {
+    const { fetchMembershipPlanById } = await import('@/app/membership/success/ApiServerActions');
+    planDetails = await fetchMembershipPlanById(existingSubscription.membershipPlanId);
+    console.log('[MEMBERSHIP-PROCESS POST] Fetched plan details as fallback for existing subscription');
+  } catch (planError) {
+    console.error('[MEMBERSHIP-PROCESS POST] ⚠️ Failed to fetch plan details as fallback (non-fatal):', planError);
+  }
+}
+
+return NextResponse.json({
+  subscription: existingSubscription,
+  plan: planDetails || null,
+  amount: details?.amount || null,
+  currency: details?.currency || 'USD',
+});
+```
+
+**Client-Side Fallback** (`MembershipQrClient.tsx`):
+```typescript
+// CRITICAL: Ensure plan is set - if not provided, try to fetch it
+let planToSet = postData.plan;
+if (!planToSet && postData.subscription.membershipPlanId) {
+  console.log('[MEMBERSHIP-QR] ⚠️ Plan not in response - attempting to fetch:', postData.subscription.membershipPlanId);
+  try {
+    // Fetch plan from backend
+    const planRes = await fetch(`/api/proxy/membership-plans/${postData.subscription.membershipPlanId}`, {
+      cache: 'no-store',
+    });
+    if (planRes.ok) {
+      planToSet = await planRes.json();
+      console.log('[MEMBERSHIP-QR] ✅ Fetched plan details');
+    }
+  } catch (planFetchError) {
+    console.error('[MEMBERSHIP-QR] ⚠️ Failed to fetch plan details (non-fatal):', planFetchError);
+  }
+}
+setPlan(planToSet || null);
+```
+
+**Key Points**:
+- Always include plan details in API response
+- Fallback to fetch plan directly if not included in details
+- Client-side also has fallback to fetch plan if missing
+- Handle errors gracefully (non-fatal)
+- Ensure success page has all data needed for display
+
+## Mobile Success Page UI
+
+### CRITICAL: Match Desktop Flow UI
+
+**Problem**: Mobile success page was missing plan features, additional plan details (max events, max attendees, billing), Stripe subscription ID display, and styled action buttons.
+
+**Root Cause**: Mobile QR page UI was not matching the complete desktop success page design.
+
+**Solution**: Replicate complete desktop success page UI with:
+- Plan features display (`PlanFeaturesList` component)
+- Additional plan details (max events, max attendees, billing)
+- Stripe subscription ID display
+- Four styled action buttons (Manage Subscription, View All Plans, My Profile, Go Home)
+
+**Implementation** (`src/app/membership/qr/MembershipQrClient.tsx`):
+```typescript
+import { PlanFeaturesList } from '@/components/membership/PlanFeaturesList';
+
+// Plan Features Display
+{plan.featuresJson && (() => {
+  try {
+    const featuresObj = typeof plan.featuresJson === 'string'
+      ? JSON.parse(plan.featuresJson)
+      : plan.featuresJson;
+    const features = Object.entries(featuresObj)
+      .filter(([key, value]) => {
+        // Filter out empty/null/invalid values
+        const valueStr = String(value).trim();
+        return valueStr !== '' && valueStr !== '0' && valueStr !== 'null' && valueStr !== 'undefined';
+      })
+      .map(([key, value]) => ({ key, value: String(value) }));
+
+    if (features.length > 0) {
+      return (
+        <div className="mb-6">
+          <h3 className="text-lg font-heading font-semibold text-foreground mb-4">
+            Plan Features
+          </h3>
+          <PlanFeaturesList features={features} />
+        </div>
+      );
+    }
+  } catch (e) {
+    console.error('Error parsing featuresJson:', e);
+  }
+  return null;
+})()}
+
+// Additional Plan Details
+<div className="space-y-4 pt-6 border-t border-border">
+  {plan.maxEventsPerMonth && plan.maxEventsPerMonth > 0 && (
+    <div className="flex items-start gap-3">
+      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+        {/* Calendar icon */}
+      </div>
+      <div className="flex-1">
+        <p className="font-body text-sm font-semibold text-foreground">Max Events</p>
+        <p className="font-body text-sm text-muted-foreground">
+          {plan.maxEventsPerMonth} per month
+        </p>
+      </div>
+    </div>
+  )}
+
+  {plan.maxAttendeesPerEvent && plan.maxAttendeesPerEvent > 0 && (
+    <div className="flex items-start gap-3">
+      <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+        {/* Users icon */}
+      </div>
+      <div className="flex-1">
+        <p className="font-body text-sm font-semibold text-foreground">Max Attendees</p>
+        <p className="font-body text-sm text-muted-foreground">
+          {plan.maxAttendeesPerEvent} per event
+        </p>
+      </div>
+    </div>
+  )}
+
+  {/* Billing information */}
+  <div className="flex items-start gap-3">
+    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
+      {/* Currency icon */}
+    </div>
+    <div className="flex-1">
+      <p className="font-body text-sm font-semibold text-foreground">Billing</p>
+      <p className="font-body text-sm text-muted-foreground">
+        {plan.billingInterval === 'MONTHLY' && 'Monthly'}
+        {plan.billingInterval === 'QUARTERLY' && 'Quarterly'}
+        {plan.billingInterval === 'YEARLY' && 'Yearly'}
+        {plan.billingInterval === 'ONE_TIME' && 'One-time'} • {plan.currency}
+      </p>
+    </div>
+  </div>
+</div>
+
+// Stripe Subscription ID Display
+{subscription.stripeSubscriptionId && (
+  <div className="flex items-start gap-3">
+    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+      {/* Code icon */}
+    </div>
+    <div className="flex-1">
+      <p className="font-body text-sm font-semibold text-foreground">Stripe Subscription ID</p>
+      <p className="font-body text-sm text-muted-foreground font-mono break-all">
+        {subscription.stripeSubscriptionId}
+      </p>
+    </div>
+  </div>
+)}
+
+// Four Styled Action Buttons
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  {/* Manage Subscription Button (Blue) */}
+  <button
+    onClick={() => router.push('/membership')}
+    className="w-full flex-shrink-0 h-14 rounded-xl bg-blue-100 hover:bg-blue-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 px-6"
+  >
+    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-200 flex items-center justify-center">
+      {/* Settings icon */}
+    </div>
+    <span className="font-semibold text-blue-700">Manage Subscription</span>
+  </button>
+
+  {/* View All Plans Button (Green) */}
+  <button
+    onClick={() => router.push('/membership')}
+    className="w-full flex-shrink-0 h-14 rounded-xl bg-green-100 hover:bg-green-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 px-6"
+  >
+    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-green-200 flex items-center justify-center">
+      {/* Building icon */}
+    </div>
+    <span className="font-semibold text-green-700">View All Plans</span>
+  </button>
+
+  {/* My Profile Button (Purple) */}
+  <button
+    onClick={() => router.push('/profile')}
+    className="w-full flex-shrink-0 h-14 rounded-xl bg-purple-100 hover:bg-purple-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 px-6"
+  >
+    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-200 flex items-center justify-center">
+      {/* User icon */}
+    </div>
+    <span className="font-semibold text-purple-700">My Profile</span>
+  </button>
+
+  {/* Go Home Button (Indigo) */}
+  <button
+    onClick={() => router.push('/')}
+    className="w-full flex-shrink-0 h-14 rounded-xl bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 px-6"
+  >
+    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-200 flex items-center justify-center">
+      {/* Home icon */}
+    </div>
+    <span className="font-semibold text-indigo-700">Go Home</span>
+  </button>
+</div>
+```
+
+**Key Points**:
+- Use `PlanFeaturesList` component for plan features display
+- Display all plan details (max events, max attendees, billing)
+- Show Stripe subscription ID for reference
+- Use styled action buttons matching admin action button pattern
+- Ensure consistent UI across mobile and desktop flows
+
+## API Endpoint Details
+
+### GET `/api/membership/success/process` (Mobile Polling)
+
+**Purpose**: Lookup existing subscription (mobile polls this endpoint)
+
+**Query Parameters**:
+- `session_id` (optional): Stripe Checkout Session ID
+- `pi` (optional): Payment Intent ID
+- `_poll` (optional): Polling attempt number (for logging)
+
+**Process**:
+1. Detect if request is from mobile browser
+2. Lookup subscription by `session_id` or `pi`
+3. Filter out CANCELLED/EXPIRED subscriptions
+4. Return subscription data with plan details
+
+**Response**:
+```typescript
+{
+  subscription: MembershipSubscriptionDTO | null,
+  plan: MembershipPlanDTO | null,
+  amount: number | null,
+  currency: string,
+  error?: string,
+  message?: string
+}
+```
+
+### POST `/api/membership/success/process` (Mobile Fallback)
+
+**Purpose**: Create subscription if webhook failed (mobile fallback)
+
+**Body Parameters**:
+- `session_id` (optional): Stripe Checkout Session ID
+- `pi` (optional): Payment Intent ID
+- `skip_qr` (optional): Skip QR code generation (not used for memberships)
+
+**Process**:
+1. Detect if request is from mobile browser
+2. Lookup existing subscription
+3. Filter out CANCELLED/EXPIRED subscriptions
+4. If not found, create subscription via `processMembershipSubscriptionFromPaymentIntent`
+5. Check Stripe API for existing active subscriptions and cancel them
+6. Ensure plan details are included in response
+7. Return subscription data with plan details
+
+**Response**:
+```typescript
+{
+  subscription: MembershipSubscriptionDTO | null,
+  plan: MembershipPlanDTO | null,
+  amount: number | null,
+  currency: string,
+  error?: string,
+  message?: string
+}
+```
+
+## Mobile Flow Error Handling
+
+### Common Errors and Solutions
+
+#### 1. "Subscription not found" After Polling
+
+**Cause**: Subscription not created by webhook or POST fallback
+
+**Solution**:
+- Verify mobile flow is calling POST endpoint after 3 GET attempts
+- Check that `paymentIntent.status === 'succeeded'`
+- Verify Stripe API lookup and cancellation logic is working
+- Check backend logs for subscription creation errors
+
+#### 2. "CANCELLED subscription returned" Error
+
+**Cause**: Backend query returned CANCELLED subscription despite filter
+
+**Solution**:
+- Verify CANCELLED/EXPIRED filtering is applied immediately after lookup
+- Check that final safety check is in place before returning response
+- Ensure client-side also filters CANCELLED/EXPIRED subscriptions
+
+#### 3. "Plan details missing" Error
+
+**Cause**: Plan not included in API response
+
+**Solution**:
+- Verify POST endpoint includes plan details in response
+- Check fallback to fetch plan directly if missing
+- Ensure client-side fallback to fetch plan if missing
+
+## Best Practices for Mobile Implementation
+
+### 1. Always Filter CANCELLED/EXPIRED Subscriptions
+
+- **CRITICAL**: Filter out CANCELLED/EXPIRED subscriptions immediately after lookup
+- Backend filters may not work correctly with expanded relations
+- Final safety check before returning response
+- Client-side also filters CANCELLED/EXPIRED subscriptions
+
+### 2. Check Stripe API Before Creating New Subscriptions
+
+- **CRITICAL**: Stripe API is the source of truth - check it before creating new subscriptions
+- Cancel all existing active subscriptions except the current one
+- Update database to reflect Stripe cancellations
+- Handle errors gracefully (non-fatal)
+
+### 3. Ensure Plan Details Are Included
+
+- **CRITICAL**: Always include plan details in API response
+- Fallback to fetch plan directly if not included in details
+- Client-side also has fallback to fetch plan if missing
+- Handle errors gracefully (non-fatal)
+
+### 4. Match Desktop Flow UI
+
+- **CRITICAL**: Mobile success page must match desktop flow UI
+- Use `PlanFeaturesList` component for plan features
+- Display all plan details (max events, max attendees, billing)
+- Show Stripe subscription ID for reference
+- Use styled action buttons matching admin action button pattern
+
+### 5. Handle Polling Properly
+
+- **CRITICAL**: Mobile polls GET endpoint up to 15 times with 2-second intervals
+- Only accepts ACTIVE or TRIAL subscriptions (filters out CANCELLED/EXPIRED)
+- POST fallback triggers after 3 GET attempts OR on final attempt
+- Exits polling loop when active subscription is found
+
+## Files Affected by Mobile Flow
+
+### Mobile Flow Files (Mobile-Specific)
+- `src/app/membership/qr/page.tsx` - Mobile QR page (server component)
+- `src/app/membership/qr/MembershipQrClient.tsx` - Mobile QR client (GET polling + POST fallback)
+- `src/app/api/membership/success/process/route.ts` - POST handler (mobile fallback)
+
+### Desktop Flow Files (Separate - Unchanged)
+- `src/app/membership/success/page.tsx` - Desktop success page (server component)
+- `src/app/membership/success/MembershipSuccessClient.tsx` - Desktop success client (GET-only flow)
+- `src/app/api/membership/success/process/route.ts` - GET handler (desktop immediate creation)
+
+### Shared Files (Used by Both)
+- `src/app/membership/success/ApiServerActions.ts` - `processMembershipSubscriptionFromPaymentIntent` function (shared)
+- `src/lib/env.ts` - Environment variable helpers (shared)
+- `src/lib/proxyHandler.ts` - Proxy handler with tenant ID header (shared)
+
+## Critical Mobile Flow Rules
+
+### 1. Mobile Flow Must Be Separate from Desktop
+
+- **CRITICAL**: Mobile flow uses GET polling + POST fallback pattern
+- **CRITICAL**: Desktop flow uses GET endpoint with immediate subscription creation fallback
+- **CRITICAL**: Mobile workflow files (`/membership/qr` page) are mobile-specific
+- **CRITICAL**: Both flows use same `processMembershipSubscriptionFromPaymentIntent` function but different entry points
+
+### 2. Mobile Flow Must Filter CANCELLED/EXPIRED Subscriptions
+
+- **CRITICAL**: Filter out CANCELLED/EXPIRED subscriptions immediately after lookup
+- **CRITICAL**: Final safety check before returning response
+- **CRITICAL**: Client-side also filters CANCELLED/EXPIRED subscriptions
+- **CRITICAL**: Set `existingSubscription = null` to force creation of new subscription
+
+### 3. Mobile Flow Must Check Stripe API
+
+- **CRITICAL**: Check Stripe API for existing active subscriptions before creating new ones
+- **CRITICAL**: Cancel all existing active subscriptions except the current one
+- **CRITICAL**: Update database to reflect Stripe cancellations
+- **CRITICAL**: Handle errors gracefully (non-fatal)
+
+### 4. Mobile Flow Must Include Plan Details
+
+- **CRITICAL**: Always include plan details in API response
+- **CRITICAL**: Fallback to fetch plan directly if not included in details
+- **CRITICAL**: Client-side also has fallback to fetch plan if missing
+- **CRITICAL**: Ensure success page has all data needed for display
+
+### 5. Mobile Success Page Must Match Desktop UI
+
+- **CRITICAL**: Mobile success page must match desktop flow UI
+- **CRITICAL**: Use `PlanFeaturesList` component for plan features
+- **CRITICAL**: Display all plan details (max events, max attendees, billing)
+- **CRITICAL**: Show Stripe subscription ID for reference
+- **CRITICAL**: Use styled action buttons matching admin action button pattern
+
+This architecture ensures optimal mobile payment experience while maintaining security, reliability, and proper subscription persistence for the MCEFEE event management system. The mobile membership subscription flow now properly creates Stripe Subscriptions for recurring billing, stores all required Stripe IDs in the database, handles plan upgrades correctly, filters out cancelled subscriptions, checks Stripe API for existing subscriptions, and displays complete subscription details on the success page matching the desktop flow.
