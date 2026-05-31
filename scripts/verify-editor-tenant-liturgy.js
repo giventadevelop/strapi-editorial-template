@@ -2,17 +2,21 @@
 
 /**
  * Verify Editor Tenant Assignment and liturgy-day counts so editors see data in Content Manager.
- * Run (with Strapi stopped): node scripts/verify-editor-tenant-liturgy.js [editor-email]
  *
- * With no args: list all editor→tenant mappings and liturgy-day count per tenant.
- * With email: show which tenant that editor is assigned to and how many liturgy days that tenant has.
+ * Run (with Strapi stopped):
+ *   node scripts/verify-editor-tenant-liturgy.js
+ *   node scripts/verify-editor-tenant-liturgy.js --editor-email=mosc.regular.user@keleno.com --tenant-id=tenant_demo_002 --year=2026
+ *   node scripts/verify-editor-tenant-liturgy.js mosc.regular.user@keleno.com  (positional email still supported)
+ *
+ * With no editor email: list all editor→tenant mappings and liturgy-day count per tenant.
+ * With editor email: show assigned tenant and liturgy-day count (year used in import hints only).
  */
 
-try {
-  require('dotenv').config();
-} catch (_) {}
+const { getEditorEmail, getTenantId, getYear } = require('./lib/liturgy-cli');
 
-const checkEmail = process.argv[2] ? String(process.argv[2]).trim().toLowerCase() : null;
+const checkEmail = getEditorEmail();
+const hintYear = getYear();
+const hintTenantId = getTenantId({ defaultValue: null });
 
 async function main() {
   const { createStrapi, compileStrapi } = require('@strapi/strapi');
@@ -77,7 +81,7 @@ async function main() {
       );
       if (!mapping) {
         console.log('No Editor Tenant Assignment found for:', checkEmail);
-        console.log('Create one with: node scripts/assign-editor-to-directory-tenant.js', checkEmail, 'tenant_demo_002');
+        console.log('Create one with: node scripts/assign-editor-to-directory-tenant.js', checkEmail, hintTenantId || 'tenant_demo_002');
         await app.destroy();
         process.exit(1);
       }
@@ -95,7 +99,7 @@ async function main() {
         } else {
           console.log('No liturgy days in the database. Import with:');
         }
-        console.log('  node scripts/import-liturgy-days-from-pdf.js --tenant-id=' + tenantIdStr + ' --year=2026');
+        console.log('  node scripts/import-liturgy-days-from-pdf.js --tenant-id=' + tenantIdStr + ' --year=' + hintYear);
       } else {
         console.log('');
         console.log('If the editor still sees 0 in Content Manager:');

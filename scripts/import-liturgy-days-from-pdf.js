@@ -24,30 +24,14 @@
 const path = require('path');
 const fs = require('fs');
 
-try {
-  require('dotenv').config();
-} catch (_) {}
-
-const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
-
-const DEFAULT_EN_PDF = path.join('documentation', 'lectionary_calendar', '2026-Liturgical-Calender.pdf');
-const DEFAULT_ML_PDF = path.join('documentation', 'lectionary_calendar', 'Panjangom_26.pdf');
-
-function getArg(name, defaultValue) {
-  const envMap = {
-    tenantId: process.env.TENANT_ID,
-    limit: process.env.LIMIT,
-    year: process.env.YEAR,
-  };
-  if (envMap[name]) return envMap[name];
-  for (let i = 2; i < process.argv.length; i++) {
-    const arg = process.argv[i];
-    if (arg === `--${name}` && process.argv[i + 1]) return process.argv[i + 1];
-    const match = arg.match(new RegExp(`^--${name}=(.+)$`));
-    if (match) return match[1].trim();
-  }
-  return defaultValue;
-}
+const {
+  DRY_RUN,
+  getArg,
+  getYear,
+  getTenantId,
+  resolveCalendarPaths,
+  resolvePath,
+} = require('./lib/liturgy-cli');
 
 function getDumpText() {
   return process.argv.includes('--dump-text');
@@ -87,13 +71,13 @@ async function dumpText(enPdf, mlPdf) {
 }
 
 async function main() {
-  const tenantId = getArg('tenantId', 'tenant_demo_002');
+  const year = getYear();
+  const paths = resolveCalendarPaths(year);
+  const tenantId = getTenantId({ defaultValue: 'tenant_demo_002' });
   const limitArg = getArg('limit', '');
   const limit = limitArg ? Math.max(0, parseInt(limitArg, 10)) : null;
-  const yearArg = getArg('year', '2026');
-  const year = Math.max(1900, Math.min(9999, parseInt(yearArg, 10) || 2026));
-  const enPdf = getArg('en-pdf', DEFAULT_EN_PDF);
-  const mlPdf = getArg('ml-pdf', DEFAULT_ML_PDF);
+  const enPdf = resolvePath(getArg('en-pdf', paths.enPdf));
+  const mlPdf = resolvePath(getArg('ml-pdf', paths.mlPdf));
 
   if (getDumpText()) {
     await dumpText(enPdf, mlPdf);
