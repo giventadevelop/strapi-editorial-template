@@ -180,7 +180,7 @@
         <li><a href="#production-cloud">7. Import liturgy days into production (Strapi Cloud)</a></li>
         <li><a href="#malayalam-excel">8. Update Malayalam headings from Excel</a></li>
         <li><a href="#translation-workflow">9. Translation workflow: PDF to Malayalam (Google Nana Banana)</a></li>
-        <li><a href="#db-copy-recovery">10. Recovering from copied SQLite (db_backup)</a></li>
+        <li><a href="#db-copy-recovery">10. Recovering from wrong liturgy data (full remediation)</a></li>
         <li><a href="#malayalam-excel-sync">11. Malayalam Excel sync (Oct–Dec + full calendar)</a></li>
         <li><a href="#cloud-push-safety">12. Cloud push safety (do not overwrite other types)</a></li>
         <li><a href="#related">13. Related documentation</a></li>
@@ -481,9 +481,10 @@
       </div>
     </div>
 
-    <h2 id="malayalam-excel">8. Update Malayalam headings from Excel</h2>
+    <h2 id="malayalam-excel">8. Update Malayalam headings from Excel (overlay only)</h2>
     <div class="section-intro">
       <p>After importing liturgy days from the English (and optionally Malayalam) PDFs, you can <strong>overwrite only the Malayalam day heading</strong> (<code>dayHeadingMalylm</code>) using an Excel file. The script does not create new records; it finds existing liturgy days by <strong>date</strong> for the given tenant and updates that single field. UTF-8 / Malayalam encoding is preserved when writing to Strapi.</p>
+      <p><strong>Not sufficient for a full calendar fix:</strong> For Oct–Dec dates, pruning PDF gibberish, and reaching 185 feast days, use <code class="script-name">sync-liturgy-days-from-malayalam-excel.js --prune-not-in-excel</code> instead (see <a href="#malayalam-excel-sync">section 11</a> and <a href="lectionary-pdf-to-excel-and-import.html#wrong-data-fix">PDF → Excel doc, section 6</a>).</p>
     </div>
     <div class="section-container parameters">
       <div class="section-header parameters">What we did</div>
@@ -546,28 +547,43 @@
       <p>Using this workflow, we had everything translated from the PDF into Malayalam via the tool, then generated the Excel sheet and ran <code class="script-name">update-liturgy-days-malayalam-from-excel.js</code> to update only the <code>dayHeadingMalylm</code> field in the Strapi database.</p>
     </div>
 
-    <h2 id="db-copy-recovery">10. Recovering from copied SQLite (db_backup)</h2>
+    <h2 id="db-copy-recovery">10. Recovering from wrong liturgy data (full remediation)</h2>
     <div class="section-intro">
-      <p>If you replaced local <code>.tmp/data.db</code> with a file from <code>db_backup/data.db</code> (copied from another machine), liturgy data is often corrupted: wrong tenant links, duplicates, gibberish Malayalam, and missing dates. <strong>Do not keep using the copied database.</strong> Run the scripted remediation below instead.</p>
+      <p>Wrong English/Malayalam calendar data can come from: copied SQLite (<code>db_backup/data.db</code>), repeated imports, <code>--split-en-headings</code>, using <code class="script-name">update-liturgy-days-malayalam-from-excel.js</code> without Excel sync, or pushing to Cloud without purge. See <a href="lectionary-pdf-to-excel-and-import.html#wrong-data-fix">PDF → Excel doc, section 6</a> for symptoms, causes, and observed counts.</p>
     </div>
     <div class="section-container">
-      <div class="section-header">Recovery checklist (tenant_demo_002, year 2026)</div>
+      <div class="section-header">Recovery checklist — local only (<code>tenant_demo_002</code>, year 2026)</div>
+      <p>Stop Strapi if it is running. Run from project root:</p>
       <table>
         <thead>
           <tr><th>Step</th><th>Command</th><th>Expected outcome</th></tr>
         </thead>
         <tbody>
-          <tr><td>1. Audit</td><td><code>node scripts/verify-editor-tenant-liturgy.js --editor-email=mosc.regular.user@keleno.com --tenant-id=tenant_demo_002 --year=2026</code></td><td>May show 0 tenant days if records are orphaned</td></tr>
-          <tr><td>2. Purge</td><td><code>node scripts/delete-liturgy-days.js --all</code></td><td>Removes all liturgy days (use <code>--all</code> when tenant filter misses orphaned rows)</td></tr>
-          <tr><td>3. PDF import</td><td><code>node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_demo_002 --year=2026</code></td><td>~166 created; no <code>--split-en-headings</code></td></tr>
-          <tr><td>4. Malayalam Excel</td><td><code>node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_demo_002</code></td><td>~120 rows updated with UTF-8 Malayalam; Excel rows without a matching DB date are skipped</td></tr>
-          <tr><td>5. Excel sync</td><td><code>node scripts/sync-liturgy-days-from-malayalam-excel.js --tenant-id=tenant_demo_002 --year=2026 --prune-not-in-excel</code></td><td>185 days, full year through Dec; see <a href="#malayalam-excel-sync">section 11</a></td></tr>
-          <tr><td>6. Verify</td><td><code>node scripts/verify-editor-tenant-liturgy.js --editor-email=...</code></td><td>185 days, 0 duplicates, date range through Dec 2026</td></tr>
-          <tr><td>7. Cloud (optional)</td><td><code>node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code></td><td>Upsert only; see <a href="#cloud-push-safety">section 12</a></td></tr>
+          <tr><td>1. Purge local</td><td><code>node scripts/delete-liturgy-days.js --tenant-id=tenant_demo_002</code></td><td>166 deleted (or use <code>--all</code> if tenant filter misses orphaned rows)</td></tr>
+          <tr><td>2. PDF import</td><td><code>node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_demo_002 --year=2026</code></td><td>~166 created; <strong>no</strong> <code>--split-en-headings</code></td></tr>
+          <tr><td>3. Excel sync</td><td><code>node scripts/sync-liturgy-days-from-malayalam-excel.js --tenant-id=tenant_demo_002 --prune-not-in-excel</code></td><td><strong>185</strong> rows; updated ~120, created ~65, pruned ~46 PDF-only extras</td></tr>
+          <tr><td>4. Verify</td><td><code>node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002 --year=2026</code></td><td>185 days for tenant; editor assignment OK</td></tr>
+        </tbody>
+      </table>
+      <div class="warning">
+        <strong>Wrong step we used before:</strong> stopping after step 2 and running only <code class="script-name">update-liturgy-days-malayalam-from-excel.js</code> — that updates Malayalam on existing dates only (~120 rows), skips Excel dates with no DB match (~67), and leaves gibberish PDF-only rows. Always run step 3 (<code>sync … --prune-not-in-excel</code>).
+      </div>
+    </div>
+    <div class="section-container usage">
+      <div class="section-header usage">Recovery checklist — local + Cloud</div>
+      <table>
+        <thead>
+          <tr><th>Step</th><th>Command</th><th>Expected outcome</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>0. Cloud purge (liturgy only)</td><td><code>node scripts/clear_cloud_data.js --remote --types=liturgy-days</code></td><td>Must pass <code>--remote</code> and <code>--types=liturgy-days</code> (e.g. 2,645 deleted when Cloud was bloated)</td></tr>
+          <tr><td>1–4</td><td>Same as local checklist above</td><td>185 rows locally</td></tr>
+          <tr><td>5. Push Cloud</td><td><code>node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code></td><td>185 upserted on Cloud; liturgy-only (does not touch articles)</td></tr>
+          <tr><td>6. Verify</td><td><code>node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002 --year=2026</code></td><td>185 on tenant; editors see data after re-login</td></tr>
         </tbody>
       </table>
       <div class="info">
-        <strong>Not 365 civil days:</strong> The lectionary PDF lists <strong>feast days</strong>, not every calendar date. Oct–Dec Excel rows apply only after those dates exist in the database (extend PDF import or add records manually).
+        <strong>Also applies after db_backup:</strong> If you copied <code>db_backup/data.db</code>, use <code>delete-liturgy-days.js --all</code> in step 1 when verify shows 0 tenant days but thousands in DB.
       </div>
       <div class="warning">
         <strong>PowerShell:</strong> After <code>$env:DRY_RUN=1</code>, run <code>Remove-Item Env:DRY_RUN</code> before the real import or Malayalam update, or subsequent commands will stay in dry-run mode.

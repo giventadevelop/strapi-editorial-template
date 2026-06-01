@@ -203,17 +203,22 @@
     <p>Parsing is best-effort. If the PDF layout changes, adjust <code class="script-name">lectionary-pdf-parser.js</code> or re-run <code>--dump-text</code> and inspect the generated <code>dumped-en.txt</code> / <code>dumped-ml.txt</code>.</p>
 
     <h2 id="troubleshooting">7. Troubleshooting</h2>
+    <div class="warning">
+      <strong>Wrong English/Malayalam data or too many rows on Cloud?</strong> See <a href="lectionary-pdf-to-excel-and-import.html#wrong-data-fix">PDF → Excel doc, section 6</a> and <a href="liturgy-days-tenant-relation-fixes.html#db-copy-recovery">Liturgy Days – full remediation checklist</a>. Do <strong>not</strong> use <code class="script-name">update-liturgy-days-malayalam-from-excel.js</code> alone — run <code class="script-name">sync-liturgy-days-from-malayalam-excel.js --prune-not-in-excel</code> after PDF import.
+    </div>
     <ul>
       <li><strong>Tenant not found</strong>: Create the tenant in Strapi Admin (Content Manager → Tenant) and use its <code>tenantId</code> in the script.</li>
       <li><strong>PDF not found</strong>: Ensure the PDFs are in <code>documentation/lectionary_calendar/</code> or pass full paths via <code>--en-pdf</code> and <code>--ml-pdf</code>.</li>
-      <li><strong>Parse errors / wrong dates</strong>: Run with <code>--dump-text</code> and check the dumped text files; update the parser if the format differs.</li>
+      <li><strong>Duplicate slugs / too many liturgy rows</strong>: Do not use <code>--split-en-headings</code>. Purge with <code class="script-name">delete-liturgy-days.js</code>, re-import, then <code class="script-name">sync-liturgy-days-from-malayalam-excel.js --prune-not-in-excel</code>. On Cloud use <code>clear_cloud_data.js --remote --types=liturgy-days</code> before push.</li>
+      <li><strong>Incomplete Malayalam or missing Oct–Dec</strong>: PDF import alone gives ~166 rows. Excel sync is required for 185 feast days — see <a href="lectionary-pdf-to-excel-and-import.html#wrong-data-fix">section 6</a>.</li>
       <li><strong>Strapi already running</strong>: Stop the server before running the scripts; they load Strapi in-process.</li>
       <li><strong>Editor sees “0 entries” in Content Manager</strong>: Liturgy Day list is tenant-scoped. The editor must be mapped to the same tenant via <strong>Editor Tenant Assignment</strong>. Run: <code class="code-highlight">TENANT_ID=tenant_demo_002 node scripts/assign-editor-to-directory-tenant.js <em>editor@example.com</em></code> (use the editor’s exact login email). Then have the editor log out and log back in. Super Admin always sees all entries.</li>
     </ul>
 
     <h2 id="related">8. Related Documentation</h2>
     <ul>
-      <li><a href="liturgy-days-tenant-relation-fixes.html">Liturgy Days – Tenant Relation Fixes &amp; Production Replication</a> – fixes for editor visibility and steps to replicate in production.</li>
+      <li><a href="lectionary-pdf-to-excel-and-import.html">PDF to Excel and Import</a> – mapping, <strong>wrong-data remediation (section 6)</strong>, and full run order.</li>
+      <li><a href="liturgy-days-tenant-relation-fixes.html">Liturgy Days – Tenant Relation Fixes</a> – editor visibility, Cloud push safety, full remediation checklist.</li>
       <li><a href="liturgy-calendar-api-reference.html">Liturgy Day API Reference</a> – frontend integration and API usage.</li>
       <li><a href="liturgy-calendar-seed-script.html">Liturgy Calendar Seed Script</a> – small manual seed (7 days) without PDFs.</li>
       <li><a href="liturgical-calendar-strapi-server.html">Liturgical Calendar – Strapi Server Specification</a> – content model and schema.</li>
