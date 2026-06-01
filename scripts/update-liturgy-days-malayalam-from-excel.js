@@ -11,33 +11,23 @@
  *   node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_demo_002 --excel=documentation/lectionary_calendar/Liturgy-Days-Malayalam-2026.xlsx
  *
  * Options:
- *   --tenant-id=XXX   (required) Tenant whose liturgy days to update (e.g. tenant_production_001)
- *   --excel=path      (optional) Path to Excel file; default: documentation/lectionary_calendar/Liturgy-Days-Malayalam-2026.xlsx
+ *   --tenant-id=XXX   (required) Tenant whose liturgy days to update
+ *   --year=YYYY       Calendar year for default Excel path (default: 2026)
+ *   --excel=path      Malayalam Excel (default: Liturgy-Days-Malayalam-{year}.xlsx)
  *   DRY_RUN=1         (optional) Log what would be updated without writing to DB
  */
 
 const path = require('path');
 const fs = require('fs');
 
-try {
-  require('dotenv').config();
-} catch (_) {}
-
-const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
-
-const DEFAULT_EXCEL = path.join('documentation', 'lectionary_calendar', 'Liturgy-Days-Malayalam-2026.xlsx');
-
-function getArg(name, defaultValue) {
-  const envMap = { tenantId: process.env.TENANT_ID };
-  if (envMap[name]) return envMap[name];
-  for (let i = 2; i < process.argv.length; i++) {
-    const arg = process.argv[i];
-    if (arg === `--${name}` && process.argv[i + 1]) return process.argv[i + 1];
-    const match = arg.match(new RegExp(`^--${name}=(.+)$`));
-    if (match) return match[1].trim();
-  }
-  return defaultValue;
-}
+const {
+  DRY_RUN,
+  getArg,
+  getYear,
+  getTenantId,
+  resolveCalendarPaths,
+  resolvePath,
+} = require('./lib/liturgy-cli');
 
 /**
  * Normalize Excel date to YYYY-MM-DD string.
@@ -107,14 +97,10 @@ function readExcelRows(excelPath) {
 }
 
 async function main() {
-  const tenantId = getArg('tenantId', getArg('tenant-id', null));
-  if (!tenantId) {
-    console.error('Missing --tenant-id. Example: node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001');
-    process.exit(1);
-  }
-
-  const excelPath = getArg('excel', DEFAULT_EXCEL);
-  const resolvedPath = path.isAbsolute(excelPath) ? excelPath : path.join(process.cwd(), excelPath);
+  const year = getYear();
+  const paths = resolveCalendarPaths(year);
+  const tenantId = getTenantId({ required: true });
+  const resolvedPath = resolvePath(getArg('excel', paths.malayalamExcel));
 
   let rows;
   try {

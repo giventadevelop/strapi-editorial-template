@@ -17,7 +17,12 @@
       "maxLength": 255
     },
     "slug": {
-      "type": "uid"
+      "type": "uid",
+      "pluginOptions": {
+        "content-manager": {
+          "description": "Lowercase kebab-case only (e.g. main-news). Use letters, numbers, and hyphens."
+        }
+      }
     },
     "articles": {
       "type": "relation",

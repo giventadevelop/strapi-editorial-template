@@ -89,7 +89,7 @@
       <li><strong>Dependencies</strong>: <code>npm install</code> (includes <code>pdf-parse</code> as devDependency for the import script).</li>
       <li><strong>Tenant</strong>: The tenant (e.g. <code>tenant_demo_002</code>) must exist in Strapi Admin (Content Manager → Tenant).</li>
       <li><strong>Strapi server</strong>: Do <strong>not</strong> run the scripts while the Strapi server is running; they load Strapi programmatically and need exclusive use of the database.</li>
-      <li><strong>PDF files</strong>: Place <code>2026-Liturgical-Calender.pdf</code> and <code>Panjangom_26.pdf</code> in <code>documentation/lectionary_calendar/</code> (or pass paths via options).</li>
+      <li><strong>Standard parameters</strong>: All liturgy scripts accept <code>--tenant-id</code>, <code>--year</code>, <code>--excel</code>, and (verify only) <code>--editor-email</code>, with env fallbacks — see <a href="lectionary-pdf-to-excel-and-import.html#standard-params">PDF → Excel doc §0</a>.</li>
     </ul>
 
     <h2 id="script-delete">3. Script 1 – Delete Liturgy Days</h2>

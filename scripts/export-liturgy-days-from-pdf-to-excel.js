@@ -18,20 +18,12 @@
 const path = require('path');
 const fs = require('fs');
 
-function getArg(name, defaultValue) {
-  const envMap = { year: process.env.YEAR };
-  if (envMap[name]) return envMap[name];
-  for (let i = 2; i < process.argv.length; i++) {
-    const arg = process.argv[i];
-    if (arg === `--${name}` && process.argv[i + 1]) return process.argv[i + 1];
-    const match = arg.match(new RegExp(`^--${name}=(.+)$`));
-    if (match) return match[1].trim();
-  }
-  return defaultValue;
-}
-
-const DEFAULT_EN_PDF = path.join('documentation', 'lectionary_calendar', '2026-Liturgical-Calender.pdf');
-const DEFAULT_ML_PDF = path.join('documentation', 'lectionary_calendar', 'Panjangom_26.pdf');
+const {
+  getArg,
+  getYear,
+  resolveCalendarPaths,
+  resolvePath,
+} = require('./lib/liturgy-cli');
 
 /** 0-based column indices for Malayalam fields (dayHeadingMalylm, seasonNameMalylm, readings ML). */
 const MALAYALAM_COL_INDICES = [2, 4, 7, 9, 11, 13];
@@ -53,10 +45,10 @@ function applyMalayalamStyle(ws, numRows) {
 }
 
 async function main() {
-  const yearArg = getArg('year', '2026');
-  const year = Math.max(1900, Math.min(9999, parseInt(yearArg, 10) || 2026));
-  const enPdf = getArg('en-pdf', DEFAULT_EN_PDF);
-  const mlPdf = getArg('ml-pdf', DEFAULT_ML_PDF);
+  const year = getYear();
+  const paths = resolveCalendarPaths(year);
+  const enPdf = resolvePath(getArg('en-pdf', paths.enPdf));
+  const mlPdf = resolvePath(getArg('ml-pdf', paths.mlPdf));
 
   const parseLiturgyPdfs = require('./lectionary-pdf-parser');
   const { days, stats } = await parseLiturgyPdfs(enPdf, mlPdf, year);

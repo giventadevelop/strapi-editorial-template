@@ -883,6 +883,11 @@ function registerPublishDateRefreshMiddleware() {
  * in the Content API (e.g. news pages return 0 results in production).
  */
 function registerTenantPublishMiddleware() {
+  const {
+    ensureDraftTenantBeforePublish,
+    copyTenantDraftToPublished,
+  } = require('./utils/tenant-assignment');
+
   const tenantScopedUids = [
     'api::article.article',
     'api::advertisement-slot.advertisement-slot',
@@ -907,82 +912,29 @@ function registerTenantPublishMiddleware() {
 
   strapi.documents.use(async (context, next) => {
     const { uid, action } = context;
-    if (action !== 'publish' || !tenantScopedUids.includes(uid)) {
+    if (!tenantScopedUids.includes(uid)) {
       return next();
     }
 
     const documentId = context.params?.documentId;
+    const locale = context.params?.locale;
+
+    if (action === 'publish' && documentId) {
+      try {
+        await ensureDraftTenantBeforePublish(strapi, uid, documentId, locale);
+      } catch (err) {
+        strapi.log.warn(`Could not ensure draft tenant before publish (${uid} ${documentId}):`, err.message);
+      }
+    }
+
     const result = await next();
-    if (!documentId) return result;
 
-    try {
-      // Use Strapi metadata to discover the link table for the tenant relation
-      const meta = strapi.db.metadata.get(uid);
-      const tenantAttr = meta?.attributes?.tenant;
-      const joinTable = tenantAttr?.joinTable;
-
-      if (!joinTable?.name || !joinTable?.joinColumn?.name || !joinTable?.inverseJoinColumn?.name) {
-        return result;
+    if (action === 'publish' && documentId) {
+      try {
+        await copyTenantDraftToPublished(strapi, uid, documentId, locale);
+      } catch (err) {
+        strapi.log.warn(`Could not copy tenant on publish (${uid} ${documentId}):`, err.message);
       }
-
-      const knex = strapi.db.connection;
-      const ct = strapi.contentType(uid);
-      if (!ct?.collectionName) return result;
-
-      const tableName = ct.collectionName;
-      const linkTable = joinTable.name;
-      const srcCol = joinTable.joinColumn.name;
-      const tgtCol = joinTable.inverseJoinColumn.name;
-      const ordCol = joinTable.orderColumnName;
-      const locale = context.params?.locale;
-
-      // Find draft row
-      const draftQuery = knex(tableName)
-        .where({ document_id: documentId })
-        .whereNull('published_at')
-        .select('id');
-      if (locale) draftQuery.andWhere({ locale });
-      const draftRow = await draftQuery.first();
-
-      // Find published row
-      const pubQuery = knex(tableName)
-        .where({ document_id: documentId })
-        .whereNotNull('published_at')
-        .select('id');
-      if (locale) pubQuery.andWhere({ locale });
-      const publishedRow = await pubQuery.first();
-
-      if (!draftRow || !publishedRow) return result;
-
-      // Get draft's tenant link
-      const draftLink = await knex(linkTable)
-        .where({ [srcCol]: draftRow.id })
-        .first();
-
-      if (!draftLink?.[tgtCol]) return result;
-
-      // Get published's tenant link
-      const pubLink = await knex(linkTable)
-        .where({ [srcCol]: publishedRow.id })
-        .first();
-
-      if (pubLink) {
-        // Update if tenant differs
-        if (pubLink[tgtCol] !== draftLink[tgtCol]) {
-          await knex(linkTable)
-            .where({ [srcCol]: publishedRow.id })
-            .update({ [tgtCol]: draftLink[tgtCol] });
-          strapi.log.info(`Tenant updated on published ${uid} (${documentId})`);
-        }
-      } else {
-        // Copy tenant link to the published row
-        const ins = { [srcCol]: publishedRow.id, [tgtCol]: draftLink[tgtCol] };
-        if (ordCol && draftLink[ordCol] != null) ins[ordCol] = draftLink[ordCol];
-        await knex(linkTable).insert(ins);
-        strapi.log.info(`Tenant copied to published ${uid} (${documentId})`);
-      }
-    } catch (err) {
-      strapi.log.warn(`Could not copy tenant on publish (${uid} ${documentId}):`, err.message);
     }
 
     return result;
@@ -1001,5 +953,7 @@ module.exports = async () => {
   await ensureCollectionTypesHaveDefaultSort();
   registerPublishDateRefreshMiddleware();
   registerTenantPublishMiddleware();
+  const { registerSlugNormalizeDocumentMiddleware } = require('./utils/normalize-slug');
+  registerSlugNormalizeDocumentMiddleware(strapi);
   await registerTenantDocumentMiddleware();
 };

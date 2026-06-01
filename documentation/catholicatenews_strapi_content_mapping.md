@@ -2,6 +2,8 @@
 
 Reference for how each section of the Catholicate News portal maps to Strapi content types and how the frontend retrieves data.
 
+**Frontend slug contract (kebab-case constants, article URLs):** [strapi_frontend_slug_contract.md](./strapi_frontend_slug_contract.md)
+
 ## Page Section → Content Type Mapping
 
 | Section | Content Type | Key Fields | How to Retrieve |

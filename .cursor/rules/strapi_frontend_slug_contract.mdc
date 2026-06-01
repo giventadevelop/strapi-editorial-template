@@ -1,0 +1,49 @@
+---
+description: Strapi→Next.js slug contract — kebab-case category filters, article URLs, no frontend validation on read
+globs: documentation/**/*.md,documentation/**/*.html,scripts/debug-production-news.mjs,scripts/normalize-production-slugs.mjs,scripts/data_import_seed_news_catholicatenews.js
+alwaysApply: false
+---
+
+# Strapi frontend slug contract
+
+**Canonical doc (share with Next.js):** [strapi_frontend_slug_contract.md](mdc:documentation/strapi_frontend_slug_contract.md)
+
+## Frontend responsibilities
+
+- **Category API filters:** Use exact lowercase kebab-case: `main-news`, `featured-news`, `press-release`, `most-read` (not `Main-News`).
+- **Article routes:** Use `article.slug` from Strapi API **as returned** — no client-side casing changes on read.
+- **Tenant + published:** Always `filters[tenant][tenantId][$eq]=...` and `filters[publishedAt][$notNull]=true` for news lists.
+- **No duplicate validation** on read paths — Strapi normalizes slugs on save via [`normalize-slug.js`](mdc:src/utils/normalize-slug.js).
+
+## Frontend does NOT need
+
+- `STRICT_KEBAB_SLUG` (Strapi server env only)
+- `$eqi` for categories after production slug backfill (`$eq` is sufficient)
+- Kebab normalization unless the frontend POSTs content to Strapi
+
+## Strapi responsibilities
+
+- Normalize all UID `slug` fields on create/update (lifecycles + document middleware)
+- Optional `STRICT_KEBAB_SLUG=1` to reject invalid CMS input instead of auto-fixing
+- One-time Cloud repair: `node scripts/normalize-production-slugs.mjs`
+
+## Constants (copy to Next.js)
+
+```typescript
+export const STRAPI_NEWS_CATEGORY_SLUGS = {
+  mainNews: 'main-news',
+  featuredNews: 'featured-news',
+  pressRelease: 'press-release',
+  mostRead: 'most-read',
+} as const;
+```
+
+## Related rules
+
+- [strapi_production_news_tenant_categories.mdc](mdc:.cursor/rules/strapi_production_news_tenant_categories.mdc) — tenant on publish, Cloud repair, naming standards
+- [catholicatenews_strapi_content_mapping.md](mdc:documentation/catholicatenews_strapi_content_mapping.md) — full API examples per page section
+
+## When updating docs or scripts
+
+- Prefer `$eq` for category slug filters in new examples; mention `$eqi` only as legacy fallback.
+- Point Next.js developers to `documentation/strapi_frontend_slug_contract.md`, not scattered notes in `api_reference.md` alone.

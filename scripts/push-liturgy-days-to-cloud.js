@@ -20,24 +20,9 @@
  *   DRY_RUN=1         Log what would be sent; no HTTP requests.
  */
 
-try {
-  require('dotenv').config();
-} catch (_) {}
-
-const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
+const { DRY_RUN, getTenantId } = require('./lib/liturgy-cli');
 const CLOUD_URL = (process.env.STRAPI_CLOUD_URL || '').replace(/\/$/, '');
 const API_TOKEN = process.env.STRAPI_CLOUD_API_TOKEN || '';
-
-function getArg(name, defaultValue) {
-  const envMap = { tenantId: process.env.TENANT_ID };
-  if (envMap[name]) return envMap[name];
-  for (let i = 2; i < process.argv.length; i++) {
-    const arg = process.argv[i];
-    const match = arg.match(new RegExp(`^--${name}=(.+)$`));
-    if (match) return match[1].trim();
-  }
-  return defaultValue;
-}
 
 async function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -116,7 +101,7 @@ async function main() {
     process.exit(1);
   }
 
-  const tenantIdFilter = getArg('tenantId', getArg('tenant-id', null));
+  const tenantIdFilter = getTenantId({ defaultValue: null });
 
   const { createStrapi, compileStrapi } = require('@strapi/strapi');
   const appContext = await compileStrapi();

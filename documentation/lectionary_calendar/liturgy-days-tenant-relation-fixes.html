@@ -180,7 +180,10 @@
         <li><a href="#production-cloud">7. Import liturgy days into production (Strapi Cloud)</a></li>
         <li><a href="#malayalam-excel">8. Update Malayalam headings from Excel</a></li>
         <li><a href="#translation-workflow">9. Translation workflow: PDF to Malayalam (Google Nana Banana)</a></li>
-        <li><a href="#related">10. Related documentation</a></li>
+        <li><a href="#db-copy-recovery">10. Recovering from copied SQLite (db_backup)</a></li>
+        <li><a href="#malayalam-excel-sync">11. Malayalam Excel sync (Oct–Dec + full calendar)</a></li>
+        <li><a href="#cloud-push-safety">12. Cloud push safety (do not overwrite other types)</a></li>
+        <li><a href="#related">13. Related documentation</a></li>
       </ul>
     </nav>
 
@@ -348,7 +351,7 @@
     <div class="section-container verify">
       <div class="section-header output">Step 5 – Verify tenant and liturgy counts</div>
       <p>Run the verify script with an editor’s email to confirm their tenant and liturgy-day count. Strapi server must be stopped.</p>
-      <div class="command-block verify" data-command-base="node scripts/verify-editor-tenant-liturgy.js" data-template-command="node scripts/verify-editor-tenant-liturgy.js editor@example.com">
+      <div class="command-block verify" data-command-base="node scripts/verify-editor-tenant-liturgy.js" data-template-command="node scripts/verify-editor-tenant-liturgy.js --editor-email=editor@example.com --tenant-id=tenant_production_001 --year=2026">
         <div class="command-header">
           <span class="command-type">Verify editor tenant and liturgy</span>
           <div class="command-header-buttons">
@@ -358,17 +361,27 @@
         </div>
         <div class="command-parameters">
           <h5>🔧 Customize parameters</h5>
-          <div class="parameter-group single">
+          <div class="parameter-group">
             <div class="parameter-input">
               <label for="cmd-prod-verify-email">Editor email:</label>
               <input type="text" id="cmd-prod-verify-email" placeholder="editor@example.com" oninput="updateCommand('cmd-prod-verify', 'email', this.value)">
             </div>
+            <div class="parameter-input">
+              <label for="cmd-prod-verify-tenant">Tenant ID (hint):</label>
+              <input type="text" id="cmd-prod-verify-tenant" value="tenant_production_001" oninput="updateCommand('cmd-prod-verify', 'tenant', this.value)">
+            </div>
+          </div>
+          <div class="parameter-group single">
+            <div class="parameter-input">
+              <label for="cmd-prod-verify-year">Year:</label>
+              <input type="text" id="cmd-prod-verify-year" value="2026" oninput="updateCommand('cmd-prod-verify', 'year', this.value)">
+            </div>
           </div>
         </div>
-        <div class="command-content" id="cmd-prod-verify">node scripts/verify-editor-tenant-liturgy.js editor@example.com</div>
+        <div class="command-content" id="cmd-prod-verify">node scripts/verify-editor-tenant-liturgy.js --editor-email=editor@example.com --tenant-id=tenant_production_001 --year=2026</div>
         <div class="command-single-line">
           <div class="command-single-line-label">Windows single-line:</div>
-          <code id="cmd-prod-verify-single-code">node scripts/verify-editor-tenant-liturgy.js editor@example.com</code>
+          <code id="cmd-prod-verify-single-code">node scripts/verify-editor-tenant-liturgy.js --editor-email=editor@example.com --tenant-id=tenant_production_001 --year=2026</code>
         </div>
       </div>
       <p>Expect “Liturgy days for this tenant” to be greater than zero after a successful import. If the editor still sees 0 in Content Manager, have them <strong>log out and log back in</strong>.</p>
@@ -483,8 +496,8 @@
     </div>
     <div class="section-container usage">
       <div class="section-header usage">Run the Malayalam update (Strapi stopped)</div>
-      <p>Required: <code class="code-highlight">--tenant-id=XXX</code>. Optional: <code class="code-highlight">--excel=path</code> (default: <code>documentation/lectionary_calendar/Liturgy-Days-Malayalam-2026.xlsx</code>), <code class="code-highlight">DRY_RUN=1</code> to preview without writing.</p>
-      <div class="command-block setup" data-command-base="node scripts/update-liturgy-days-malayalam-from-excel.js" data-template-command="node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001">
+      <p>Required: <code class="code-highlight">--tenant-id=XXX</code>. Optional: <code class="code-highlight">--year=YYYY</code>, <code class="code-highlight">--excel=path</code> (default from year), <code class="code-highlight">DRY_RUN=1</code> to preview without writing.</p>
+      <div class="command-block setup" data-command-base="node scripts/update-liturgy-days-malayalam-from-excel.js" data-template-command="node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001 --year=2026">
         <div class="command-header">
           <span class="command-type">Update Malayalam headings from Excel</span>
           <div class="command-header-buttons">
@@ -494,17 +507,27 @@
         </div>
         <div class="command-parameters">
           <h5>🔧 Customize parameters</h5>
-          <div class="parameter-group single">
+          <div class="parameter-group">
             <div class="parameter-input">
               <label for="cmd-prod-malayalam-tenant">Tenant ID:</label>
               <input type="text" id="cmd-prod-malayalam-tenant" placeholder="tenant_production_001" value="tenant_production_001" oninput="updateCommand('cmd-prod-malayalam', 'tenant', this.value)">
             </div>
+            <div class="parameter-input">
+              <label for="cmd-prod-malayalam-year">Year:</label>
+              <input type="text" id="cmd-prod-malayalam-year" value="2026" oninput="updateCommand('cmd-prod-malayalam', 'year', this.value)">
+            </div>
+          </div>
+          <div class="parameter-group single">
+            <div class="parameter-input">
+              <label for="cmd-prod-malayalam-excel">Excel path (optional):</label>
+              <input type="text" id="cmd-prod-malayalam-excel" placeholder="default from year" oninput="updateCommand('cmd-prod-malayalam', 'excel', this.value)">
+            </div>
           </div>
         </div>
-        <div class="command-content" id="cmd-prod-malayalam">node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001</div>
+        <div class="command-content" id="cmd-prod-malayalam">node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001 --year=2026</div>
         <div class="command-single-line">
           <div class="command-single-line-label">Windows single-line:</div>
-          <code id="cmd-prod-malayalam-single-code">node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001</code>
+          <code id="cmd-prod-malayalam-single-code">node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_production_001 --year=2026</code>
         </div>
       </div>
     </div>
@@ -523,7 +546,117 @@
       <p>Using this workflow, we had everything translated from the PDF into Malayalam via the tool, then generated the Excel sheet and ran <code class="script-name">update-liturgy-days-malayalam-from-excel.js</code> to update only the <code>dayHeadingMalylm</code> field in the Strapi database.</p>
     </div>
 
-    <h2 id="related">10. Related documentation</h2>
+    <h2 id="db-copy-recovery">10. Recovering from copied SQLite (db_backup)</h2>
+    <div class="section-intro">
+      <p>If you replaced local <code>.tmp/data.db</code> with a file from <code>db_backup/data.db</code> (copied from another machine), liturgy data is often corrupted: wrong tenant links, duplicates, gibberish Malayalam, and missing dates. <strong>Do not keep using the copied database.</strong> Run the scripted remediation below instead.</p>
+    </div>
+    <div class="section-container">
+      <div class="section-header">Recovery checklist (tenant_demo_002, year 2026)</div>
+      <table>
+        <thead>
+          <tr><th>Step</th><th>Command</th><th>Expected outcome</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>1. Audit</td><td><code>node scripts/verify-editor-tenant-liturgy.js --editor-email=mosc.regular.user@keleno.com --tenant-id=tenant_demo_002 --year=2026</code></td><td>May show 0 tenant days if records are orphaned</td></tr>
+          <tr><td>2. Purge</td><td><code>node scripts/delete-liturgy-days.js --all</code></td><td>Removes all liturgy days (use <code>--all</code> when tenant filter misses orphaned rows)</td></tr>
+          <tr><td>3. PDF import</td><td><code>node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_demo_002 --year=2026</code></td><td>~166 created; no <code>--split-en-headings</code></td></tr>
+          <tr><td>4. Malayalam Excel</td><td><code>node scripts/update-liturgy-days-malayalam-from-excel.js --tenant-id=tenant_demo_002</code></td><td>~120 rows updated with UTF-8 Malayalam; Excel rows without a matching DB date are skipped</td></tr>
+          <tr><td>5. Excel sync</td><td><code>node scripts/sync-liturgy-days-from-malayalam-excel.js --tenant-id=tenant_demo_002 --year=2026 --prune-not-in-excel</code></td><td>185 days, full year through Dec; see <a href="#malayalam-excel-sync">section 11</a></td></tr>
+          <tr><td>6. Verify</td><td><code>node scripts/verify-editor-tenant-liturgy.js --editor-email=...</code></td><td>185 days, 0 duplicates, date range through Dec 2026</td></tr>
+          <tr><td>7. Cloud (optional)</td><td><code>node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code></td><td>Upsert only; see <a href="#cloud-push-safety">section 12</a></td></tr>
+        </tbody>
+      </table>
+      <div class="info">
+        <strong>Not 365 civil days:</strong> The lectionary PDF lists <strong>feast days</strong>, not every calendar date. Oct–Dec Excel rows apply only after those dates exist in the database (extend PDF import or add records manually).
+      </div>
+      <div class="warning">
+        <strong>PowerShell:</strong> After <code>$env:DRY_RUN=1</code>, run <code>Remove-Item Env:DRY_RUN</code> before the real import or Malayalam update, or subsequent commands will stay in dry-run mode.
+      </div>
+    </div>
+
+    <h2 id="malayalam-excel-sync">11. Malayalam Excel sync (Oct–Dec + full calendar)</h2>
+    <div class="section-intro">
+      <p>The PDF parser stops around late September because the English PDF text order is not strictly chronological. The authoritative feast-day list with correct UTF-8 Malayalam is <code>Liturgy-Days-Malayalam-2026.xlsx</code> (<strong>185 unique dates</strong>, through <code>2026-12-27</code>). Use <code class="script-name">sync-liturgy-days-from-malayalam-excel.js</code> after PDF import to align local (and Cloud) data with that Excel file.</p>
+    </div>
+    <div class="section-container usage">
+      <div class="section-header usage">What the sync script does</div>
+      <ul>
+        <li><strong>Creates</strong> liturgy days for Excel dates missing in the DB (e.g. Oct–Dec and summer gaps).</li>
+        <li><strong>Updates</strong> <code>dayHeadingMalylm</code> for every Excel row (proper Malayalam script).</li>
+        <li><strong>Prunes</strong> (with <code>--prune-not-in-excel</code>) PDF-only rows not in the Excel calendar (~46 parser artifacts with gibberish Malayalam).</li>
+        <li><strong>Fills English</strong> headings from <code>liturgy-days-from-pdf.xlsx</code> when the date matches (optional supplement).</li>
+      </ul>
+      <div class="command-block advance" data-command-base="node scripts/sync-liturgy-days-from-malayalam-excel.js" data-template-command="node scripts/sync-liturgy-days-from-malayalam-excel.js --tenant-id=tenant_demo_002 --year=2026 --prune-not-in-excel">
+        <div class="command-header">
+          <span class="command-type">Excel sync (create + update + prune)</span>
+          <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-prod-sync')" title="Copy template">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'cmd-prod-sync')" title="Copy command">📋 Copy</button>
+          </div>
+        </div>
+        <div class="command-parameters">
+          <h5>🔧 Customize parameters</h5>
+          <div class="parameter-group">
+            <div class="parameter-input">
+              <label for="cmd-prod-sync-tenant">Tenant ID:</label>
+              <input type="text" id="cmd-prod-sync-tenant" value="tenant_demo_002" oninput="updateCommand('cmd-prod-sync', 'tenant', this.value)">
+            </div>
+            <div class="parameter-input">
+              <label for="cmd-prod-sync-year">Year:</label>
+              <input type="text" id="cmd-prod-sync-year" value="2026" oninput="updateCommand('cmd-prod-sync', 'year', this.value)">
+            </div>
+          </div>
+          <div class="parameter-group">
+            <div class="parameter-input">
+              <label for="cmd-prod-sync-excel">Excel path (optional):</label>
+              <input type="text" id="cmd-prod-sync-excel" placeholder="default from year" oninput="updateCommand('cmd-prod-sync', 'excel', this.value)">
+            </div>
+            <div class="parameter-input">
+              <label for="cmd-prod-sync-prune">Add --prune-not-in-excel (yes/no):</label>
+              <input type="text" id="cmd-prod-sync-prune" value="yes" oninput="updateCommand('cmd-prod-sync', 'prune', this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="command-content" id="cmd-prod-sync">node scripts/sync-liturgy-days-from-malayalam-excel.js --tenant-id=tenant_demo_002 --year=2026 --prune-not-in-excel</div>
+        <div class="command-single-line">
+          <div class="command-single-line-label">Windows single-line:</div>
+          <code id="cmd-prod-sync-single-code">node scripts/sync-liturgy-days-from-malayalam-excel.js --tenant-id=tenant_demo_002 --year=2026 --prune-not-in-excel</code>
+        </div>
+      </div>
+      <p><strong>Verified May 2026:</strong> Local and Cloud both have <strong>185</strong> liturgy days for <code>tenant_demo_002</code>, <strong>0</strong> with missing/gibberish Malayalam. Cloud push: Created 65, Updated 120 (liturgy-only; other collection types untouched).</p>
+      <p>Master spreadsheet (Malayalam + English where PDF export matches): <code>documentation/lectionary_calendar/Liturgy-Days-Master-2026.xlsx</code> — build with <code class="script-name">build-liturgy-master-excel.js</code>.</p>
+    </div>
+
+    <h2 id="cloud-push-safety">12. Cloud push safety (do not overwrite other types)</h2>
+    <div class="section-container usage">
+      <div class="section-header usage">Use liturgy-only push when Cloud has other content</div>
+      <p>Strapi Cloud may already hold articles, media, events, and tenant configuration. To sync liturgy data without touching other collection types:</p>
+      <table>
+        <thead>
+          <tr><th>Method</th><th>Safe when Cloud has content?</th><th>What it touches</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code class="script-name">push-liturgy-days-to-cloud.js</code></td><td><strong>Yes</strong> (recommended)</td><td>Only <code>/api/liturgy-days</code>; may create missing tenants on Cloud; upsert by date + tenant</td></tr>
+          <tr><td><code>npm run push:rest-to-cloud</code></td><td><strong>No</strong> (unless Cloud is empty)</td><td>All exported types from tar.gz</td></tr>
+          <tr><td><code>npm run strapi transfer</code></td><td><strong>No</strong></td><td>Replaces entire Cloud database and assets</td></tr>
+          <tr><td><code>clear_cloud_data.js --remote --types=liturgy-days</code></td><td>Partial</td><td>Deletes only liturgy days on Cloud (use before full re-push if tenant relation was wrong)</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Recommended sequence:</strong></p>
+      <ol>
+        <li><code>DRY_RUN=1 node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code> (PowerShell: <code>$env:DRY_RUN=1; node scripts/...</code>)</li>
+        <li><code>node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code></li>
+        <li>Confirm output: e.g. <strong>Created: 0, Updated: 166, Skipped: 0</strong> when Cloud already had the same dates.</li>
+      </ol>
+      <div class="warning">
+        <strong>Windows TLS:</strong> If push fails with <code>unable to verify the first certificate</code>, set <code>$env:NODE_TLS_REJECT_UNAUTHORIZED="0"</code> for that session only, then re-run the push. This is a local trust/proxy issue, not a Strapi bug.
+      </div>
+      <div class="success">
+        <strong>Verified May 2026:</strong> Liturgy-only push updated 166 records on Cloud with zero creates skipped and no changes to articles or other collection types.
+      </div>
+    </div>
+
+    <h2 id="related">13. Related documentation</h2>
     <ul>
       <li><a href="lectionary-bulk-import-guide.html">Lectionary Bulk Import from PDFs</a> – delete/import scripts, options, troubleshooting.</li>
       <li><a href="liturgy-calendar-api-reference.html">Liturgy Day API Reference</a> – frontend integration and API usage.</li>
@@ -537,6 +670,14 @@
 
   <script>
     const commandParams = {};
+    function appendTenantYearExcel(cmd, p, opts) {
+      opts = opts || {};
+      if (p.tenant && String(p.tenant).trim()) cmd += ' --tenant-id=' + String(p.tenant).trim();
+      if (p.year && String(p.year).trim()) cmd += ' --year=' + String(p.year).trim();
+      if (p.excel && String(p.excel).trim()) cmd += ' --excel=' + String(p.excel).trim();
+      if (opts.prune && String(p.prune).toLowerCase().startsWith('y')) cmd += ' --prune-not-in-excel';
+      return cmd;
+    }
     function updateCommand(commandId, paramName, paramValue) {
       if (!commandParams[commandId]) commandParams[commandId] = {};
       commandParams[commandId][paramName] = paramValue;
@@ -549,17 +690,17 @@
       if (commandId === 'cmd-prod-delete') {
         if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
       } else if (commandId === 'cmd-prod-import') {
-        if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
-        if (p.year) cmd += ' --year=' + p.year;
+        cmd = appendTenantYearExcel(cmd, p);
       } else if (commandId === 'cmd-prod-assign') {
         if (p.email) cmd += ' ' + p.email;
         if (p.tenant) cmd += ' ' + p.tenant;
         cmd = cmd.trim();
       } else if (commandId === 'cmd-prod-verify') {
-        if (p.email) cmd += ' ' + p.email;
-        cmd = cmd.trim();
-      } else if (commandId === 'cmd-prod-malayalam') {
-        if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
+        if (p.email && p.email.trim()) cmd += ' --editor-email=' + p.email.trim();
+        if (p.tenant && p.tenant.trim()) cmd += ' --tenant-id=' + p.tenant.trim();
+        if (p.year && p.year.trim()) cmd += ' --year=' + p.year.trim();
+      } else if (commandId === 'cmd-prod-malayalam' || commandId === 'cmd-prod-sync') {
+        cmd = appendTenantYearExcel(cmd, p, commandId === 'cmd-prod-sync' ? { prune: true } : {});
       } else if (commandId === 'cmd-push-cloud') {
         if (p.tenant) cmd += ' --tenant-id=' + p.tenant;
       }
@@ -593,7 +734,7 @@
       }
     }
     document.addEventListener('DOMContentLoaded', function() {
-      ['cmd-prod-delete', 'cmd-prod-import', 'cmd-prod-assign', 'cmd-prod-verify', 'cmd-prod-malayalam', 'cmd-push-cloud'].forEach(function(id) {
+      ['cmd-prod-delete', 'cmd-prod-import', 'cmd-prod-assign', 'cmd-prod-verify', 'cmd-prod-malayalam', 'cmd-prod-sync', 'cmd-push-cloud'].forEach(function(id) {
         var block = document.getElementById(id) && document.getElementById(id).closest('.command-block');
         if (!block) return;
         var tenantIn = block.querySelector('input[id$="-tenant"]');
@@ -602,6 +743,10 @@
         if (tenantIn && tenantIn.value) updateCommand(id, 'tenant', tenantIn.value);
         if (emailIn && emailIn.value) updateCommand(id, 'email', emailIn.value);
         if (yearIn && yearIn.value) updateCommand(id, 'year', yearIn.value);
+        var excelIn = block.querySelector('input[id$="-excel"]');
+        var pruneIn = block.querySelector('input[id$="-prune"]');
+        if (excelIn && excelIn.value) updateCommand(id, 'excel', excelIn.value);
+        if (pruneIn && pruneIn.value) updateCommand(id, 'prune', pruneIn.value);
       });
     });
   </script>
