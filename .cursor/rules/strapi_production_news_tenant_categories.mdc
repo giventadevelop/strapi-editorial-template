@@ -1,0 +1,118 @@
+---
+description: Production MOSC news — tenant on publish, category slugs, naming standards, and Cloud repair runbook
+globs: src/bootstrap.js,src/utils/tenant-assignment.js,src/api/article/**/*,src/api/category/**/*,src/index.js,scripts/debug-production-news.mjs,scripts/repair-production-article-tenant*.mjs,scripts/normalize-production-category-slugs.mjs
+alwaysApply: false
+---
+
+# Strapi Production News — Tenant, Categories, and Naming
+
+## Problem (symptoms)
+
+- Production news page shows **“No articles”** while local works.
+- **Tenant filter** returns 0 when published rows lack `articles_tenant_lnk` (draft may have tenant; published does not).
+- **Category sections empty** when production slugs are `Main-News` but frontend filters `main-news`.
+
+## Root causes
+
+1. **Strapi 5 Draft & Publish**: draft and published are separate DB rows; **relation link tables are not always copied on publish**.
+2. **Category slug casing**: UID fields stored with wrong casing break `filters[category][slug][$eq]=main-news`.
+
+## Enforcement (code — requires Strapi Cloud deploy)
+
+| Layer | File | Behavior |
+|-------|------|----------|
+| Article lifecycles | [`src/api/article/content-types/article/lifecycles.js`](mdc:src/api/article/content-types/article/lifecycles.js) | `beforeCreate` / `beforeUpdate`: assign tenant from editor-tenant mapping |
+| Category lifecycles | [`src/api/category/content-types/category/lifecycles.js`](mdc:src/api/category/content-types/category/lifecycles.js) | Normalize `slug` to lowercase kebab-case on create/update |
+| Publish middleware | [`src/bootstrap.js`](mdc:src/bootstrap.js) `registerTenantPublishMiddleware()` | **Before** publish: ensure draft has tenant; **after** publish: copy tenant link to published row |
+| Shared helpers | [`src/utils/tenant-assignment.js`](mdc:src/utils/tenant-assignment.js) | Editor→tenant resolution, link-table ensure/copy |
+| Editor RBAC | [`src/bootstrap.js`](mdc:src/bootstrap.js) `registerTenantDocumentMiddleware()` | Tenant-scoped find/update for editor role |
+
+**Tenant-scoped UIDs** (publish middleware): article, advertisement-slot, flash-news-item, directory-home, and all directory collection types listed in `registerTenantPublishMiddleware`.
+
+## One-time Cloud repair (no new deploy required for endpoint)
+
+Uses existing **`POST /api/migration/fix-published`** in [`src/index.js`](mdc:src/index.js):
+
+```json
+{
+  "tenantDocumentId": "<tenant documentId from /api/tenants>",
+  "articles": [{ "documentId": "...", "uid": "api::article.article" }]
+}
+```
+
+Auth: `Authorization: Bearer` = `STRAPI_CLOUD_API_TOKEN` or `STRAPI_MIGRATION_TOKEN`.
+
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| [`scripts/debug-production-news.mjs`](mdc:scripts/debug-production-news.mjs) | Read-only: tenant, articles, category slug probes |
+| [`scripts/repair-production-article-tenant-published.mjs`](mdc:scripts/repair-production-article-tenant-published.mjs) | Batch `fix-published` for all article documentIds |
+| [`scripts/repair-production-article-tenant.mjs`](mdc:scripts/repair-production-article-tenant.mjs) | PUT tenant on draft/published via Document API |
+| [`scripts/normalize-production-category-slugs.mjs`](mdc:scripts/normalize-production-category-slugs.mjs) | `Main-News` → `main-news`, etc. on Cloud |
+| [`scripts/fix_article_category_tenant.js`](mdc:scripts/fix_article_category_tenant.js) | Local DB: propagate category/tenant links to all article rows |
+
+**Env**: `STRAPI_CLOUD_URL`, `STRAPI_CLOUD_API_TOKEN`, `TENANT_ID` (default `tenant_demo_002`).
+
+**Windows TLS** (if `fetch failed`):
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED='0'
+```
+
+## Operational runbook (order)
+
+1. **Diagnostics** (read-only): `node scripts/debug-production-news.mjs`
+2. **Published tenant backfill** (if tenant filter = 0): `node scripts/repair-production-article-tenant-published.mjs --tenant-id=tenant_demo_002`
+3. **Category slug normalize** (if lowercase filters = 0): `node scripts/normalize-production-category-slugs.mjs` (use `--dry-run` first)
+4. **Re-verify**: `node scripts/debug-production-news.mjs` — expect tenant-primary rows and category slugs `main-news`, `press-release`, `featured-news`
+5. **Deploy Strapi** with lifecycle + middleware changes (see below) so **future** publishes keep tenant and slugs
+6. **Frontend**: confirm production news page; hard-refresh / invalidate CDN if cached
+
+**npm**: `npm run normalize:category-slugs-cloud`
+
+## When to deploy Strapi Cloud
+
+Deploy **after** committing/pushing these paths:
+
+- `src/utils/tenant-assignment.js`
+- `src/bootstrap.js` (tenant publish middleware)
+- `src/api/article/content-types/article/lifecycles.js`
+- `src/api/category/content-types/category/lifecycles.js`
+
+**Timing**:
+
+- Steps 1–4 (repair scripts) can run **before or after** deploy; they use REST + existing migration route.
+- Deploy is required so **new** publishes/updates automatically keep tenant on published rows and category slugs stay normalized in the CMS.
+
+Do **not** wait for deploy to run slug normalization or `fix-published` backfill.
+
+## Content API query patterns (frontend / Next)
+
+- **Tenant filter**: prefer OR of `filters[tenant][tenantId][$eq]` and `filters[tenant][documentId][$eq]` when populate is unreliable.
+- **Category filter**: use lowercase slugs: `main-news`, `press-release`, `featured-news`, `most-read`.
+- **`populate=tenant`**: may still show `tenant: null` on list responses even when link table is correct; trust tenant filter counts from debug script.
+
+## Collection type naming standards
+
+| Field | Standard | Example |
+|-------|----------|---------|
+| `singularName` / `pluralName` | lowercase, kebab-case where multi-word | `article` / `articles`, `retired-bishop` / `retired-bishops` |
+| `displayName` | Human UI label only (any casing, en-dash OK) | `Editorial – Article`, `Directory – Bishops` |
+| REST path | `/api/{pluralName}` | `/api/articles`, `/api/categories` |
+| UID | `api::{singular}.{singular}` | `api::article.article` |
+| Category `slug` field | **lowercase kebab-case** | `main-news` not `Main-News` |
+
+**Do not** rename collection types in DB for API fixes. Refactor `displayName` only for editor clarity.
+
+## Related rules
+
+- [strapi-cloud-bootstrap-fixes.mdc](mdc:.cursor/rules/strapi-cloud-bootstrap-fixes.mdc) — CM config after transfer
+- Push/import: [`scripts/rest_api_push_to_cloud.js`](mdc:scripts/rest_api_push_to_cloud.js) uses `normalizeSlug()` and case-insensitive category dedup
+
+## Checklist after changes
+
+- [ ] `debug-production-news.mjs`: tenant-primary > 0 rows
+- [ ] Category probes `main-news`, `press-release`, `featured-news` return rows
+- [ ] Strapi Cloud deployed with tenant-assignment + lifecycles
+- [ ] Editor mapped via `scripts/assign-editor-to-directory-tenant.js` if CM user cannot see tenant content

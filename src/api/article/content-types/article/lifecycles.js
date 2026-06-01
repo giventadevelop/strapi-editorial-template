@@ -1,37 +1,12 @@
 'use strict';
 
+const {
+  getTenantForAdminUser,
+  getTenantForEmail,
+  resolveTenantFromRequestContext,
+  applyTenantToEventData,
+} = require('../../../../utils/tenant-assignment');
 const requestContext = require('../../../../utils/request-context');
-
-/**
- * Resolve tenant for an admin user. Returns { id, documentId }.
- * Use id for relation writes (link table FK is tenants.id); documentId for queries.
- */
-async function getTenantForAdminUser(strapi, adminUserId) {
-  if (!adminUserId) return null;
-  const adminUser = await strapi.db.query('admin::user').findOne({
-    where: { id: adminUserId },
-    select: ['email'],
-  });
-  if (!adminUser?.email) return null;
-  return getTenantForEmail(strapi, adminUser.email);
-}
-
-/** Case-insensitive lookup by admin email. Returns { id, documentId } or null. */
-async function getTenantForEmail(strapi, email) {
-  if (!email) return null;
-  const emailLower = String(email).toLowerCase();
-  const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
-    where: {},
-    populate: { tenant: true },
-  });
-  const mapping = mappings.find((m) => (m.adminUserEmail || '').toLowerCase() === emailLower);
-  const tenant = mapping?.tenant;
-  if (!tenant) return null;
-  const id = tenant.id;
-  const documentId = tenant.documentId ?? tenant.document_id;
-  if (id == null && documentId == null) return null;
-  return { id: id ?? undefined, documentId: documentId ?? undefined };
-}
 
 module.exports = {
   async beforeCreate(event) {
@@ -39,14 +14,21 @@ module.exports = {
     const ctx = requestContext.get();
     const user = ctx?.state?.user || ctx?.state?.admin;
     const email = user?.email;
-    const tenant = email ? await getTenantForEmail(strapi, email) : null;
-    const relationId = tenant?.id ?? tenant?.documentId;
-    if (relationId != null) {
-      event.params.data.tenant = relationId;
-    } else {
-      delete event.params.data.tenant;
+    const tenant = email ? await getTenantForEmail(strapi, email) : await resolveTenantFromRequestContext(strapi);
+    applyTenantToEventData(event, tenant);
+  },
+
+  async beforeUpdate(event) {
+    if (!event.params?.data) return;
+    const ctx = requestContext.get();
+    const user = ctx?.state?.user || ctx?.state?.admin;
+    const email = user?.email;
+    const tenant = email ? await getTenantForEmail(strapi, email) : await resolveTenantFromRequestContext(strapi);
+    if (tenant && (event.params.data.tenant == null || event.params.data.tenant === '')) {
+      applyTenantToEventData(event, tenant);
     }
   },
+
   async afterCreate(event) {
     const { result } = event;
     if (!result || result.tenant) return;
