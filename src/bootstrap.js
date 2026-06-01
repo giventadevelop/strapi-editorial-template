@@ -953,5 +953,7 @@ module.exports = async () => {
   await ensureCollectionTypesHaveDefaultSort();
   registerPublishDateRefreshMiddleware();
   registerTenantPublishMiddleware();
+  const { registerSlugNormalizeDocumentMiddleware } = require('./utils/normalize-slug');
+  registerSlugNormalizeDocumentMiddleware(strapi);
   await registerTenantDocumentMiddleware();
 };

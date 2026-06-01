@@ -7,9 +7,11 @@ const {
   applyTenantToEventData,
 } = require('../../../../utils/tenant-assignment');
 const requestContext = require('../../../../utils/request-context');
+const { applyKebabSlugToEvent } = require('../../../../utils/normalize-slug');
 
 module.exports = {
   async beforeCreate(event) {
+    applyKebabSlugToEvent(event);
     if (!event.params?.data) return;
     const ctx = requestContext.get();
     const user = ctx?.state?.user || ctx?.state?.admin;
@@ -19,6 +21,7 @@ module.exports = {
   },
 
   async beforeUpdate(event) {
+    applyKebabSlugToEvent(event);
     if (!event.params?.data) return;
     const ctx = requestContext.get();
     const user = ctx?.state?.user || ctx?.state?.admin;

@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Normalize category slugs on Strapi Cloud to lowercase kebab-case (frontend expects main-news, etc.).
+ * @deprecated Prefer scripts/normalize-production-slugs.mjs (all slug types).
+ * This file only normalizes categories. Kept for backward compatibility.
  *
  * Usage:
  *   node scripts/normalize-production-category-slugs.mjs
- *   node scripts/normalize-production-category-slugs.mjs --dry-run
+ *   node scripts/normalize-production-slugs.mjs --only=categories
  */
 
 import 'dotenv/config';

@@ -22,7 +22,7 @@ alwaysApply: false
 | Layer | File | Behavior |
 |-------|------|----------|
 | Article lifecycles | [`src/api/article/content-types/article/lifecycles.js`](mdc:src/api/article/content-types/article/lifecycles.js) | `beforeCreate` / `beforeUpdate`: assign tenant from editor-tenant mapping |
-| Category lifecycles | [`src/api/category/content-types/category/lifecycles.js`](mdc:src/api/category/content-types/category/lifecycles.js) | Normalize `slug` to lowercase kebab-case on create/update |
+| Slug lifecycles + middleware | [`src/utils/normalize-slug.js`](mdc:src/utils/normalize-slug.js), per-type `lifecycles.js`, [`src/bootstrap.js`](mdc:src/bootstrap.js) | All UID `slug` fields → lowercase kebab-case on save; optional `STRICT_KEBAB_SLUG=1` rejects invalid slugs with a validation error |
 | Publish middleware | [`src/bootstrap.js`](mdc:src/bootstrap.js) `registerTenantPublishMiddleware()` | **Before** publish: ensure draft has tenant; **after** publish: copy tenant link to published row |
 | Shared helpers | [`src/utils/tenant-assignment.js`](mdc:src/utils/tenant-assignment.js) | Editor→tenant resolution, link-table ensure/copy |
 | Editor RBAC | [`src/bootstrap.js`](mdc:src/bootstrap.js) `registerTenantDocumentMiddleware()` | Tenant-scoped find/update for editor role |
@@ -49,7 +49,8 @@ Auth: `Authorization: Bearer` = `STRAPI_CLOUD_API_TOKEN` or `STRAPI_MIGRATION_TO
 | [`scripts/debug-production-news.mjs`](mdc:scripts/debug-production-news.mjs) | Read-only: tenant, articles, category slug probes |
 | [`scripts/repair-production-article-tenant-published.mjs`](mdc:scripts/repair-production-article-tenant-published.mjs) | Batch `fix-published` for all article documentIds |
 | [`scripts/repair-production-article-tenant.mjs`](mdc:scripts/repair-production-article-tenant.mjs) | PUT tenant on draft/published via Document API |
-| [`scripts/normalize-production-category-slugs.mjs`](mdc:scripts/normalize-production-category-slugs.mjs) | `Main-News` → `main-news`, etc. on Cloud |
+| [`scripts/normalize-production-slugs.mjs`](mdc:scripts/normalize-production-slugs.mjs) | Backfill all slug fields on Cloud/local (`--only=categories` optional) |
+| [`scripts/normalize-production-category-slugs.mjs`](mdc:scripts/normalize-production-category-slugs.mjs) | Categories only (deprecated; use normalize-production-slugs) |
 | [`scripts/fix_article_category_tenant.js`](mdc:scripts/fix_article_category_tenant.js) | Local DB: propagate category/tenant links to all article rows |
 
 **Env**: `STRAPI_CLOUD_URL`, `STRAPI_CLOUD_API_TOKEN`, `TENANT_ID` (default `tenant_demo_002`).
@@ -64,12 +65,12 @@ $env:NODE_TLS_REJECT_UNAUTHORIZED='0'
 
 1. **Diagnostics** (read-only): `node scripts/debug-production-news.mjs`
 2. **Published tenant backfill** (if tenant filter = 0): `node scripts/repair-production-article-tenant-published.mjs --tenant-id=tenant_demo_002`
-3. **Category slug normalize** (if lowercase filters = 0): `node scripts/normalize-production-category-slugs.mjs` (use `--dry-run` first)
+3. **Slug normalize** (if lowercase filters = 0): `node scripts/normalize-production-slugs.mjs` (use `--dry-run` first; `--only=categories` for categories only)
 4. **Re-verify**: `node scripts/debug-production-news.mjs` — expect tenant-primary rows and category slugs `main-news`, `press-release`, `featured-news`
 5. **Deploy Strapi** with lifecycle + middleware changes (see below) so **future** publishes keep tenant and slugs
 6. **Frontend**: confirm production news page; hard-refresh / invalidate CDN if cached
 
-**npm**: `npm run normalize:category-slugs-cloud`
+**npm**: `npm run normalize:slugs-cloud` or `npm run normalize:category-slugs-cloud` (categories only)
 
 ## When to deploy Strapi Cloud
 
@@ -78,7 +79,9 @@ Deploy **after** committing/pushing these paths:
 - `src/utils/tenant-assignment.js`
 - `src/bootstrap.js` (tenant publish middleware)
 - `src/api/article/content-types/article/lifecycles.js`
+- `src/utils/normalize-slug.js`
 - `src/api/category/content-types/category/lifecycles.js`
+- `src/api/article/content-types/article/lifecycles.js` (and other slug types: tenant, bishop, diocese, parish, priest, directory-entry)
 
 **Timing**:
 
@@ -101,12 +104,20 @@ Do **not** wait for deploy to run slug normalization or `fix-published` backfill
 | `displayName` | Human UI label only (any casing, en-dash OK) | `Editorial – Article`, `Directory – Bishops` |
 | REST path | `/api/{pluralName}` | `/api/articles`, `/api/categories` |
 | UID | `api::{singular}.{singular}` | `api::article.article` |
-| Category `slug` field | **lowercase kebab-case** | `main-news` not `Main-News` |
+| Any `slug` UID field | **lowercase kebab-case** | `main-news`, article/parish/directory slugs, etc. |
+
+## Slug validation in Content Manager
+
+- **While typing**: Strapi’s built-in **UID** field does **not** show live kebab-case errors (it allows `Main-News`, underscores, etc.). There is no native “validate as you type” for kebab-only on UID fields without a **custom admin field** (large change).
+- **On save (default)**: `applyKebabSlugToEvent` **auto-corrects** to kebab-case (e.g. `Main-News` → `main-news`). Field **description** in schema hints editors under the slug input.
+- **On save (strict)**: Set `STRICT_KEBAB_SLUG=1` in `.env` / Cloud env → save **fails** with `ValidationError` if slug is not already valid kebab-case (admin shows API error).
+- **Content-Type Builder**: For a **Text** field (not UID), Advanced settings → **Regexp** can add `^[a-z0-9]+(-[a-z0-9]+)*$` — but you lose UID auto-generation from title/name.
 
 **Do not** rename collection types in DB for API fixes. Refactor `displayName` only for editor clarity.
 
 ## Related rules
 
+- [strapi_frontend_slug_contract.mdc](mdc:.cursor/rules/strapi_frontend_slug_contract.mdc) — **share with Next.js**: category slugs, article URLs, no frontend validation on read
 - [strapi-cloud-bootstrap-fixes.mdc](mdc:.cursor/rules/strapi-cloud-bootstrap-fixes.mdc) — CM config after transfer
 - Push/import: [`scripts/rest_api_push_to_cloud.js`](mdc:scripts/rest_api_push_to_cloud.js) uses `normalizeSlug()` and case-insensitive category dedup
 

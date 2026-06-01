@@ -21,7 +21,12 @@
     },
     "slug": {
       "type": "uid",
-      "targetField": "title"
+      "targetField": "title",
+      "pluginOptions": {
+        "content-manager": {
+          "description": "Lowercase kebab-case only (e.g. my-article-title). Use letters, numbers, and hyphens."
+        }
+      }
     },
     "cover": {
       "type": "media",

@@ -37,6 +37,7 @@
     "update:liturgy-days-malayalam": "node ./scripts/update-liturgy-days-malayalam-from-excel.js",
     "push:liturgy-days-to-cloud": "node ./scripts/push-liturgy-days-to-cloud.js",
     "normalize:category-slugs-cloud": "node ./scripts/normalize-production-category-slugs.mjs",
+    "normalize:slugs-cloud": "node ./scripts/normalize-production-slugs.mjs",
     "test:bishop_upload": "node ./scripts/test_bishop_upload.js",
     "migrate:upload-records-to-s3": "node ./scripts/migrate_upload_records_to_s3.js",
     "migrate:upload-records-to-s3:prod": "node ./scripts/migrate_upload_records_to_s3_prod.js",

@@ -539,7 +539,12 @@ export interface ApiArticleArticle extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Private;
     publishedAt: Schema.Attribute.DateTime;
-    slug: Schema.Attribute.UID<'title'>;
+    slug: Schema.Attribute.UID<'title'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          description: 'Lowercase kebab-case only (e.g. my-article-title). Use letters, numbers, and hyphens.';
+        };
+      }>;
     tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
       Schema.Attribute.SetPluginOptions<{
         'content-manager': {
@@ -675,7 +680,12 @@ export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
         maxLength: 255;
       }>;
     publishedAt: Schema.Attribute.DateTime;
-    slug: Schema.Attribute.UID;
+    slug: Schema.Attribute.UID &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          description: 'Lowercase kebab-case only (e.g. main-news). Use letters, numbers, and hyphens.';
+        };
+      }>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1574,7 +1584,12 @@ export interface ApiTenantTenant extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     publishedAt: Schema.Attribute.DateTime;
-    slug: Schema.Attribute.UID<'name'>;
+    slug: Schema.Attribute.UID<'name'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          description: 'Lowercase kebab-case only (e.g. tenant-demo-002). Use letters, numbers, and hyphens.';
+        };
+      }>;
     tenantId: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Unique;

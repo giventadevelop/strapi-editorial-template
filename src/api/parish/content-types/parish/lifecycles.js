@@ -1,6 +1,7 @@
 'use strict';
 
 const requestContext = require('../../../../utils/request-context');
+const { applyKebabSlugToEvent } = require('../../../../utils/normalize-slug');
 
 async function getTenantForAdminUser(strapi, adminUserId) {
   if (!adminUserId) return null;
@@ -30,6 +31,7 @@ async function getTenantForEmail(strapi, email) {
 
 module.exports = {
   async beforeCreate(event) {
+    applyKebabSlugToEvent(event);
     if (!event.params?.data) return;
     // Preserve tenant when already set (e.g. by sync script or data import)
     const existing = event.params.data.tenant;
@@ -46,6 +48,9 @@ module.exports = {
     } else {
       delete event.params.data.tenant;
     }
+  },
+  beforeUpdate(event) {
+    applyKebabSlugToEvent(event);
   },
   async afterCreate(event) {
     const { result } = event;

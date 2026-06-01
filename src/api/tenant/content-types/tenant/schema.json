@@ -24,7 +24,12 @@
     },
     "slug": {
       "type": "uid",
-      "targetField": "name"
+      "targetField": "name",
+      "pluginOptions": {
+        "content-manager": {
+          "description": "Lowercase kebab-case only (e.g. tenant-demo-002). Use letters, numbers, and hyphens."
+        }
+      }
     },
     "domain": {
       "type": "string",

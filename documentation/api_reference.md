@@ -341,11 +341,13 @@ GET /api/articles?filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publish
 
 If **Main News** returns 0 items but **Most Read** (no category filter) returns items, the category slug likely does not match. Strapi may store the slug as `Main-News` (from the name "Main News") while the filter uses `main-news`.
 
-**Fix:** Use the case-insensitive operator `$eqi`:
+**Fix (preferred):** Ensure Strapi category slugs are lowercase kebab-case (`main-news`, etc.) — see [strapi_frontend_slug_contract.md](./strapi_frontend_slug_contract.md) and `node scripts/normalize-production-slugs.mjs` on Cloud.
+
+**Legacy fallback:** Use the case-insensitive operator `$eqi`:
 ```
 filters[category][slug][$eqi]=main-news
 ```
-This matches `main-news`, `Main-News`, `MAIN-NEWS`, etc.
+This matches `main-news`, `Main-News`, `MAIN-NEWS`, etc. After normalization, prefer `$eq`.
 
 ### Advertisement position mismatch
 
