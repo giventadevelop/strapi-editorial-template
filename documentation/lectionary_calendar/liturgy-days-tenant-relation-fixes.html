@@ -183,7 +183,8 @@
         <li><a href="#db-copy-recovery">10. Recovering from wrong liturgy data (full remediation)</a></li>
         <li><a href="#malayalam-excel-sync">11. Malayalam Excel sync (Oct–Dec + full calendar)</a></li>
         <li><a href="#cloud-push-safety">12. Cloud push safety (do not overwrite other types)</a></li>
-        <li><a href="#related">13. Related documentation</a></li>
+        <li><a href="#local-to-cloud-sync">13. Replicate local liturgy corrections to production (Cloud)</a></li>
+        <li><a href="#related">14. Related documentation</a></li>
       </ul>
     </nav>
 
@@ -578,7 +579,7 @@
         <tbody>
           <tr><td>0. Cloud purge (liturgy only)</td><td><code>node scripts/clear_cloud_data.js --remote --types=liturgy-days</code></td><td>Must pass <code>--remote</code> and <code>--types=liturgy-days</code> (e.g. 2,645 deleted when Cloud was bloated)</td></tr>
           <tr><td>1–4</td><td>Same as local checklist above</td><td>185 rows locally</td></tr>
-          <tr><td>5. Push Cloud</td><td><code>node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002</code></td><td>185 upserted on Cloud; liturgy-only (does not touch articles)</td></tr>
+          <tr><td>5. Push Cloud</td><td><code>node scripts/sync-liturgy-calendar-local-to-cloud.js --tenant-id=tenant_demo_002 --year=2026 --verify-cloud</code> (or <code>push-liturgy-days-to-cloud.js</code>)</td><td>186 upserted on Cloud (June 2026 run); liturgy-only</td></tr>
           <tr><td>6. Verify</td><td><code>node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002 --year=2026</code></td><td>185 on tenant; editors see data after re-login</td></tr>
         </tbody>
       </table>
@@ -652,6 +653,7 @@
           <tr><th>Method</th><th>Safe when Cloud has content?</th><th>What it touches</th></tr>
         </thead>
         <tbody>
+          <tr><td><code class="script-name">sync-liturgy-calendar-local-to-cloud.js</code></td><td><strong>Yes</strong> (after local fixes)</td><td>Same as push; reads local DB; optional <code>--english-only</code>, <code>--verify-cloud</code>, <code>--year</code></td></tr>
           <tr><td><code class="script-name">push-liturgy-days-to-cloud.js</code></td><td><strong>Yes</strong> (recommended)</td><td>Only <code>/api/liturgy-days</code>; may create missing tenants on Cloud; upsert by date + tenant</td></tr>
           <tr><td><code>npm run push:rest-to-cloud</code></td><td><strong>No</strong> (unless Cloud is empty)</td><td>All exported types from tar.gz</td></tr>
           <tr><td><code>npm run strapi transfer</code></td><td><strong>No</strong></td><td>Replaces entire Cloud database and assets</td></tr>
@@ -672,7 +674,86 @@
       </div>
     </div>
 
-    <h2 id="related">13. Related documentation</h2>
+    <h2 id="local-to-cloud-sync">13. Replicate local liturgy corrections to production (Cloud)</h2>
+    <div class="section-intro">
+      <p>After fixing liturgy data <strong>locally</strong> (monthly English heading scripts, Excel sync, manual edits), replicate the same records to <strong>Strapi Cloud (production)</strong> without touching articles, media, or other collection types. The script reads from the <strong>local SQLite database</strong> via Strapi bootstrap and upserts matching Cloud records by <strong>date + tenant</strong>.</p>
+    </div>
+    <div class="section-container parameters">
+      <div class="section-header parameters">Script</div>
+      <p><code class="script-name">sync-liturgy-calendar-local-to-cloud.js</code> (npm: <code class="code-highlight">npm run sync:liturgy-calendar-to-cloud -- --tenant-id=tenant_demo_002</code>)</p>
+      <table>
+        <thead>
+          <tr><th>Option</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>--tenant-id=XXX</code></td><td>Sync only this tenant (recommended: <code>tenant_demo_002</code>)</td></tr>
+          <tr><td><code>--year=YYYY</code></td><td>Limit to dates in that calendar year (e.g. <code>2026</code>)</td></tr>
+          <tr><td><code>--english-only</code></td><td>On Cloud <strong>update</strong>, send only <code>dayHeadingEn</code> (Malayalam/season left unchanged on existing rows)</td></tr>
+          <tr><td><code>--verify-cloud</code></td><td>Print Cloud liturgy-day count for tenant before/after sync</td></tr>
+          <tr><td><code>DRY_RUN=1</code></td><td>Load local data and preview; no HTTP writes to Cloud</td></tr>
+        </tbody>
+      </table>
+      <p><strong>Env (required):</strong> <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code> in <code>.env</code> (see <code>.env.example</code>).</p>
+    </div>
+    <div class="section-container usage">
+      <div class="section-header usage">Recommended workflow after local English corrections</div>
+      <ol>
+        <li>Finish all local fixes (monthly <code>fix-*-english-liturgy-2026.js</code> scripts or Content Manager edits).</li>
+        <li>Verify local: <code class="code-highlight">node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002 --year=2026</code></li>
+        <li>Preview Cloud sync: <code class="code-highlight">$env:DRY_RUN=1; node scripts/sync-liturgy-calendar-local-to-cloud.js --tenant-id=tenant_demo_002 --year=2026</code></li>
+        <li>Sync to production: <code class="code-highlight">node scripts/sync-liturgy-calendar-local-to-cloud.js --tenant-id=tenant_demo_002 --year=2026 --verify-cloud</code></li>
+        <li>On Cloud Admin: confirm Editor Tenant Assignment for the editor email + tenant; editor logs out/in.</li>
+      </ol>
+      <div class="command-block setup" data-command-base="node scripts/sync-liturgy-calendar-local-to-cloud.js" data-template-command="node scripts/sync-liturgy-calendar-local-to-cloud.js --tenant-id=tenant_demo_002 --year=2026 --verify-cloud">
+        <div class="command-header">
+          <span class="command-type">Sync local liturgy calendar → Cloud</span>
+          <div class="command-header-buttons">
+            <button class="copy-button-template" onclick="copyTemplateCommand(this, 'cmd-sync-cloud')" title="Copy template">📄 Template</button>
+            <button class="copy-button" onclick="copyCommand(this, 'cmd-sync-cloud')" title="Copy command">📋 Copy</button>
+          </div>
+        </div>
+        <div class="command-parameters">
+          <h5>🔧 Customize parameters</h5>
+          <div class="parameter-group">
+            <div class="parameter-input">
+              <label for="cmd-sync-cloud-tenant">Tenant ID:</label>
+              <input type="text" id="cmd-sync-cloud-tenant" value="tenant_demo_002" oninput="updateCommand('cmd-sync-cloud', 'tenant', this.value)">
+            </div>
+            <div class="parameter-input">
+              <label for="cmd-sync-cloud-year">Year:</label>
+              <input type="text" id="cmd-sync-cloud-year" value="2026" oninput="updateCommand('cmd-sync-cloud', 'year', this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="command-content" id="cmd-sync-cloud">node scripts/sync-liturgy-calendar-local-to-cloud.js --tenant-id=tenant_demo_002 --year=2026 --verify-cloud</div>
+        <div class="command-single-line">
+          <div class="command-single-line-label">Windows single-line:</div>
+          <code id="cmd-sync-cloud-single-code">node scripts/sync-liturgy-calendar-local-to-cloud.js --tenant-id=tenant_demo_002 --year=2026 --verify-cloud</code>
+        </div>
+      </div>
+      <div class="info">
+        <strong>English-only mode</strong> (when Cloud Malayalam is already correct): add <code>--english-only</code> so updates touch only <code>dayHeadingEn</code> on existing Cloud rows.
+      </div>
+    </div>
+    <div class="section-container output">
+      <div class="section-header output">Observed run (June 2026, after local monthly English fixes)</div>
+      <table>
+        <thead>
+          <tr><th>Metric</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Local records synced (<code>tenant_demo_002</code>, 2026)</td><td><strong>186</strong></td></tr>
+          <tr><td>Cloud count before</td><td><strong>185</strong></td></tr>
+          <tr><td>Created on Cloud</td><td><strong>1</strong> (date missing on Cloud, e.g. Aug 12)</td></tr>
+          <tr><td>Updated on Cloud</td><td><strong>185</strong></td></tr>
+          <tr><td>Cloud count after</td><td><strong>186</strong></td></tr>
+          <tr><td>Articles / other types</td><td><strong>Untouched</strong></td></tr>
+        </tbody>
+      </table>
+      <p>Alternative: <code class="script-name">push-liturgy-days-to-cloud.js</code> performs the same upsert (all fields, no <code>--english-only</code>). Use either script for liturgy-only Cloud sync; prefer <code class="script-name">sync-liturgy-calendar-local-to-cloud.js</code> after manual local corrections for clearer logging and <code>--verify-cloud</code>.</p>
+    </div>
+
+    <h2 id="related">14. Related documentation</h2>
     <ul>
       <li><a href="lectionary-bulk-import-guide.html">Lectionary Bulk Import from PDFs</a> – delete/import scripts, options, troubleshooting.</li>
       <li><a href="liturgy-calendar-api-reference.html">Liturgy Day API Reference</a> – frontend integration and API usage.</li>

@@ -1,0 +1,73 @@
+{
+  "kind": "collectionType",
+  "collectionName": "holy_synod_members",
+  "info": {
+    "singularName": "holy-synod-member",
+    "pluralName": "holy-synod-members",
+    "displayName": "Directory – Holy Synod",
+    "description": "Holy Synod member (Catholicos or Metropolitan): biography, contact, and image"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Full title/name"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "memberType": {
+      "type": "enumeration",
+      "enum": ["catholicos", "metropolitan"],
+      "required": true,
+      "default": "metropolitan"
+    },
+    "excerpt": {
+      "type": "text",
+      "description": "Short summary for list/card views"
+    },
+    "body": {
+      "type": "richtext",
+      "description": "Full biography (HTML)"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Portrait / featured image"
+    },
+    "address": {
+      "type": "text"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phones": {
+      "type": "text",
+      "description": "Phone number(s), comma-separated if multiple"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order on Holy Synod listing"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

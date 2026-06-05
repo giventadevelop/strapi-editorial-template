@@ -25,6 +25,7 @@ const SUBJECTS = [
   'api::bishop.bishop',
   'api::catholicos.catholicos',
   'api::diocesan-bishop.diocesan-bishop',
+  'api::holy-synod-member.holy-synod-member',
   'api::retired-bishop.retired-bishop',
   'api::diocese.diocese',
   'api::parish.parish',

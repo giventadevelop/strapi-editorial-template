@@ -326,7 +326,7 @@ node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002 --year=
 node scripts/delete-liturgy-days.js --tenant-id=tenant_demo_002
 node scripts/import-liturgy-days-from-pdf.js --tenant-id=tenant_demo_002 --year=2026
 node scripts/sync-liturgy-days-from-malayalam-excel.js --tenant-id=tenant_demo_002 --prune-not-in-excel
-node scripts/push-liturgy-days-to-cloud.js --tenant-id=tenant_demo_002
+node scripts/sync-liturgy-calendar-local-to-cloud.js --tenant-id=tenant_demo_002 --year=2026 --verify-cloud
 node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002 --year=2026</code></pre>
       <p><strong>Observed results (Cloud, earlier full remediation):</strong> Cloud purge 2,645 deleted → push 185 created on Cloud. Always pass <code>--remote</code> and <code>--types=liturgy-days</code> to <code class="script-name">clear_cloud_data.js</code> so other collection types are not deleted.</p>
       <div class="info">

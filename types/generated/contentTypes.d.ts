@@ -1076,6 +1076,53 @@ export interface ApiGlobalGlobal extends Struct.SingleTypeSchema {
   };
 }
 
+export interface ApiHolySynodMemberHolySynodMember
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'holy_synod_members';
+  info: {
+    description: 'Holy Synod member (Catholicos or Metropolitan): biography, contact, and image';
+    displayName: 'Directory \u2013 Holy Synod';
+    pluralName: 'holy-synod-members';
+    singularName: 'holy-synod-member';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    address: Schema.Attribute.Text;
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    email: Schema.Attribute.String;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::holy-synod-member.holy-synod-member'
+    > &
+      Schema.Attribute.Private;
+    memberType: Schema.Attribute.Enumeration<['catholicos', 'metropolitan']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'metropolitan'>;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    phones: Schema.Attribute.Text;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiHomepageHomepage extends Struct.SingleTypeSchema {
   collectionName: 'homepages';
   info: {
@@ -2169,6 +2216,7 @@ declare module '@strapi/strapi' {
       'api::editor-tenant.editor-tenant': ApiEditorTenantEditorTenant;
       'api::flash-news-item.flash-news-item': ApiFlashNewsItemFlashNewsItem;
       'api::global.global': ApiGlobalGlobal;
+      'api::holy-synod-member.holy-synod-member': ApiHolySynodMemberHolySynodMember;
       'api::homepage.homepage': ApiHomepageHomepage;
       'api::institution.institution': ApiInstitutionInstitution;
       'api::liturgy-day.liturgy-day': ApiLiturgyDayLiturgyDay;
