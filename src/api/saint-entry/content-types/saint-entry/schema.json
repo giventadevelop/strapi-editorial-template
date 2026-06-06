@@ -1,0 +1,57 @@
+{
+  "kind": "collectionType",
+  "collectionName": "saint_entries",
+  "info": {
+    "singularName": "saint-entry",
+    "pluralName": "saint-entries",
+    "displayName": "Directory – Saints",
+    "description": "Saint or holy figure: summary, biography, and image"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Saint title or name"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "excerpt": {
+      "type": "text",
+      "description": "Short summary for list/card views"
+    },
+    "body": {
+      "type": "richtext",
+      "description": "Full biography or article content (HTML)"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Portrait / featured image"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order on Saints listing"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

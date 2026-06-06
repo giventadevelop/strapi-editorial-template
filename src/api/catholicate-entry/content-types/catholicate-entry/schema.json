@@ -1,0 +1,57 @@
+{
+  "kind": "collectionType",
+  "collectionName": "catholicate_entries",
+  "info": {
+    "singularName": "catholicate-entry",
+    "pluralName": "catholicate-entries",
+    "displayName": "Directory – The Catholicate",
+    "description": "Catholicate introduction or Catholicos biography: summary, body, and image"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Page title"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "excerpt": {
+      "type": "text",
+      "description": "Short summary for list/card views"
+    },
+    "body": {
+      "type": "richtext",
+      "description": "Full article content (HTML)"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Featured / card image"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order on Catholicate listing"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

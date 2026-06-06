@@ -692,6 +692,47 @@ export interface ApiCategoryCategory extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiCatholicateEntryCatholicateEntry
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'catholicate_entries';
+  info: {
+    description: 'Catholicate introduction or Catholicos biography: summary, body, and image';
+    displayName: 'Directory \u2013 The Catholicate';
+    pluralName: 'catholicate-entries';
+    singularName: 'catholicate-entry';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::catholicate-entry.catholicate-entry'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiCatholicosCatholicos extends Struct.CollectionTypeSchema {
   collectionName: 'catholicos_entries';
   info: {
@@ -957,6 +998,47 @@ export interface ApiDirectoryHomeDirectoryHome extends Struct.SingleTypeSchema {
   };
 }
 
+export interface ApiEcumenicalArticleEcumenicalArticle
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'ecumenical_articles';
+  info: {
+    description: 'Ecumenical relations article: summary, body, and featured image';
+    displayName: 'Directory \u2013 Ecumenical';
+    pluralName: 'ecumenical-articles';
+    singularName: 'ecumenical-article';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::ecumenical-article.ecumenical-article'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiEditorTenantEditorTenant
   extends Struct.CollectionTypeSchema {
   collectionName: 'editor_tenants';
@@ -1070,6 +1152,53 @@ export interface ApiGlobalGlobal extends Struct.SingleTypeSchema {
     publishedAt: Schema.Attribute.DateTime;
     siteDescription: Schema.Attribute.Text & Schema.Attribute.Required;
     siteName: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiHolySynodMemberHolySynodMember
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'holy_synod_members';
+  info: {
+    description: 'Holy Synod member (Catholicos or Metropolitan): biography, contact, and image';
+    displayName: 'Directory \u2013 Holy Synod';
+    pluralName: 'holy-synod-members';
+    singularName: 'holy-synod-member';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    address: Schema.Attribute.Text;
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    email: Schema.Attribute.String;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::holy-synod-member.holy-synod-member'
+    > &
+      Schema.Attribute.Private;
+    memberType: Schema.Attribute.Enumeration<['catholicos', 'metropolitan']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'metropolitan'>;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    phones: Schema.Attribute.Text;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1419,6 +1548,46 @@ export interface ApiRetiredBishopRetiredBishop
     name: Schema.Attribute.String & Schema.Attribute.Required;
     order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     phones: Schema.Attribute.Text;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiSaintEntrySaintEntry extends Struct.CollectionTypeSchema {
+  collectionName: 'saint_entries';
+  info: {
+    description: 'Saint or holy figure: summary, biography, and image';
+    displayName: 'Directory \u2013 Saints';
+    pluralName: 'saint-entries';
+    singularName: 'saint-entry';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::saint-entry.saint-entry'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
     publishedAt: Schema.Attribute.DateTime;
     slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
     tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
@@ -2160,15 +2329,18 @@ declare module '@strapi/strapi' {
       'api::author.author': ApiAuthorAuthor;
       'api::bishop.bishop': ApiBishopBishop;
       'api::category.category': ApiCategoryCategory;
+      'api::catholicate-entry.catholicate-entry': ApiCatholicateEntryCatholicateEntry;
       'api::catholicos.catholicos': ApiCatholicosCatholicos;
       'api::church-dignitary.church-dignitary': ApiChurchDignitaryChurchDignitary;
       'api::diocesan-bishop.diocesan-bishop': ApiDiocesanBishopDiocesanBishop;
       'api::diocese.diocese': ApiDioceseDiocese;
       'api::directory-entry.directory-entry': ApiDirectoryEntryDirectoryEntry;
       'api::directory-home.directory-home': ApiDirectoryHomeDirectoryHome;
+      'api::ecumenical-article.ecumenical-article': ApiEcumenicalArticleEcumenicalArticle;
       'api::editor-tenant.editor-tenant': ApiEditorTenantEditorTenant;
       'api::flash-news-item.flash-news-item': ApiFlashNewsItemFlashNewsItem;
       'api::global.global': ApiGlobalGlobal;
+      'api::holy-synod-member.holy-synod-member': ApiHolySynodMemberHolySynodMember;
       'api::homepage.homepage': ApiHomepageHomepage;
       'api::institution.institution': ApiInstitutionInstitution;
       'api::liturgy-day.liturgy-day': ApiLiturgyDayLiturgyDay;
@@ -2177,6 +2349,7 @@ declare module '@strapi/strapi' {
       'api::pilgrim-centre.pilgrim-centre': ApiPilgrimCentrePilgrimCentre;
       'api::priest.priest': ApiPriestPriest;
       'api::retired-bishop.retired-bishop': ApiRetiredBishopRetiredBishop;
+      'api::saint-entry.saint-entry': ApiSaintEntrySaintEntry;
       'api::seminary.seminary': ApiSeminarySeminary;
       'api::sidebar-promotional-block.sidebar-promotional-block': ApiSidebarPromotionalBlockSidebarPromotionalBlock;
       'api::spiritual-organisation.spiritual-organisation': ApiSpiritualOrganisationSpiritualOrganisation;

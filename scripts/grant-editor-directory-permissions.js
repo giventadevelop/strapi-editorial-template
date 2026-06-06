@@ -25,6 +25,10 @@ const SUBJECTS = [
   'api::bishop.bishop',
   'api::catholicos.catholicos',
   'api::diocesan-bishop.diocesan-bishop',
+  'api::holy-synod-member.holy-synod-member',
+  'api::ecumenical-article.ecumenical-article',
+  'api::saint-entry.saint-entry',
+  'api::catholicate-entry.catholicate-entry',
   'api::retired-bishop.retired-bishop',
   'api::diocese.diocese',
   'api::parish.parish',
@@ -45,6 +49,36 @@ const ACTIONS = [
   'plugin::content-manager.explorer.update',
   'plugin::content-manager.explorer.delete',
 ];
+
+/** All attribute names for a content type (required for field-level CM permissions). */
+function getFieldNamesForSubject(strapi, subject) {
+  const ct = strapi.contentTypes[subject];
+  if (!ct?.attributes) return [];
+  return Object.keys(ct.attributes);
+}
+
+/** Strapi 5 stores allowed fields in properties.fields; empty {} hides every field in the edit view. */
+function propertiesForAction(action, fieldNames) {
+  if (action === 'plugin::content-manager.explorer.delete') return {};
+  if (
+    action === 'plugin::content-manager.explorer.create' ||
+    action === 'plugin::content-manager.explorer.read' ||
+    action === 'plugin::content-manager.explorer.update'
+  ) {
+    return { fields: fieldNames };
+  }
+  return {};
+}
+
+function parseProperties(raw) {
+  if (raw == null) return {};
+  if (typeof raw === 'object') return raw;
+  try {
+    return JSON.parse(raw || '{}');
+  } catch (_) {
+    return {};
+  }
+}
 
 async function main() {
   const { createStrapi, compileStrapi } = require('@strapi/strapi');
@@ -74,9 +108,12 @@ async function main() {
     const targetConditions = [];
 
     for (const subject of SUBJECTS) {
+      const fieldNames = getFieldNamesForSubject(strapi, subject);
+
       for (const action of ACTIONS) {
+        const actionProperties = propertiesForAction(action, fieldNames);
         const rows = await knex('admin_permissions as p')
-          .select('p.id', 'p.document_id', 'p.conditions')
+          .select('p.id', 'p.document_id', 'p.conditions', 'p.properties')
           .innerJoin('admin_permissions_role_lnk as l', 'l.permission_id', 'p.id')
           .where('p.action', action)
           .andWhere('p.subject', subject)
@@ -88,10 +125,18 @@ async function main() {
           const currentConditions = Array.isArray(keep.conditions)
             ? keep.conditions
             : JSON.parse(keep.conditions || '[]');
-          if (JSON.stringify(currentConditions) !== JSON.stringify(targetConditions)) {
+          const currentProperties = parseProperties(keep.properties);
+          const needsConditions =
+            JSON.stringify(currentConditions) !== JSON.stringify(targetConditions);
+          const needsProperties =
+            JSON.stringify(currentProperties) !== JSON.stringify(actionProperties);
+          if (needsConditions || needsProperties) {
             await knex('admin_permissions')
               .where({ id: keep.id })
-              .update({ conditions: JSON.stringify(targetConditions) });
+              .update({
+                conditions: JSON.stringify(targetConditions),
+                properties: JSON.stringify(actionProperties),
+              });
             updated++;
             console.log('  Updated:', action, '→', subject);
           }
@@ -109,6 +154,7 @@ async function main() {
             action,
             subject,
             conditions: targetConditions,
+            properties: actionProperties,
           },
           select: ['id', 'documentId'],
         });
