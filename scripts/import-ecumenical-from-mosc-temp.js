@@ -1,13 +1,13 @@
 'use strict';
 
 /**
- * Import Holy Synod members from mosc-temp (HTML clone + Next.js pages + public images).
- * Creates entries in Directory – Holy Synod only; does not modify other collection types.
+ * Import Ecumenical articles from mosc-temp (Next.js pages + public images).
+ * Creates entries in Directory – Ecumenical only; does not modify other collection types.
  *
  * Sources:
- *   - code_clone_ref/mosc_in/holysynod HTML pages
- *   - Next.js holy-synod hub page.tsx for excerpt and card image
- *   - public/images/holy-synod/* (preferred images)
+ *   - ecumenical/page.tsx hub (ECUMENICAL_ARTICLES) for title, excerpt, card image, order
+ *   - ecumenical/<slug>/page.tsx for body and detail featured image
+ *   - public/images/mosc/ecumenical, public/images/ecumenical, public/images/logos
  *
  * Env:
  *   MOSC_TEMP_DIR     (default: C:\project_workspace\mosc-temp)
@@ -16,11 +16,12 @@
  *   --replace         Update existing rows for same slug+tenant
  *   --images-only     Replace image media only (no text/content changes)
  *
- * Image priority (matches mosc-redesign holy-synod pages):
- *   1. Hub card image from holy-synod/page.tsx (synodMembers)
- *   2. Detail page featured image from holy-synod/<slug>/page.tsx
- *   node scripts/import-holy-synod-from-mosc-temp.js
- *   node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=tenant_demo_002
+ * Image priority (matches mosc-redesign ecumenical hub cards):
+ *   1. Hub card image from ecumenical/page.tsx
+ *   2. Detail page featured image from ecumenical/<slug>/page.tsx
+ *
+ *   node scripts/import-ecumenical-from-mosc-temp.js
+ *   node scripts/import-ecumenical-from-mosc-temp.js --tenant-id=tenant_demo_002 --replace
  */
 
 try {
@@ -30,7 +31,6 @@ try {
 const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
-const cheerio = require('cheerio');
 
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 const REPLACE = process.argv.includes('--replace');
@@ -44,116 +44,11 @@ const TENANT_ID = (() => {
 const MOSC_ROOT = path.resolve(
   process.env.MOSC_TEMP_DIR || process.env.STRAPI_DATA_IMPORT_MOSC_TEMP_DIR || 'C:\\project_workspace\\mosc-temp'
 );
-const HOLYSYNOD_HTML = path.join(MOSC_ROOT, 'code_clone_ref', 'mosc_in', 'holysynod');
-const HOLYSYNOD_PAGES = path.join(MOSC_ROOT, 'src', 'app', 'mosc-redesign', '(syro)', 'holy-synod');
-const PUBLIC_HOLYSYNOD_IMAGES = path.join(MOSC_ROOT, 'public', 'images', 'holy-synod');
-const MOSC_ASSETS_HOLYSYNOD = path.join(MOSC_ROOT, 'public', 'mosc', 'assets', 'images', 'mosc_images', 'Holy Synod');
+const ECUMENICAL_PAGES = path.join(MOSC_ROOT, 'src', 'app', 'mosc-redesign', '(syro)', 'ecumenical');
+const PUBLIC_MOSC_ECUMENICAL = path.join(MOSC_ROOT, 'public', 'images', 'mosc', 'ecumenical');
+const PUBLIC_ECUMENICAL = path.join(MOSC_ROOT, 'public', 'images', 'ecumenical');
 
-const UID = 'api::holy-synod-member.holy-synod-member';
-
-function slugify(name) {
-  if (!name || typeof name !== 'string') return '';
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-function text($el) {
-  return $el.text().trim().replace(/\s+/g, ' ');
-}
-
-function loadHubMeta() {
-  const hubPath = path.join(HOLYSYNOD_PAGES, 'page.tsx');
-  if (!fs.existsSync(hubPath)) return new Map();
-  const raw = fs.readFileSync(hubPath, 'utf8');
-  const imageBaseMatch = raw.match(/const IMAGE_BASE = '([^']+)'/);
-  const imageBase = imageBaseMatch ? imageBaseMatch[1] : '/mosc/assets/images/mosc_images/Holy Synod';
-
-  const map = new Map();
-  const blockRe =
-    /title:\s*'((?:\\'|[^'])*)'[\s\S]*?excerpt:\s*\n\s*'((?:\\'|[^'])*)'[\s\S]*?image:\s*(?:'([^']*)'|`([^`]*?)`)[\s\S]*?internalHref:\s*'([^']*)'/g;
-  let m;
-  let order = 0;
-  while ((m = blockRe.exec(raw)) !== null) {
-    const internalHref = m[5];
-    const slug = internalHref.split('/').filter(Boolean).pop();
-    if (!slug) continue;
-    let cardImage = (m[3] || m[4] || '').trim();
-    cardImage = cardImage.replace(/\$\{IMAGE_BASE\}/g, imageBase);
-    map.set(slug, {
-      title: m[1].replace(/\\'/g, "'").trim(),
-      excerpt: m[2].replace(/\\'/g, "'").trim(),
-      cardImage,
-      order: order++,
-    });
-  }
-  return map;
-}
-
-function loadPageDetailImage(slug) {
-  const pagePath = path.join(HOLYSYNOD_PAGES, slug, 'page.tsx');
-  if (!fs.existsSync(pagePath)) return null;
-  const raw = fs.readFileSync(pagePath, 'utf8');
-  const m = raw.match(/<Image[^>]+src="([^"]+)"/) || raw.match(/src="(\/images\/holy-synod\/[^"]+)"/);
-  return m ? m[1] : null;
-}
-
-function parseDetailHtml(html, htmlFile) {
-  const $ = cheerio.load(html);
-  const box = $('.cnt-box-inner');
-  if (!box.length) return null;
-
-  const name = text(box.find('h3').first());
-  if (!name) return null;
-
-  const imgSrc = box.find('img.wp-post-image').first().attr('src') || box.find('img').first().attr('src');
-  const paragraphs = box
-    .find('p')
-    .map((_, el) => text($(el)))
-    .get()
-    .filter(Boolean);
-
-  let address = null;
-  let email = null;
-  let phones = null;
-  const bioParts = [];
-
-  for (const p of paragraphs) {
-    const lower = p.toLowerCase();
-    if (/^email\s*:/i.test(p) || lower.includes('email:')) {
-      const mail = p.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-      if (mail) email = mail[0];
-      continue;
-    }
-    if (/^address\s*:/i.test(p) || /\bph\s*:/i.test(p) || /\bcell\s*:/i.test(p) || /\btel\s*:/i.test(p)) {
-      address = address ? `${address}\n${p}` : p;
-      const phoneMatches = p.match(/(?:ph|cell|tel)\s*:\s*([^]+)/gi);
-      if (phoneMatches) {
-        const nums = phoneMatches.map((x) => x.replace(/^(ph|cell|tel)\s*:\s*/i, '').trim());
-        phones = phones ? `${phones}, ${nums.join(', ')}` : nums.join(', ');
-      }
-      continue;
-    }
-    bioParts.push(p);
-  }
-
-  const bodyHtml = bioParts.map((p) => `<p>${p}</p>`).join('\n');
-  const htmlDir = path.dirname(htmlFile);
-
-  return {
-    name,
-    htmlImagePath: imgSrc,
-    htmlDir,
-    address,
-    email,
-    phones,
-    bodyHtml,
-  };
-}
+const UID = 'api::ecumenical-article.ecumenical-article';
 
 function findFileCaseInsensitive(dir, baseName) {
   if (!dir || !baseName || !fs.existsSync(dir)) return null;
@@ -169,30 +64,96 @@ function findFileCaseInsensitive(dir, baseName) {
   return null;
 }
 
-function resolveImageFile(imageRef, htmlDir) {
+function loadHubMeta() {
+  const hubPath = path.join(ECUMENICAL_PAGES, 'page.tsx');
+  if (!fs.existsSync(hubPath)) return new Map();
+  const raw = fs.readFileSync(hubPath, 'utf8');
+  const map = new Map();
+  let order = 0;
+
+  for (const line of raw.split('\n')) {
+    if (!line.includes('title:') || !line.includes('href:')) continue;
+    const titleM = line.match(/title:\s*'((?:\\'|[^'])*)'/);
+    const excerptDouble = line.match(/excerpt:\s*"((?:\\"|[^"])*)"/);
+    const excerptSingle = line.match(/excerpt:\s*'((?:\\'|[^'])*)'/);
+    const imageNull = /image:\s*null/.test(line);
+    const imageM = line.match(/image:\s*'([^']*)'/);
+    const hrefM = line.match(/href:\s*'([^']*)'/);
+    if (!hrefM) continue;
+    const slug = hrefM[1].split('/').filter(Boolean).pop();
+    if (!slug) continue;
+    map.set(slug, {
+      title: titleM ? titleM[1].replace(/\\'/g, "'").trim() : slug,
+      excerpt: (excerptDouble?.[1] || excerptSingle?.[1] || '')
+        .replace(/\\'/g, "'")
+        .replace(/\\"/g, '"')
+        .trim(),
+      cardImage: imageNull ? null : imageM?.[1] || null,
+      order: order++,
+    });
+  }
+  return map;
+}
+
+function jsxParagraphToHtml(content) {
+  let html = content
+    .replace(/\{' '\}/g, ' ')
+    .replace(/\{`([^`]*)`\}/g, '$1')
+    .replace(/<br\s*\/?>/gi, '<br/>');
+  html = html.replace(/<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g, '<a href="$1">$2</a>');
+  html = html.replace(/<(?!\/a>|a |br\b)[^>]+>/gi, '');
+  return html.replace(/\s+/g, ' ').trim();
+}
+
+function parseDetailPage(slug) {
+  const pagePath = path.join(ECUMENICAL_PAGES, slug, 'page.tsx');
+  if (!fs.existsSync(pagePath)) return null;
+  const raw = fs.readFileSync(pagePath, 'utf8');
+  const bannerMatch = raw.match(/SyroPageBanner title="([^"]+)"/);
+  const imageMatch = raw.match(/<Image[^>]+src="([^"]+)"/);
+
+  const proseIdx = raw.indexOf('className="prose');
+  const sidebarIdx = raw.indexOf('EcumenicalSidebar');
+  const section =
+    proseIdx >= 0 ? raw.slice(proseIdx, sidebarIdx > proseIdx ? sidebarIdx : raw.length) : raw;
+
+  const paras = [];
+  const pRe = /<p(?:\s+className="[^"]*")?[^>]*>([\s\S]*?)<\/p>/g;
+  let pm;
+  while ((pm = pRe.exec(section)) !== null) {
+    const text = jsxParagraphToHtml(pm[1]);
+    if (text.length >= 10) paras.push(text);
+  }
+
+  const bodyHtml = paras.length ? paras.map((p) => `<p>${p}</p>`).join('\n') : null;
+  return {
+    bannerTitle: bannerMatch?.[1]?.trim() || null,
+    detailImage: imageMatch?.[1] || null,
+    bodyHtml,
+    firstParagraph: paras[0] || null,
+  };
+}
+
+function resolveImageFile(imageRef) {
   if (!imageRef || typeof imageRef !== 'string') return null;
   const ref = imageRef.trim();
   const candidates = [];
 
-  if (ref.startsWith('/images/holy-synod/')) {
+  if (ref.startsWith('/images/mosc/ecumenical/')) {
     const base = path.basename(ref);
-    candidates.push(path.join(PUBLIC_HOLYSYNOD_IMAGES, base));
-    candidates.push(findFileCaseInsensitive(PUBLIC_HOLYSYNOD_IMAGES, base));
+    candidates.push(path.join(PUBLIC_MOSC_ECUMENICAL, base));
+    candidates.push(findFileCaseInsensitive(PUBLIC_MOSC_ECUMENICAL, base));
   }
-  if (ref.startsWith('/mosc/assets/')) {
+  if (ref.startsWith('/images/ecumenical/')) {
+    const base = path.basename(ref);
+    candidates.push(path.join(PUBLIC_ECUMENICAL, base));
+    candidates.push(findFileCaseInsensitive(PUBLIC_ECUMENICAL, base));
+  }
+  if (ref.startsWith('/images/')) {
     candidates.push(path.join(MOSC_ROOT, 'public', ref.replace(/^\//, '').replace(/\//g, path.sep)));
     const base = path.basename(ref);
-    candidates.push(findFileCaseInsensitive(MOSC_ASSETS_HOLYSYNOD, base));
-  }
-  if (ref.includes('Holy Synod') || ref.includes('mosc_images')) {
-    candidates.push(path.join(MOSC_ROOT, 'public', ref.replace(/^\//, '').replace(/\//g, path.sep)));
-    candidates.push(path.join(MOSC_ASSETS_HOLYSYNOD, path.basename(ref)));
-    candidates.push(findFileCaseInsensitive(MOSC_ASSETS_HOLYSYNOD, path.basename(ref)));
-  }
-  if (ref.startsWith('../../')) {
-    candidates.push(path.resolve(htmlDir, ref));
-  } else if (!ref.startsWith('http')) {
-    candidates.push(path.resolve(htmlDir, ref));
+    candidates.push(findFileCaseInsensitive(PUBLIC_MOSC_ECUMENICAL, base));
+    candidates.push(findFileCaseInsensitive(PUBLIC_ECUMENICAL, base));
   }
 
   for (const c of candidates) {
@@ -201,6 +162,17 @@ function resolveImageFile(imageRef, htmlDir) {
     } catch (_) {}
   }
   return null;
+}
+
+function discoverDetailSlugs() {
+  const slugs = [];
+  if (!fs.existsSync(ECUMENICAL_PAGES)) return slugs;
+  for (const ent of fs.readdirSync(ECUMENICAL_PAGES, { withFileTypes: true })) {
+    if (!ent.isDirectory()) continue;
+    const pagePath = path.join(ECUMENICAL_PAGES, ent.name, 'page.tsx');
+    if (fs.existsSync(pagePath)) slugs.push(ent.name);
+  }
+  return slugs.sort();
 }
 
 async function getUploadFileDocumentId(strapi, uploaded) {
@@ -268,26 +240,6 @@ async function setMediaRelationViaDb(strapi, entityDocumentId, fileDocumentId) {
   }
 }
 
-function discoverHtmlPages() {
-  const pages = [];
-  if (!fs.existsSync(HOLYSYNOD_HTML)) return pages;
-
-  const rootHtml = path.join(HOLYSYNOD_HTML, 'his-holiness-baselios-marthoma-mathews-iii.html');
-  if (fs.existsSync(rootHtml)) {
-    pages.push({ slug: 'his-holiness-baselios-marthoma-mathews-iii', htmlPath: rootHtml });
-  }
-
-  const entries = fs.readdirSync(HOLYSYNOD_HTML, { withFileTypes: true });
-  for (const ent of entries) {
-    if (!ent.isDirectory()) continue;
-    const indexHtml = path.join(HOLYSYNOD_HTML, ent.name, 'index.html');
-    if (fs.existsSync(indexHtml)) {
-      pages.push({ slug: ent.name, htmlPath: indexHtml });
-    }
-  }
-  return pages;
-}
-
 async function getOrCreateTenant(strapi, tenantId) {
   const existing = await strapi.db.query('api::tenant.tenant').findOne({
     where: { tenantId },
@@ -309,7 +261,7 @@ async function getOrCreateTenant(strapi, tenantId) {
 }
 
 async function main() {
-  console.log('Holy Synod import from mosc-temp');
+  console.log('Ecumenical import from mosc-temp');
   console.log('  MOSC_ROOT:', MOSC_ROOT);
   console.log('  TENANT_ID:', TENANT_ID);
   if (DRY_RUN) console.log('  DRY_RUN=1');
@@ -323,12 +275,11 @@ async function main() {
   }
 
   const hubMeta = loadHubMeta();
-  const htmlPages = discoverHtmlPages();
-  console.log('Hub members (page.tsx):', hubMeta.size);
-  console.log('Detail HTML pages:', htmlPages.length);
+  const slugs = discoverDetailSlugs();
+  console.log('Hub articles (page.tsx):', hubMeta.size);
+  console.log('Detail pages:', slugs.length);
   console.log('');
 
-  // Use a NODE_ENV without config/env/*/plugins.js S3 override so local disk upload works.
   const prevNodeEnv = process.env.NODE_ENV;
   if (!process.env.STRAPI_IMPORT_NODE_ENV) {
     process.env.NODE_ENV = 'staging';
@@ -355,32 +306,29 @@ async function main() {
   let created = 0;
   let updated = 0;
   let skipped = 0;
+  let orphanOrder = hubMeta.size;
 
-  for (const { slug, htmlPath } of htmlPages) {
-    const html = fs.readFileSync(htmlPath, 'utf8');
-    const parsed = parseDetailHtml(html, htmlPath);
-    if (!parsed) {
-      console.warn('Skip (parse failed):', slug);
+  for (const slug of slugs) {
+    const hub = hubMeta.get(slug) || {};
+    const detail = parseDetailPage(slug);
+    if (!detail) {
+      console.warn('Skip (no detail page):', slug);
       skipped++;
       continue;
     }
 
-    const hub = hubMeta.get(slug) || {};
-    const name = hub.title || parsed.name;
-    const excerpt = hub.excerpt || parsed.bodyHtml.replace(/<[^>]+>/g, ' ').slice(0, 280);
-    const memberType =
-      slug.includes('his-holiness') || /catholicos/i.test(name) ? 'catholicos' : 'metropolitan';
-    const order = hub.order != null ? hub.order : 0;
+    const name = hub.title || detail.bannerTitle || slug;
+    const excerpt =
+      hub.excerpt ||
+      (detail.firstParagraph ? detail.firstParagraph.slice(0, 280) : null);
+    const order = hub.order != null ? hub.order : orphanOrder++;
 
-    const imageCandidates = [
-      hub.cardImage,
-      loadPageDetailImage(slug),
-    ];
+    const imageCandidates = [hub.cardImage, detail.detailImage];
     let imageFile = null;
     let imageRefUsed = null;
     for (const ref of imageCandidates) {
       if (!ref) continue;
-      imageFile = resolveImageFile(ref, parsed.htmlDir);
+      imageFile = resolveImageFile(ref);
       if (imageFile) {
         imageRefUsed = ref;
         break;
@@ -395,7 +343,14 @@ async function main() {
         continue;
       }
       if (DRY_RUN) {
-        console.log('Would replace image:', slug, '|', imageFile ? path.basename(imageFile) : 'none', '| ref:', imageRefUsed || '-');
+        console.log(
+          'Would replace image:',
+          slug,
+          '|',
+          imageFile ? path.basename(imageFile) : 'none',
+          '| ref:',
+          imageRefUsed || '-'
+        );
         updated++;
         continue;
       }
@@ -425,12 +380,8 @@ async function main() {
     const data = {
       name,
       slug,
-      memberType,
       excerpt,
-      body: parsed.bodyHtml || null,
-      address: parsed.address,
-      email: parsed.email,
-      phones: parsed.phones,
+      body: detail.bodyHtml || null,
       order,
       tenant: connectTenant,
     };
@@ -442,7 +393,14 @@ async function main() {
     }
 
     if (DRY_RUN) {
-      console.log('Would import:', slug, '|', name.slice(0, 50), '| image:', imageFile ? path.basename(imageFile) : 'none');
+      console.log(
+        'Would import:',
+        slug,
+        '|',
+        name.slice(0, 50),
+        '| image:',
+        imageFile ? path.basename(imageFile) : 'none'
+      );
       created++;
       continue;
     }

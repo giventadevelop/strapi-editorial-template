@@ -347,6 +347,10 @@ async function ensureEditorTenantScopedPermissions() {
     'api::bishop.bishop',
     'api::catholicos.catholicos',
     'api::diocesan-bishop.diocesan-bishop',
+    'api::holy-synod-member.holy-synod-member',
+    'api::ecumenical-article.ecumenical-article',
+    'api::saint-entry.saint-entry',
+    'api::catholicate-entry.catholicate-entry',
     'api::retired-bishop.retired-bishop',
     'api::diocese.diocese',
     'api::parish.parish',
@@ -383,9 +387,16 @@ async function ensureEditorTenantScopedPermissions() {
     const roleId = editorRole.id;
 
     for (const subject of subjects) {
+      const ct = strapi.contentTypes[subject];
+      const fieldNames = ct?.attributes ? Object.keys(ct.attributes) : [];
       for (const action of actions) {
+        const actionProperties =
+          action === 'plugin::content-manager.explorer.delete'
+            ? {}
+            : { fields: fieldNames };
+
         const rows = await knex('admin_permissions as p')
-          .select('p.id', 'p.document_id', 'p.conditions')
+          .select('p.id', 'p.document_id', 'p.conditions', 'p.properties')
           .innerJoin('admin_permissions_role_lnk as l', 'l.permission_id', 'p.id')
           .where('p.action', action)
           .andWhere('p.subject', subject)
@@ -397,11 +408,26 @@ async function ensureEditorTenantScopedPermissions() {
           const currentConditions = Array.isArray(keep.conditions)
             ? keep.conditions
             : JSON.parse(keep.conditions || '[]');
-          if (JSON.stringify(currentConditions) !== JSON.stringify(targetConditions)) {
+          let currentProperties = keep.properties;
+          if (typeof currentProperties === 'string') {
+            try {
+              currentProperties = JSON.parse(currentProperties || '{}');
+            } catch (_) {
+              currentProperties = {};
+            }
+          }
+          const needsConditions =
+            JSON.stringify(currentConditions) !== JSON.stringify(targetConditions);
+          const needsProperties =
+            JSON.stringify(currentProperties || {}) !== JSON.stringify(actionProperties);
+          if (needsConditions || needsProperties) {
             await knex('admin_permissions')
               .where({ id: keep.id })
-              .update({ conditions: JSON.stringify(targetConditions) });
-            strapi.log.info(`Updated Editor permission conditions: ${action} on ${subject}`);
+              .update({
+                conditions: JSON.stringify(targetConditions),
+                properties: JSON.stringify(actionProperties),
+              });
+            strapi.log.info(`Updated Editor permission: ${action} on ${subject}`);
           }
 
           if (rows.length > 1) {
@@ -420,6 +446,7 @@ async function ensureEditorTenantScopedPermissions() {
             action,
             subject,
             conditions: targetConditions,
+            properties: actionProperties,
           },
           select: ['id', 'documentId'],
         });
@@ -461,6 +488,10 @@ async function hideTenantFieldInContentManagerLayout() {
     'api::bishop.bishop',
     'api::catholicos.catholicos',
     'api::diocesan-bishop.diocesan-bishop',
+    'api::holy-synod-member.holy-synod-member',
+    'api::ecumenical-article.ecumenical-article',
+    'api::saint-entry.saint-entry',
+    'api::catholicate-entry.catholicate-entry',
     'api::retired-bishop.retired-bishop',
     'api::diocese.diocese',
     'api::parish.parish',
@@ -518,6 +549,10 @@ async function registerTenantDocumentMiddleware() {
     'api::bishop.bishop',
     'api::catholicos.catholicos',
     'api::diocesan-bishop.diocesan-bishop',
+    'api::holy-synod-member.holy-synod-member',
+    'api::ecumenical-article.ecumenical-article',
+    'api::saint-entry.saint-entry',
+    'api::catholicate-entry.catholicate-entry',
     'api::retired-bishop.retired-bishop',
     'api::diocese.diocese',
     'api::parish.parish',
@@ -643,6 +678,10 @@ async function ensureContentApiPublicPermissions() {
     { controller: 'parish', actions: ['find', 'findOne'] },
     { controller: 'priest', actions: ['find', 'findOne'] },
     { controller: 'directory-entry', actions: ['find', 'findOne'] },
+    { controller: 'holy-synod-member', actions: ['find', 'findOne'] },
+    { controller: 'ecumenical-article', actions: ['find', 'findOne'] },
+    { controller: 'saint-entry', actions: ['find', 'findOne'] },
+    { controller: 'catholicate-entry', actions: ['find', 'findOne'] },
     { controller: 'liturgy-day', actions: ['find', 'findOne'] },
   ];
   for (const { controller, actions } of toEnsure) {
@@ -896,6 +935,10 @@ function registerTenantPublishMiddleware() {
     'api::bishop.bishop',
     'api::catholicos.catholicos',
     'api::diocesan-bishop.diocesan-bishop',
+    'api::holy-synod-member.holy-synod-member',
+    'api::ecumenical-article.ecumenical-article',
+    'api::saint-entry.saint-entry',
+    'api::catholicate-entry.catholicate-entry',
     'api::retired-bishop.retired-bishop',
     'api::diocese.diocese',
     'api::parish.parish',

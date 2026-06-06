@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Holy Synod – Schema, Import &amp; API Guide</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; --green: #3fb950; --warn: #d29922; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 54rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    h4 { font-size: 0.95rem; margin-top: 1rem; color: var(--text); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; border-radius: 8px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; }
+    pre code { background: none; border: none; padding: 0; color: #0d3b66; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    tr:hover td { background: rgba(88, 166, 255, 0.05); }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #333; }
+    .good { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #155724; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    li { margin: 0.25rem 0; }
+    a { color: var(--accent); }
+    .toc { margin: 1.5rem 0; padding: 1rem; background: var(--surface); border-radius: 8px; }
+    .toc ul { list-style: none; padding-left: 0; }
+    .toc li { margin: 0.35rem 0; }
+    .toc a { text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; border: none; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p, .section-intro li { color: #333; }
+    .section-container { border-radius: 8px; margin: 1.5rem 0; overflow: hidden; border: 1px solid var(--border); }
+    .section-header { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; padding: 12px 16px; font-weight: 600; }
+    .section-body { padding: 16px; background: var(--surface); }
+    .parameters-list { background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); border-left: 4px solid #ff9800; border-radius: 8px; padding: 16px; margin: 1rem 0; color: #333; }
+    .parameters-list li { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; padding: 0; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-type { font-weight: bold; color: #0d3b66; }
+    .command-header-buttons { display: flex; gap: 8px; }
+    .copy-button, .copy-button-template { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; }
+    .copy-button { background: #0066cc; color: white; }
+    .copy-button-template { background: #6c757d; color: white; }
+    .command-parameters { padding: 15px; background: rgba(255,255,255,0.5); border-bottom: 1px solid rgba(0,0,0,0.1); }
+    .command-parameters h5 { margin: 0 0 12px 0; font-size: 0.9em; color: #333; }
+    .parameter-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .parameter-group.single { grid-template-columns: 1fr; }
+    .parameter-input label { font-size: 0.8em; color: #555; font-weight: 600; display: block; margin-bottom: 4px; }
+    .parameter-input input { width: 100%; padding: 8px 12px; border: 2px solid #ddd; border-radius: 4px; font-family: 'Courier New', monospace; }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
+    .command-single-line { padding: 12px 15px; background: #e8f4f8; border-top: 1px solid #b8d4e3; }
+    .command-single-line-label { font-size: 0.8em; color: #666; margin-bottom: 4px; }
+    .command-single-line code { background: #e8f4f8; color: #0d3b66; padding: 4px 8px; border: 1px solid #b8d4e3; display: block; word-break: break-all; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    @media (max-width: 768px) { .parameter-group { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <h1>Holy Synod – Schema, Import &amp; API Guide</h1>
+    <p>Requirements and runbook for importing <strong>Holy Synod</strong> members from the <strong>mosc-temp</strong> project into Strapi (<strong>Directory – Holy Synod</strong>), with tenant scoping and frontend API access. Pattern mirrors Diocese / Parish directory imports.</p>
+
+    <nav class="toc" aria-label="Contents">
+      <h2 id="toc">Contents</h2>
+      <ul>
+        <li><a href="#plan">1. Plan overview</a></li>
+        <li><a href="#schema">2. Strapi schema</a></li>
+        <li><a href="#sources">3. mosc-temp data sources</a></li>
+        <li><a href="#import">4. Import script</a></li>
+        <li><a href="#admin">5. Content Manager</a></li>
+        <li><a href="#api">6. REST API (frontend)</a></li>
+        <li><a href="#frontend">7. Frontend integration</a></li>
+        <li><a href="#verify">8. Verification</a></li>
+        <li><a href="#related">9. Related docs</a></li>
+      </ul>
+    </nav>
+
+    <h2 id="plan">1. Plan overview</h2>
+    <div class="section-intro">
+      <p>End-to-end flow (same pattern as <a href="../diocese_parish_directory/directory_parish_data_import_steps.html">Directory import</a>):</p>
+      <ol>
+        <li><strong>Schema</strong> – Collection type <code class="code-highlight">Directory – Holy Synod</code> (<code>api::holy-synod-member.holy-synod-member</code>) with tenant relation.</li>
+        <li><strong>Scrape</strong> – Parse HTML clone + Next.js hub/detail pages + local images from <code class="code-highlight">C:\project_workspace\mosc-temp</code>.</li>
+        <li><strong>Import</strong> – Run <code class="script-name">import-holy-synod-from-mosc-temp.js</code> (Strapi stopped) for tenant <code>tenant_demo_002</code>.</li>
+        <li><strong>Permissions</strong> – Bootstrap grants Public <code>find</code>/<code>findOne</code>; Editor role via <code class="script-name">grant-editor-directory-permissions.js</code>.</li>
+        <li><strong>Frontend</strong> – Next.js (mosc-temp) fetches <code>GET /api/holy-synod-members</code> filtered by tenant, sorted by <code>order</code>.</li>
+      </ol>
+    </div>
+
+    <h2 id="schema">2. Strapi schema</h2>
+    <div class="section-container">
+      <div class="section-header">Collection type: Directory – Holy Synod</div>
+      <div class="section-body">
+        <p>UID: <code>api::holy-synod-member.holy-synod-member</code> · Table: <code>holy_synod_members</code> · Schema file: <code>src/api/holy-synod-member/content-types/holy-synod-member/schema.json</code></p>
+        <table>
+          <thead>
+            <tr><th>Field</th><th>Type</th><th>Required</th><th>Source / use</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>name</code></td><td>string</td><td>yes</td><td>Full title from hub <code>page.tsx</code> or HTML <code>&lt;h3&gt;</code></td></tr>
+            <tr><td><code>slug</code></td><td>uid</td><td>yes</td><td>Folder name / URL segment (kebab-case, auto-normalized)</td></tr>
+            <tr><td><code>memberType</code></td><td>enum</td><td>yes</td><td><code>catholicos</code> or <code>metropolitan</code></td></tr>
+            <tr><td><code>excerpt</code></td><td>text</td><td>no</td><td>Card summary from hub <code>synodMembers[]</code></td></tr>
+            <tr><td><code>body</code></td><td>richtext</td><td>no</td><td>Full biography HTML from clone detail pages</td></tr>
+            <tr><td><code>image</code></td><td>media (image)</td><td>no</td><td>Portrait from <code>public/images/holy-synod/</code> or <code>public/mosc/assets/.../Holy Synod/</code></td></tr>
+            <tr><td><code>address</code></td><td>text</td><td>no</td><td>Parsed from contact block in HTML</td></tr>
+            <tr><td><code>email</code></td><td>string</td><td>no</td><td>Parsed from HTML</td></tr>
+            <tr><td><code>phones</code></td><td>text</td><td>no</td><td>Phone / cell / tel lines</td></tr>
+            <tr><td><code>order</code></td><td>integer</td><td>no</td><td>Display order from hub <code>synodMembers</code> array index</td></tr>
+            <tr><td><code>tenant</code></td><td>relation → Tenant</td><td>yes (import)</td><td><strong>Required</strong> – same as Dioceses/Parishes; hidden in Content Manager edit UI</td></tr>
+          </tbody>
+        </table>
+        <div class="good">
+          <strong>Tenant:</strong> Every imported row is linked to <code>tenant_demo_002</code> (or your <code>TENANT_ID</code>). Lifecycles auto-assign tenant for Editor-created entries. List views for Editors are tenant-scoped.
+        </div>
+      </div>
+    </div>
+
+    <h2 id="sources">3. mosc-temp data sources</h2>
+    <div class="parameters-list">
+      <strong>Environment</strong>
+      <ul>
+        <li><code>MOSC_TEMP_DIR</code> – default <code>C:\project_workspace\mosc-temp</code></li>
+        <li><code>TENANT_ID</code> – default <code>tenant_demo_002</code></li>
+      </ul>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Source path (under mosc-temp)</th><th>Provides</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>code_clone_ref/mosc_in/holysynod/</code></td><td>30 HTML detail pages (biography, address, email, phones, legacy images)</td></tr>
+        <tr><td><code>src/app/mosc-redesign/(syro)/holy-synod/page.tsx</code></td><td>Hub list: title, excerpt, card image, <code>order</code>, slug via <code>internalHref</code></td></tr>
+        <tr><td><code>src/app/mosc-redesign/(syro)/holy-synod/&lt;slug&gt;/page.tsx</code></td><td>Detail page featured image path (fallback)</td></tr>
+        <tr><td><code>public/images/holy-synod/</code></td><td>Card and portrait images (<code>Synod-*.jpg</code>, <code>ath.jpg</code>, etc.)</td></tr>
+        <tr><td><code>public/mosc/assets/images/mosc_images/Holy Synod/</code></td><td>Catholicos and some metropolitan portraits</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="import">4. Import script</h2>
+    <p>Script: <code class="script-name">import-holy-synod-from-mosc-temp.js</code> · npm: <code>npm run import:holy-synod</code></p>
+    <div class="warn">
+      <strong>Stop Strapi first.</strong> The script loads Strapi in-process and needs exclusive database access (same rule as directory and liturgy import scripts).
+    </div>
+
+    <div class="command-block setup" data-command-base="node scripts/import-holy-synod-from-mosc-temp.js" data-template-command="node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=tenant_demo_002">
+      <div class="command-header">
+        <span class="command-type">Import Script</span>
+        <div class="command-header-buttons">
+          <button class="copy-button-template" onclick="copyTemplateCommand(this, 'import-holy-synod')" title="Copy template command">📄 Template</button>
+          <button class="copy-button" onclick="copyCommand(this, 'import-holy-synod')" title="Copy customized command">📋 Copy</button>
+        </div>
+      </div>
+      <div class="command-parameters">
+        <h5>🔧 Customize Parameters:</h5>
+        <div class="parameter-group">
+          <div class="parameter-input">
+            <label for="import-holy-synod-tenant-id">Tenant ID:</label>
+            <input type="text" id="import-holy-synod-tenant-id" value="tenant_demo_002" oninput="updateHolySynodImportCommand()">
+          </div>
+          <div class="parameter-input">
+            <label for="import-holy-synod-mosc-dir">MOSC_TEMP_DIR (optional env):</label>
+            <input type="text" id="import-holy-synod-mosc-dir" placeholder="C:\project_workspace\mosc-temp" oninput="updateHolySynodImportCommand()">
+          </div>
+        </div>
+      </div>
+      <div class="command-content" id="import-holy-synod">node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=tenant_demo_002</div>
+      <div class="command-single-line">
+        <div class="command-single-line-label">Windows Single-Line:</div>
+        <code id="import-holy-synod-single-code">node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=tenant_demo_002</code>
+      </div>
+    </div>
+
+    <div class="command-block verify" data-command-base="node scripts/import-holy-synod-from-mosc-temp.js" data-template-command="node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=tenant_demo_002 --replace">
+      <div class="command-header">
+        <span class="command-type">Re-import (update existing)</span>
+        <div class="command-header-buttons">
+          <button class="copy-button-template" onclick="copyTemplateCommand(this, 'import-holy-synod-replace')" title="Copy template command">📄 Template</button>
+          <button class="copy-button" onclick="copyCommand(this, 'import-holy-synod-replace')" title="Copy customized command">📋 Copy</button>
+        </div>
+      </div>
+      <div class="command-content" id="import-holy-synod-replace">node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=tenant_demo_002 --replace</div>
+      <div class="command-single-line">
+        <div class="command-single-line-label">Windows Single-Line:</div>
+        <code id="import-holy-synod-replace-single-code">node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=tenant_demo_002 --replace</code>
+      </div>
+    </div>
+
+    <p>Other flags: <code>DRY_RUN=1</code> (preview only). Images upload to <strong>local</strong> <code>public/uploads/</code> during import (script uses <code>NODE_ENV=staging</code> to avoid S3).</p>
+
+    <h2 id="admin">5. Content Manager</h2>
+    <div class="note">
+      After <code>npm run develop</code>, open <strong>Directory – Holy Synod</strong> in the sidebar (24 collection types when registered).
+    </div>
+    <p><strong>Direct admin URL (local):</strong></p>
+    <pre><code>http://localhost:1337/admin/content-manager/collection-types/api::holy-synod-member.holy-synod-member</code></pre>
+    <p>Grant Editor access if the type is missing for non–Super Admin users:</p>
+    <pre><code>node scripts/grant-editor-directory-permissions.js</code></pre>
+
+    <h2 id="api">6. REST API (frontend)</h2>
+    <p>Public role has <code>find</code> and <code>findOne</code> (granted in bootstrap). Always filter by tenant.</p>
+
+    <h4>List all members (hub page)</h4>
+    <pre><code>GET /api/holy-synod-members?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[image]=*</code></pre>
+
+    <h4>Single member by slug</h4>
+    <pre><code>GET /api/holy-synod-members?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;filters[slug][$eq]=his-grace-dr-thomas-mar-athanasius&amp;populate[image]=*</code></pre>
+
+    <h4>Response fields (per item)</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Frontend use</th></tr></thead>
+      <tbody>
+        <tr><td><code>name</code></td><td>Page title, card heading</td></tr>
+        <tr><td><code>slug</code></td><td>Route segment <code>/holy-synod/[slug]</code></td></tr>
+        <tr><td><code>memberType</code></td><td><code>catholicos</code> vs <code>metropolitan</code> styling</td></tr>
+        <tr><td><code>excerpt</code></td><td>Hub card teaser</td></tr>
+        <tr><td><code>body</code></td><td>Detail page biography (HTML)</td></tr>
+        <tr><td><code>image.url</code></td><td>Portrait – prefix with Strapi base URL</td></tr>
+        <tr><td><code>address</code>, <code>email</code>, <code>phones</code></td><td>Contact block on detail page</td></tr>
+        <tr><td><code>order</code></td><td>Hub list sort order</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="frontend">7. Frontend integration (mosc-temp)</h2>
+    <div class="section-intro">
+      <p>Replace hardcoded <code>synodMembers</code> in <code>src/app/mosc-redesign/(syro)/holy-synod/page.tsx</code> with a server fetch, following the same pattern as <code>getBishopsData.ts</code> for Directory Bishops.</p>
+    </div>
+    <pre><code>// Example: src/app/mosc-redesign/(syro)/holy-synod/getHolySynodData.ts
+import { getStrapiUrl, getStrapiApiBase, getStrapiHeaders, getStrapiTenantId } from '@/lib/strapi';
+
+export async function getHolySynodMembers() {
+  const baseUrl = getStrapiUrl();
+  const base = getStrapiApiBase();
+  const tenantId = getStrapiTenantId();
+  if (!baseUrl || !base || !tenantId) return [];
+
+  const params = new URLSearchParams();
+  params.set('filters[tenant][tenantId][$eq]', tenantId);
+  params.set('sort', 'order:asc');
+  params.set('populate[image]', '*');
+
+  const res = await fetch(`${base}/holy-synod-members?${params}`, {
+    headers: getStrapiHeaders(),
+    cache: 'no-store',
+  });
+  if (!res.ok) return [];
+  const json = await res.json();
+  return Array.isArray(json?.data) ? json.data : [];
+}</code></pre>
+    <p>Map <code>image.url</code> with your existing <code>getMediaUrl()</code> helper (see Directory bishops). Detail pages can fetch by <code>slug</code> or receive data from the list.</p>
+
+    <h2 id="verify">8. Verification</h2>
+    <ol>
+      <li>Content Manager shows <strong>30</strong> entries for <code>tenant_demo_002</code>.</li>
+      <li>Each entry has an <strong>image</strong> linked in Media Library.</li>
+      <li>API returns data: <code>curl "http://localhost:1337/api/holy-synod-members?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;populate[image]=*"</code></li>
+      <li>Restart Strapi after schema/bootstrap changes so sidebar shows <strong>Directory – Holy Synod</strong>.</li>
+    </ol>
+
+    <h2 id="related">9. Related documentation</h2>
+    <ul>
+      <li><a href="../diocese_parish_directory/directory_parish_data_import_steps.html">Directory &amp; Parish import steps</a></li>
+      <li><a href="../diocese_parish_directory/content_type_mapping.html">Portal → Strapi content type mapping</a></li>
+      <li><a href="../lectionary_calendar/liturgy-calendar-api-reference.html">Liturgy Day API reference</a> (tenant filter pattern)</li>
+    </ul>
+
+    <hr style="border: 0; border-top: 1px solid var(--border); margin: 2rem 0;">
+    <p style="font-size: 0.875rem; color: var(--muted);">Holy Synod import guide · Strapi editorial template · Last updated June 2026</p>
+  </div>
+
+  <script>
+    const commandParams = {};
+
+    function updateHolySynodImportCommand() {
+      const tenant = document.getElementById('import-holy-synod-tenant-id')?.value?.trim() || 'tenant_demo_002';
+      const moscDir = document.getElementById('import-holy-synod-mosc-dir')?.value?.trim();
+      let cmd = 'node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=' + tenant;
+      if (moscDir) cmd = 'set MOSC_TEMP_DIR=' + moscDir + ' && ' + cmd;
+      const el = document.getElementById('import-holy-synod');
+      const single = document.getElementById('import-holy-synod-single-code');
+      if (el) el.textContent = cmd;
+      if (single) single.textContent = cmd;
+    }
+
+    function updateCommandFromParams(commandId) {
+      const commandElement = document.getElementById(commandId);
+      if (!commandElement) return;
+      const commandBlock = commandElement.closest('.command-block');
+      if (!commandBlock) return;
+      let baseCommand = commandBlock.getAttribute('data-command-base') || commandElement.textContent.trim();
+      const params = commandParams[commandId] || {};
+      let command = baseCommand;
+      Object.keys(params).forEach(function (key) {
+        const val = params[key];
+        if (val && String(val).trim()) command += ' --' + key + '=' + String(val).trim();
+      });
+      commandElement.textContent = command;
+      const singleLineCode = document.getElementById(commandId + '-single-code');
+      if (singleLineCode) singleLineCode.textContent = command;
+    }
+
+    function updateCommand(commandId, paramName, paramValue) {
+      if (!commandParams[commandId]) commandParams[commandId] = {};
+      commandParams[commandId][paramName] = paramValue;
+      updateCommandFromParams(commandId);
+    }
+
+    function copyTemplateCommand(button, commandId) {
+      const commandBlock = button.closest('.command-block');
+      if (!commandBlock) return;
+      let templateCommand = commandBlock.getAttribute('data-template-command') || '';
+      templateCommand = templateCommand.replace(/&quot;/g, '"');
+      navigator.clipboard.writeText(templateCommand).then(function () {
+        button.textContent = '✓ Copied!';
+        setTimeout(function () { button.textContent = '📄 Template'; }, 2000);
+      });
+    }
+
+    function copyCommand(button, commandId) {
+      const commandElement = document.getElementById(commandId);
+      if (!commandElement) return;
+      const commandText = commandElement.textContent.trim();
+      navigator.clipboard.writeText(commandText).then(function () {
+        button.textContent = '✓ Copied!';
+        setTimeout(function () { button.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      updateHolySynodImportCommand();
+    });
+  </script>
+</body>
+</html>
