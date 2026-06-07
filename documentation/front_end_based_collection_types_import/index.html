@@ -8,7 +8,7 @@
     :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
-    .doc { max-width: 54rem; margin: 0 auto; }
+    .doc { max-width: 72rem; margin: 0 auto; }
     h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
     h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
     p { margin: 0.5rem 0 1rem; color: var(--muted); }
@@ -26,7 +26,10 @@
     .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
     .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
     .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
-    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; white-space: nowrap; }
+    .copy-button-sm { padding: 4px 10px; font-size: 0.8em; }
+    .url-copy-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .url-copy-cell .local-url { flex: 1; min-width: 12rem; font-size: 0.82em; word-break: break-all; }
     .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
   </style>
 </head>
@@ -43,11 +46,48 @@
       <p><strong>Generic AI prompt:</strong> <a href="generic-prompt-frontend-collection-type-prd.html">Generate additional PRDs</a></p>
     </div>
     <h2>Collection type PRDs</h2>
+    <p>Local URLs assume <strong>mosc-temp</strong> Next.js dev server on port <code class="code-highlight">3000</code>.</p>
     <table>
-      <thead><tr><th>Page</th><th>PRD</th><th>npm script</th></tr></thead>
+      <thead><tr><th>Section</th><th>Collection type</th><th>mosc-temp local URL</th><th>PRD</th><th>npm script</th></tr></thead>
       <tbody>
-        <tr><td>/mosc-redesign/catholicate</td><td><a href="the-catholicate-import-prd.html">Directory – The Catholicate</a></td><td><code>npm run import:catholicate</code></td></tr><tr><td>/mosc-redesign/ecumenical</td><td><a href="ecumenical-import-prd.html">Directory – Ecumenical</a></td><td><code>npm run import:ecumenical</code></td></tr><tr><td>/mosc-redesign/saints</td><td><a href="saints-import-prd.html">Directory – Saints</a></td><td><code>npm run import:saints</code></td></tr><tr><td>/mosc-redesign/publications</td><td><a href="publications-import-prd.html">Directory – Publications</a></td><td><code>npm run import:publications</code></td></tr><tr><td>/mosc-redesign/theological-seminaries</td><td><a href="theological-seminaries-import-prd.html">Directory – Theological Seminaries</a></td><td><code>npm run import:theological-seminaries</code></td></tr>
-        <tr><td>/mosc-redesign/holy-synod</td><td><a href="../holy_synod/holy-synod-import-and-api-guide.html">Holy Synod (full guide)</a></td><td><code>npm run import:holy-synod</code></td></tr>
+        <tr>
+    <td>Catholicate</td>
+    <td>Directory – The Catholicate<br><code class="code-highlight">catholicate-entry · catholicate-entry</code></td>
+    <td><div class="url-copy-cell"><code class="local-url" id="url-catholicate">http://localhost:3000/mosc-redesign/catholicate</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-catholicate')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
+    <td><a href="the-catholicate-import-prd.html">PRD</a></td>
+    <td><code>npm run import:catholicate</code></td>
+  </tr><tr>
+    <td>Ecumenical</td>
+    <td>Directory – Ecumenical<br><code class="code-highlight">ecumenical-article · ecumenical-article</code></td>
+    <td><div class="url-copy-cell"><code class="local-url" id="url-ecumenical">http://localhost:3000/mosc-redesign/ecumenical</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-ecumenical')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
+    <td><a href="ecumenical-import-prd.html">PRD</a></td>
+    <td><code>npm run import:ecumenical</code></td>
+  </tr><tr>
+    <td>Saints</td>
+    <td>Directory – Saints<br><code class="code-highlight">saint-entry · saint-entry</code></td>
+    <td><div class="url-copy-cell"><code class="local-url" id="url-saints">http://localhost:3000/mosc-redesign/saints</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-saints')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
+    <td><a href="saints-import-prd.html">PRD</a></td>
+    <td><code>npm run import:saints</code></td>
+  </tr><tr>
+    <td>Publications</td>
+    <td>Directory – Publications<br><code class="code-highlight">publication-entry · publication-entry</code></td>
+    <td><div class="url-copy-cell"><code class="local-url" id="url-publications">http://localhost:3000/mosc-redesign/publications</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-publications')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
+    <td><a href="publications-import-prd.html">PRD</a></td>
+    <td><code>npm run import:publications</code></td>
+  </tr><tr>
+    <td>Theological seminaries</td>
+    <td>Directory – Theological Seminaries<br><code class="code-highlight">theological-seminary-entry · theological-seminary-entry</code></td>
+    <td><div class="url-copy-cell"><code class="local-url" id="url-theological-seminaries">http://localhost:3000/mosc-redesign/theological-seminaries</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-theological-seminaries')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
+    <td><a href="theological-seminaries-import-prd.html">PRD</a></td>
+    <td><code>npm run import:theological-seminaries</code></td>
+  </tr>
+        <tr>
+          <td>Holy Synod</td>
+          <td>Directory – Holy Synod<br><code class="code-highlight">holy-synod-member · holy-synod-member</code></td>
+          <td><div class="url-copy-cell"><code class="local-url" id="url-holy-synod">http://localhost:3000/mosc-redesign/holy-synod</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-holy-synod')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
+          <td><a href="../holy_synod/holy-synod-import-and-api-guide.html">Full guide</a></td>
+          <td><code>npm run import:holy-synod</code></td>
+        </tr>
       </tbody>
     </table>
     <h2>Run all imports (Strapi stopped)</h2>
@@ -70,6 +110,7 @@
         setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
       });
     }
+    function copyText(btn, id) { copyCommand(btn, id); }
   </script>
 </body>
 </html>

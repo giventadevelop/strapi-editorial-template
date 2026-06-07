@@ -8,7 +8,7 @@
     :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
     * { box-sizing: border-box; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
-    .doc { max-width: 54rem; margin: 0 auto; }
+    .doc { max-width: 72rem; margin: 0 auto; }
     h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
     h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
     p { margin: 0.5rem 0 1rem; color: var(--muted); }
@@ -26,7 +26,10 @@
     .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
     .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
     .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
-    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; white-space: nowrap; }
+    .copy-button-sm { padding: 4px 10px; font-size: 0.8em; }
+    .url-copy-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .url-copy-cell .local-url { flex: 1; min-width: 12rem; font-size: 0.82em; word-break: break-all; }
     .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
   </style>
 </head>
@@ -68,6 +71,7 @@ Also store the above prompt as a separate HTML as a generic prompt to generate a
         setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
       });
     }
+    function copyText(btn, id) { copyCommand(btn, id); }
   </script>
 </body>
 </html>
