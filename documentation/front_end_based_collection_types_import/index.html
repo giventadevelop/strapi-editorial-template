@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Front-end collection type imports</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 54rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #333; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p, .section-intro li { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Front-end collection type imports</a></p>
+    
+    <h1>Front-end based collection type imports</h1>
+    <p>PRD / runbooks for importing MOSC redesign pages from <code class="code-highlight">mosc-temp</code> into Strapi directory collection types (tenant-scoped). Same pattern as Holy Synod.</p>
+    <div class="section-intro">
+      <p><strong>MOSC source root:</strong> <code class="code-highlight">MOSC_TEMP_DIR</code> (default <code>C:\project_workspace\mosc-temp</code>)</p>
+      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code></p>
+      <p><strong>Master guide:</strong> <a href="../holy_synod/holy-synod-import-and-api-guide.html">Holy Synod – Schema, Import &amp; API Guide</a></p>
+      <p><strong>Generic AI prompt:</strong> <a href="generic-prompt-frontend-collection-type-prd.html">Generate additional PRDs</a></p>
+    </div>
+    <h2>Collection type PRDs</h2>
+    <table>
+      <thead><tr><th>Page</th><th>PRD</th><th>npm script</th></tr></thead>
+      <tbody>
+        <tr><td>/mosc-redesign/catholicate</td><td><a href="the-catholicate-import-prd.html">Directory – The Catholicate</a></td><td><code>npm run import:catholicate</code></td></tr><tr><td>/mosc-redesign/ecumenical</td><td><a href="ecumenical-import-prd.html">Directory – Ecumenical</a></td><td><code>npm run import:ecumenical</code></td></tr><tr><td>/mosc-redesign/saints</td><td><a href="saints-import-prd.html">Directory – Saints</a></td><td><code>npm run import:saints</code></td></tr><tr><td>/mosc-redesign/publications</td><td><a href="publications-import-prd.html">Directory – Publications</a></td><td><code>npm run import:publications</code></td></tr><tr><td>/mosc-redesign/theological-seminaries</td><td><a href="theological-seminaries-import-prd.html">Directory – Theological Seminaries</a></td><td><code>npm run import:theological-seminaries</code></td></tr>
+        <tr><td>/mosc-redesign/holy-synod</td><td><a href="../holy_synod/holy-synod-import-and-api-guide.html">Holy Synod (full guide)</a></td><td><code>npm run import:holy-synod</code></td></tr>
+      </tbody>
+    </table>
+    <h2>Run all imports (Strapi stopped)</h2>
+    
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Sequential replace import for tenant_demo_002</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-all')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="cmd-all">npm run import:catholicate -- --tenant-id=tenant_demo_002 --replace && npm run import:ecumenical -- --tenant-id=tenant_demo_002 --replace && npm run import:saints -- --tenant-id=tenant_demo_002 --replace && npm run import:publications -- --tenant-id=tenant_demo_002 --replace && npm run import:theological-seminaries -- --tenant-id=tenant_demo_002 --replace && npm run grant:editor-directory</div>
+    </div>
+
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
