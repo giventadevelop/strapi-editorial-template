@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Institutions – Production Cloud Push PRD</title>
+  <style>
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; color: #333; }
+    .ok { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; color: #155724; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; border: none; background: #0066cc; color: white; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Cloud push index</a> · <a href="../institutions-import-prd.html">Local import PRD</a> · <a href="generic-production-cloud-data-push-guide.html">Generic guide</a></p>
+
+    <h1>Institutions – Production / Cloud data push PRD</h1>
+    <p>Push <strong>Directory – Institutions</strong> from local Strapi to Strapi Cloud. Status: <strong>Content pushed</strong> (219 entries created June 2026; images pending Cloud upload fix).</p>
+
+    <div class="section-intro">
+      <p><strong>Strapi UID:</strong> <code class="code-highlight">api::institution.institution</code></p>
+      <p><strong>REST plural:</strong> <code class="code-highlight">institutions</code></p>
+      <p><strong>Local CM:</strong> <code>http://localhost:1337/admin/content-manager/collection-types/api::institution.institution</code></p>
+      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code></p>
+      <p><strong>Upsert key:</strong> <code>slug</code> + <code>tenantId</code></p>
+      <p><strong>Expected count:</strong> 219 entries (9 categories from mosc-temp)</p>
+    </div>
+
+    <h2>1. Script strategy</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Reuse?</td><td><strong>Yes</strong> — cloned from <code class="script-name">push-publications-to-cloud.js</code> (contact-field payload)</td></tr>
+        <tr><td>Script path</td><td><code class="script-name">scripts/push-institutions-to-cloud.js</code></td></tr>
+        <tr><td>npm script</td><td><code>push:institutions-to-cloud</code></td></tr>
+        <tr><td>Verify script</td><td><code class="script-name">scripts/verify-institutions-cloud.js</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. Cloud payload fields</h2>
+    <p>Fields sent in <code>PUT</code>/<code>POST</code> <code>data</code> object:</p>
+    <p><code>name, slug, address, email, phones, website, description, order, tenant</code> — then separate <code>PUT</code> for <code>image</code> after upload from <code>public/uploads</code>.</p>
+    <p>Category images are shared per institution row (same file linked many times on Cloud; script uploads once per unique local file where possible).</p>
+
+    <h2>3. Prerequisites</h2>
+    <ol>
+      <li>Phase A complete: <code>npm run import:institutions -- --tenant-id=tenant_demo_002 --replace</code> (<a href="../institutions-import-prd.html">local PRD</a>).</li>
+      <li><code>.env</code>: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code> (Full Access).</li>
+      <li>Local Strapi dev server <strong>stopped</strong> (embedded Strapi loads local DB).</li>
+      <li>Cloud schema includes <code>institutions</code> API (HTTP 200 on <code>/api/institutions</code>).</li>
+      <li>Image files under <code>public/uploads/</code> from local import (category images from mosc-temp).</li>
+    </ol>
+
+    <div class="warn"><strong>Large push:</strong> ~219 entries with ~150ms delay between requests — expect several minutes. Use <code>DRY_RUN=1</code> first to confirm count.</div>
+
+    <h2>4. Commands (Windows single-line)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Dry run</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-dry')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-dry">set DRY_RUN=1&amp;&amp; npm run push:institutions-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Push / update content + images</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-push')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-push">npm run push:institutions-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Images only (retry after Cloud upload fix)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img">npm run push:institutions-to-cloud -- --tenant-id=tenant_demo_002 --images-only</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Verify on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-verify')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-verify">node scripts/verify-institutions-cloud.js</div>
+    </div>
+
+    <h2>5. REST verification (production)</h2>
+    <p><code>GET {STRAPI_CLOUD_URL}/api/institutions?pagination[pageSize]=100&amp;populate[0]=tenant&amp;populate[1]=image&amp;filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc</code></p>
+    <p>Expect <strong>219</strong> entries; each <code>tenant.tenantId</code> = <code>tenant_demo_002</code>. Filter by slug prefix for category tabs, e.g. <code>filters[slug][$startsWith]=schools-</code>.</p>
+
+    <h2>6. Category slug prefixes (frontend)</h2>
+    <table>
+      <thead><tr><th>Category</th><th>Slug prefix</th><th>Local count</th></tr></thead>
+      <tbody>
+        <tr><td>Major centres</td><td><code>major-centres-</code></td><td>7</td></tr>
+        <tr><td>Monasteries</td><td><code>monasteries-</code></td><td>26</td></tr>
+        <tr><td>Convents</td><td><code>convents-</code></td><td>14</td></tr>
+        <tr><td>Orphanages</td><td><code>orphanages-</code></td><td>45</td></tr>
+        <tr><td>Hospitals</td><td><code>hospitals-</code></td><td>25</td></tr>
+        <tr><td>Medical college</td><td><code>medical-college-</code></td><td>1</td></tr>
+        <tr><td>Engineering colleges</td><td><code>engineering-colleges-</code></td><td>2</td></tr>
+        <tr><td>MOC colleges</td><td><code>moc-colleges-</code></td><td>17</td></tr>
+        <tr><td>Schools</td><td><code>schools-</code></td><td>82</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note"><strong>Legacy Cloud data:</strong> If old directory.mosc.in institution rows exist on Cloud for the same tenant, upsert updates matching slugs and creates new ones. Orphans with different slugs remain until cleared via Cloud admin or <code>clear_cloud_data.js</code>.</div>
+
+    <div class="ok"><strong>June 2026 push result:</strong> 219 created, 0 skipped. Cloud tenant total: 222 (includes 3 legacy rows with old slugs from directory.mosc.in — safe to delete in Cloud admin if unwanted). Images: Cloud <code>/api/upload</code> returned errors — re-run <code>--images-only</code> when fixed.</div>
+
+    <h2>7. AI prompt (Institutions cloud push)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy prompt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'prompt')">📋 Copy</button></div>
+      <div class="command-content" id="prompt" style="white-space:pre-wrap;">Push Institutions from local Strapi to Strapi Cloud. Clone push-publications-to-cloud.js → push-institutions-to-cloud.js. UID api::institution.institution, plural institutions, tenant tenant_demo_002. Local import first (import:institutions --replace, 219 rows). Payload: name, slug, address, email, phones, website, description, order, tenant + image upload. npm run push:institutions-to-cloud. Verify with scripts/verify-institutions-cloud.js. Document in production_cloud_data_push/institutions-production-cloud-push-prd.html.</div>
+    </div>
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1519,6 +1519,51 @@ export interface ApiPriestPriest extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiPublicationEntryPublicationEntry
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'publication_entries';
+  info: {
+    description: 'Church publication: summary, body, contact, and image';
+    displayName: 'Directory \u2013 Publications';
+    pluralName: 'publication-entries';
+    singularName: 'publication-entry';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    address: Schema.Attribute.Text;
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    email: Schema.Attribute.String;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::publication-entry.publication-entry'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    phones: Schema.Attribute.Text;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    website: Schema.Attribute.String;
+  };
+}
+
 export interface ApiRetiredBishopRetiredBishop
   extends Struct.CollectionTypeSchema {
   collectionName: 'retired_bishops';
@@ -1765,6 +1810,54 @@ export interface ApiTenantTenant extends Struct.CollectionTypeSchema {
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+  };
+}
+
+export interface ApiTheologicalSeminaryTheologicalSeminary
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'theological_seminaries';
+  info: {
+    description: 'Theological seminary: summary, body, contact, and image';
+    displayName: 'Directory \u2013 Theological Seminaries';
+    pluralName: 'theological-seminaries';
+    singularName: 'theological-seminary';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    address: Schema.Attribute.Text;
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    email: Schema.Attribute.String;
+    established: Schema.Attribute.String;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::theological-seminary.theological-seminary'
+    > &
+      Schema.Attribute.Private;
+    location: Schema.Attribute.String;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    phones: Schema.Attribute.Text;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    subtitle: Schema.Attribute.String;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    website: Schema.Attribute.String;
   };
 }
 
@@ -2348,12 +2441,14 @@ declare module '@strapi/strapi' {
       'api::parish.parish': ApiParishParish;
       'api::pilgrim-centre.pilgrim-centre': ApiPilgrimCentrePilgrimCentre;
       'api::priest.priest': ApiPriestPriest;
+      'api::publication-entry.publication-entry': ApiPublicationEntryPublicationEntry;
       'api::retired-bishop.retired-bishop': ApiRetiredBishopRetiredBishop;
       'api::saint-entry.saint-entry': ApiSaintEntrySaintEntry;
       'api::seminary.seminary': ApiSeminarySeminary;
       'api::sidebar-promotional-block.sidebar-promotional-block': ApiSidebarPromotionalBlockSidebarPromotionalBlock;
       'api::spiritual-organisation.spiritual-organisation': ApiSpiritualOrganisationSpiritualOrganisation;
       'api::tenant.tenant': ApiTenantTenant;
+      'api::theological-seminary.theological-seminary': ApiTheologicalSeminaryTheologicalSeminary;
       'api::working-committee.working-committee': ApiWorkingCommitteeWorkingCommittee;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;

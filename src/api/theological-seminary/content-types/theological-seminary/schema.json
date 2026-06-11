@@ -1,0 +1,82 @@
+{
+  "kind": "collectionType",
+  "collectionName": "theological_seminaries",
+  "info": {
+    "singularName": "theological-seminary",
+    "pluralName": "theological-seminaries",
+    "displayName": "Directory – Theological Seminaries",
+    "description": "Theological seminary: summary, body, contact, and image"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Seminary title"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "subtitle": {
+      "type": "string",
+      "description": "Short subtitle (e.g. Old Seminary, Kottayam)"
+    },
+    "excerpt": {
+      "type": "text",
+      "description": "Short summary for list/card views"
+    },
+    "body": {
+      "type": "richtext",
+      "description": "Main article content (HTML)"
+    },
+    "location": {
+      "type": "string",
+      "description": "City/region shown on hub card"
+    },
+    "established": {
+      "type": "string",
+      "description": "Year or era established"
+    },
+    "address": {
+      "type": "text"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phones": {
+      "type": "text",
+      "description": "Phone/fax numbers, comma-separated if multiple"
+    },
+    "website": {
+      "type": "string"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Featured / card image"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order on Theological Seminaries listing"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

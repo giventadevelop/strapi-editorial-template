@@ -44,48 +44,63 @@
       <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code></p>
       <p><strong>Master guide:</strong> <a href="../holy_synod/holy-synod-import-and-api-guide.html">Holy Synod – Schema, Import &amp; API Guide</a></p>
       <p><strong>Generic AI prompt:</strong> <a href="generic-prompt-frontend-collection-type-prd.html">Generate additional PRDs</a></p>
+      <p><strong>Production / Cloud push:</strong> <a href="production_cloud_data_push/index.html">Cloud data push runbooks</a> (local Strapi → Strapi Cloud)</p>
     </div>
     <h2>Collection type PRDs</h2>
     <p>Local URLs assume <strong>mosc-temp</strong> Next.js dev server on port <code class="code-highlight">3000</code>.</p>
     <table>
-      <thead><tr><th>Section</th><th>Collection type</th><th>mosc-temp local URL</th><th>PRD</th><th>npm script</th></tr></thead>
+      <thead><tr><th>Section</th><th>Collection type</th><th>mosc-temp local URL</th><th>Local import PRD</th><th>Cloud push PRD</th><th>npm script</th></tr></thead>
       <tbody>
         <tr>
     <td>Catholicate</td>
     <td>Directory – The Catholicate<br><code class="code-highlight">catholicate-entry · catholicate-entry</code></td>
     <td><div class="url-copy-cell"><code class="local-url" id="url-catholicate">http://localhost:3000/mosc-redesign/catholicate</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-catholicate')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
-    <td><a href="the-catholicate-import-prd.html">PRD</a></td>
+    <td><a href="the-catholicate-import-prd.html">Import</a></td>
+    <td><a href="production_cloud_data_push/catholicate-production-cloud-push-prd.html">Cloud</a></td>
     <td><code>npm run import:catholicate</code></td>
   </tr><tr>
     <td>Ecumenical</td>
     <td>Directory – Ecumenical<br><code class="code-highlight">ecumenical-article · ecumenical-article</code></td>
     <td><div class="url-copy-cell"><code class="local-url" id="url-ecumenical">http://localhost:3000/mosc-redesign/ecumenical</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-ecumenical')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
-    <td><a href="ecumenical-import-prd.html">PRD</a></td>
+    <td><a href="ecumenical-import-prd.html">Import</a></td>
+    <td><a href="production_cloud_data_push/ecumenical-production-cloud-push-prd.html">Cloud</a></td>
     <td><code>npm run import:ecumenical</code></td>
   </tr><tr>
     <td>Saints</td>
     <td>Directory – Saints<br><code class="code-highlight">saint-entry · saint-entry</code></td>
     <td><div class="url-copy-cell"><code class="local-url" id="url-saints">http://localhost:3000/mosc-redesign/saints</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-saints')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
-    <td><a href="saints-import-prd.html">PRD</a></td>
+    <td><a href="saints-import-prd.html">Import</a></td>
+    <td><a href="production_cloud_data_push/saints-production-cloud-push-prd.html">Cloud</a></td>
     <td><code>npm run import:saints</code></td>
   </tr><tr>
     <td>Publications</td>
     <td>Directory – Publications<br><code class="code-highlight">publication-entry · publication-entry</code></td>
     <td><div class="url-copy-cell"><code class="local-url" id="url-publications">http://localhost:3000/mosc-redesign/publications</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-publications')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
-    <td><a href="publications-import-prd.html">PRD</a></td>
+    <td><a href="publications-import-prd.html">Import</a></td>
+    <td><a href="production_cloud_data_push/publications-production-cloud-push-prd.html">Cloud</a></td>
     <td><code>npm run import:publications</code></td>
   </tr><tr>
     <td>Theological seminaries</td>
-    <td>Directory – Theological Seminaries<br><code class="code-highlight">theological-seminary-entry · theological-seminary-entry</code></td>
+    <td>Directory – Theological Seminaries<br><code class="code-highlight">theological-seminary · theological-seminary</code></td>
     <td><div class="url-copy-cell"><code class="local-url" id="url-theological-seminaries">http://localhost:3000/mosc-redesign/theological-seminaries</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-theological-seminaries')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
-    <td><a href="theological-seminaries-import-prd.html">PRD</a></td>
+    <td><a href="theological-seminaries-import-prd.html">Import</a></td>
+    <td><a href="production_cloud_data_push/theological-seminaries-production-cloud-push-prd.html">Cloud</a></td>
     <td><code>npm run import:theological-seminaries</code></td>
   </tr>
+        <tr>
+          <td>Institutions</td>
+          <td>Directory – Institutions<br><code class="code-highlight">institution · institution</code></td>
+          <td><div class="url-copy-cell"><code class="local-url" id="url-institutions">http://localhost:3000/mosc-redesign/institutions</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-institutions')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
+          <td><a href="institutions-import-prd.html">Import</a></td>
+          <td>—</td>
+          <td><code>npm run import:institutions</code></td>
+        </tr>
         <tr>
           <td>Holy Synod</td>
           <td>Directory – Holy Synod<br><code class="code-highlight">holy-synod-member · holy-synod-member</code></td>
           <td><div class="url-copy-cell"><code class="local-url" id="url-holy-synod">http://localhost:3000/mosc-redesign/holy-synod</code><button type="button" class="copy-button copy-button-sm" onclick="copyCommand(this,'url-holy-synod')" title="Copy mosc-temp local URL">📋 Copy</button></div></td>
-          <td><a href="../holy_synod/holy-synod-import-and-api-guide.html">Full guide</a></td>
+          <td><a href="../holy_synod/holy-synod-import-and-api-guide.html">Import guide</a></td>
+          <td><a href="production_cloud_data_push/holy-synod-production-cloud-push-prd.html">Cloud</a></td>
           <td><code>npm run import:holy-synod</code></td>
         </tr>
       </tbody>

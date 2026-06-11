@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Publications – Production Cloud Push PRD</title>
+  <style>
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; padding: 10px 15px; }
+    .command-content { padding: 12px 15px; font-family: monospace; font-size: 0.9em; color: #0d3b66; word-break: break-all; }
+    .copy-button { padding: 6px 12px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Cloud push index</a> · <a href="../publications-import-prd.html">Local import PRD</a></p>
+    <h1>Publications – Production / Cloud data push PRD</h1>
+    <p>Push <strong>Directory – Publications</strong> from local Strapi to Strapi Cloud. Status: <strong>Script ready</strong> — blocked until <code>publication-entry</code> schema is deployed to Cloud (<code>/api/publication-entries</code> currently HTTP 404).</p>
+
+    <div class="section-intro">
+      <p><strong>UID:</strong> <code class="code-highlight">api::publication-entry.publication-entry</code></p>
+      <p><strong>REST plural:</strong> <code class="code-highlight">publication-entries</code></p>
+      <p><strong>Local CM:</strong> <code>http://localhost:1337/admin/content-manager/collection-types/api::publication-entry.publication-entry</code></p>
+      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code> · <strong>Expected rows:</strong> ~1+ (Malankara Sabha Magazine Masika)</p>
+    </div>
+
+    <h2>1. Script strategy</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Reuse?</td><td><strong>Yes</strong> — cloned from <code class="script-name">push-catholicate-to-cloud.js</code></td></tr>
+        <tr><td>Script path</td><td><code class="script-name">scripts/push-publications-to-cloud.js</code></td></tr>
+        <tr><td>Constants</td><td><code>UID = 'api::publication-entry.publication-entry'</code>, <code>PLURAL = 'publication-entries'</code></td></tr>
+        <tr><td>npm</td><td><code>push:publications-to-cloud</code></td></tr>
+        <tr><td>Verify script</td><td><code class="script-name">scripts/verify-publications-cloud.js</code></td></tr>
+        <tr><td>Payload</td><td><code>name, slug, excerpt, body, address, email, phones, website, order, tenant</code> + image upload/link</td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. Prerequisites</h2>
+    <ol>
+      <li>Phase A complete: <code>npm run import:publications -- --tenant-id=tenant_demo_002 --replace</code> (<a href="../publications-import-prd.html">local PRD</a>).</li>
+      <li>Deploy code to Cloud so <code>publication-entries</code> exists: <code>npx strapi login</code> then <code>npx strapi deploy --force</code>.</li>
+      <li><code>.env</code>: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code> (Full Access).</li>
+      <li>Local Strapi dev server <strong>stopped</strong> (embedded Strapi loads local DB).</li>
+    </ol>
+
+    <h2>3. Commands (Windows single-line)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Dry run</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-dry')">📋 Copy</button></div>
+      <div class="command-content" id="c-dry">set DRY_RUN=1&amp;&amp; npm run push:publications-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Push</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c1')">📋 Copy</button></div>
+      <div class="command-content" id="c1">npm run push:publications-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Verify on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-verify')">📋 Copy</button></div>
+      <div class="command-content" id="c-verify">node scripts/verify-publications-cloud.js</div>
+    </div>
+
+    <h2>4. REST verification</h2>
+    <p><code>GET /api/publication-entries?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
+    <p>Expect 1 entry (<code>malankara-sabha-magazine-masika</code>); <code>tenant.tenantId</code> = <code>tenant_demo_002</code>.</p>
+
+    <div class="warn" style="background:#fff3cd;border-left:4px solid #ffc107;padding:0.75rem 1rem;margin:1rem 0;color:#333;"><strong>June 2026:</strong> Local import ready (1 row). Cloud push blocked: <code>/api/publication-entries</code> returns HTTP 404 until schema deploy. After deploy, run push command above.</div>
+
+    <h2>5. AI prompt</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
+      <div class="command-content" id="p" style="white-space:pre-wrap;">Push Publications from local Strapi to Cloud. Clone push-catholicate-to-cloud.js → push-publications-to-cloud.js. UID api::publication-entry.publication-entry, plural publication-entries, tenant tenant_demo_002. import:publications first. npm push:publications-to-cloud. Same tenant slug upsert as Catholicate.</div>
+    </div>
+  </div>
+  <script>
+    function copyCommand(btn, id) { navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(() => { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = '📋 Copy', 2000); }); }
+  </script>
+</body>
+</html>
