@@ -26,6 +26,8 @@ const TENANT_SCOPED_UIDS = new Set([
   'api::ecumenical-article.ecumenical-article',
   'api::saint-entry.saint-entry',
   'api::catholicate-entry.catholicate-entry',
+  'api::theological-seminary.theological-seminary',
+  'api::publication-entry.publication-entry',
   'api::retired-bishop.retired-bishop',
   'api::diocese.diocese',
   'api::parish.parish',

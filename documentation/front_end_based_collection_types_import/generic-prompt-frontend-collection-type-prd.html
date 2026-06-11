@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generic prompt – Front-end collection type PRD</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #333; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p, .section-intro li { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; white-space: nowrap; }
+    .copy-button-sm { padding: 4px 10px; font-size: 0.8em; }
+    .url-copy-cell { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .url-copy-cell .local-url { flex: 1; min-width: 12rem; font-size: 0.82em; word-break: break-all; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Front-end collection type imports</a></p>
+    
+    <h1>Generic prompt – Generate front-end collection type PRD</h1>
+    <p>Copy this prompt when adding a new MOSC redesign section to Strapi (directory collection type + import + HTML PRD).</p>
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Prompt template</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'prompt-text')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="prompt-text" style="white-space: pre-wrap;">From the file folder "C:\project_workspace\mosc-temp\src\app\mosc-redesign" scrape all the data informations and images of [PAGE TITLE] page http://localhost:3000/mosc-redesign/[SECTION-PATH] and upload all those informations under the content manager collection types in strapi. Currently we have collection types related to Dioceses, bishops, parishes, institutions etc. Similar to that we need to add a new collection type for [Title] with all the data and images associated with a particular tenant_id from the folder "C:\project_workspace\mosc-temp\src\app\mosc-redesign". DO not make any other change in any other content. Find a way to do the above requirement and if possible do it. We have already completed this process for Holy synod collection type Directory – Holy Synod — please use that as an example by referring documentation/holy_synod/holy-synod-import-and-api-guide.html.
+
+With the above details in context create separate HTML files as PRD files for importing the additional collection types at the location documentation\front_end_based_collection_types_import. Also mention that run all the scripts or commands that are required. Please run all of them for me instead of asking me for prompts to run them.
+
+Also store the above prompt as a separate HTML as a generic prompt to generate additional PRDs.</div>
+    </div>
+    <h2>Checklist for implementer</h2>
+    <ol>
+      <li>Schema: name, slug, excerpt, body, image, order, tenant (+ section-specific fields)</li>
+      <li>Lifecycles: tenant auto-assign + kebab slug (copy catholicate-entry)</li>
+      <li>bootstrap.js: tenant middleware lists + Public find/findOne</li>
+      <li>content-manager strapi-server.js: TENANT_SCOPED_UIDS</li>
+      <li>normalize-slug.js + grant-editor-directory-permissions.js</li>
+      <li>scripts/import-[section]-from-mosc-temp.js + package.json npm script</li>
+      <li>HTML PRD in documentation/front_end_based_collection_types_import/</li>
+    </ol>
+
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+    function copyText(btn, id) { copyCommand(btn, id); }
+  </script>
+</body>
+</html>

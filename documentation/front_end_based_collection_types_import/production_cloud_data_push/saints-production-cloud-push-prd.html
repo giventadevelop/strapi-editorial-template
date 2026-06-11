@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Saints – Production Cloud Push PRD</title>
+  <style>
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; padding: 10px 15px; }
+    .command-content { padding: 12px 15px; font-family: monospace; font-size: 0.9em; color: #0d3b66; word-break: break-all; }
+    .copy-button { padding: 6px 12px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Cloud push index</a> · <a href="../saints-import-prd.html">Local import PRD</a></p>
+    <h1>Saints – Production / Cloud data push PRD</h1>
+    <p>Push <strong>Directory – Saints</strong> to Strapi Cloud. Status: <strong>Script to create</strong> (clone Catholicate).</p>
+
+    <div class="section-intro">
+      <p><strong>UID:</strong> <code class="code-highlight">api::saint-entry.saint-entry</code></p>
+      <p><strong>REST plural:</strong> <code class="code-highlight">saint-entries</code></p>
+      <p><strong>Local CM:</strong> <code>http://localhost:1337/admin/content-manager/collection-types/api::saint-entry.saint-entry</code></p>
+      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code> · <strong>Upsert:</strong> slug + tenantId</p>
+    </div>
+
+    <h2>1. Script strategy</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Reuse Catholicate script?</td><td><strong>Yes</strong> — same fields: name, slug, excerpt, body, image, order, tenant</td></tr>
+        <tr><td>New script</td><td><code class="script-name">scripts/push-saints-to-cloud.js</code></td></tr>
+        <tr><td>Change</td><td><code>UID</code>, <code>PLURAL = 'saint-entries'</code>, log title</td></tr>
+        <tr><td>npm</td><td><code>push:saints-to-cloud</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. Commands (after script created)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Push</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c1')">📋 Copy</button></div>
+      <div class="command-content" id="c1">npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Dry run</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c2')">📋 Copy</button></div>
+      <div class="command-content" id="c2">set DRY_RUN=1&amp;&amp; npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>3. REST verification</h2>
+    <p><code>GET /api/saint-entries?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
+
+    <h2>4. AI prompt</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
+      <div class="command-content" id="p" style="white-space:pre-wrap;">Push Saints from local Strapi to Cloud. Clone push-catholicate-to-cloud.js → push-saints-to-cloud.js. UID api::saint-entry.saint-entry, plural saint-entries, tenant tenant_demo_002. Run import:saints first. Add npm push:saints-to-cloud. Follow catholicate-production-cloud-push-prd.html pattern.</div>
+    </div>
+  </div>
+  <script>
+    function copyCommand(btn, id) { navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(() => { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = '📋 Copy', 2000); }); }
+  </script>
+</body>
+</html>

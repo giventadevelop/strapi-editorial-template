@@ -1,0 +1,70 @@
+{
+  "kind": "collectionType",
+  "collectionName": "publication_entries",
+  "info": {
+    "singularName": "publication-entry",
+    "pluralName": "publication-entries",
+    "displayName": "Directory – Publications",
+    "description": "Church publication: summary, body, contact, and image"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Publication title"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "excerpt": {
+      "type": "text",
+      "description": "Short summary for list/card views"
+    },
+    "body": {
+      "type": "richtext",
+      "description": "Full article content (HTML)"
+    },
+    "address": {
+      "type": "text"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phones": {
+      "type": "text",
+      "description": "Phone numbers, comma-separated if multiple"
+    },
+    "website": {
+      "type": "string"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Cover / featured image"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order on Publications listing"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

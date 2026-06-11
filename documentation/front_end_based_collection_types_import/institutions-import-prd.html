@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Institutions – Import PRD</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #333; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p, .section-intro li { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; white-space: nowrap; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Front-end collection type imports</a></p>
+
+    <h1>Institutions – Import PRD</h1>
+    <p>PRD / runbook for importing <strong>Directory – Institutions</strong> from <strong>mosc-temp</strong> into Strapi. Replaces legacy directory.mosc.in seed data for the same collection type. Status: <strong>Implemented</strong>.</p>
+
+    <div class="section-intro">
+      <p><strong>Frontend route:</strong> <code class="code-highlight">/mosc-redesign/institutions</code></p>
+      <p><strong>Strapi UID:</strong> <code class="code-highlight">api::institution.institution</code></p>
+      <p><strong>Content Manager:</strong> <code>http://localhost:1337/admin/content-manager/collection-types/api::institution.institution</code></p>
+      <p><strong>Default tenant:</strong> <code class="code-highlight">tenant_demo_002</code></p>
+      <p><strong>Expected row count:</strong> 219 individual institutions (9 categories; schools: 82)</p>
+    </div>
+
+    <h2>1. Schema fields</h2>
+    <p>name, slug, address, email, phones, website, description, image, order, tenant</p>
+
+    <h2>2. mosc-temp sources (under MOSC_TEMP_DIR)</h2>
+    <ul>
+      <li><code>src/app/mosc-redesign/(syro)/institutions/page.tsx</code> — hub cards (category order + images)</li>
+      <li><code>src/app/mosc-redesign/(syro)/institutions/&lt;category&gt;/page.tsx</code> — institution lists</li>
+      <li>Categories: major-centres, monasteries, convents, orphanages, hospitals, medical-college, engineering-colleges, moc-colleges, schools</li>
+      <li><code>public/images/institutions/</code> — category featured images</li>
+    </ul>
+
+    <h2>3. Import script</h2>
+    <p><code class="script-name">import-institutions-from-mosc-temp.js</code> · npm script: <code class="code-highlight">import:institutions</code></p>
+    <div class="warn"><strong>Stop Strapi</strong> before import (embedded Strapi loads local DB). Use <code>--replace</code> to <strong>delete all existing institutions for the tenant</strong> first, then import fresh from mosc-temp.</div>
+
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Delete tenant rows + fresh import (recommended)</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-import')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="cmd-import">npm run import:institutions -- --tenant-id=tenant_demo_002 --replace</div>
+    </div>
+
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Dry run preview</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-dry')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="cmd-dry">set DRY_RUN=1&amp;&amp; npm run import:institutions -- --tenant-id=tenant_demo_002 --replace</div>
+    </div>
+
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Refresh Editor directory permissions</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-grant')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="cmd-grant">npm run grant:editor-directory</div>
+    </div>
+
+    <h2>4. Slug strategy</h2>
+    <p>Each institution gets a unique slug: <code>{category}-{normalized-name}</code>, with location suffix when names repeat within a category (e.g. two “St. Mary’s Hospital” entries).</p>
+
+    <h2>5. REST API (frontend)</h2>
+    <p><code class="code-highlight">GET /api/institutions?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate=image</code></p>
+    <p>Filter by tenant on the Next.js server or proxy. Optional: filter by slug prefix for category tabs (e.g. <code>filters[slug][$startsWith]=hospitals-</code>).</p>
+
+    <h2>6. Verification</h2>
+    <ol>
+      <li>Content Manager → Directory – Institutions → rows for <code>tenant_demo_002</code></li>
+      <li>Old directory.mosc.in rows are gone after <code>--replace</code></li>
+      <li>Categories match mosc-redesign sidebar (9 sections)</li>
+      <li>Category images linked in Media Library (shared per category)</li>
+      <li>Frontend <code>/mosc-redesign/institutions</code> can load from Strapi when wired</li>
+    </ol>
+    <div class="note">Reference: <a href="ecumenical-import-prd.html">Ecumenical import PRD</a> · Cloud push: <a href="production_cloud_data_push/institutions-production-cloud-push-prd.html">Institutions production push PRD</a> · Previous data may have come from <code>data_import_seed_directory_mosc_in.js</code> — use <code>--replace</code> to replace with mosc-temp content only.</div>
+
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

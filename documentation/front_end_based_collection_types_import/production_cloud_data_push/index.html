@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Production / Cloud data push – Index</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    .badge-done { background: #28a745; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-todo { background: #ffc107; color: #333; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="../index.html">← Local import index</a></p>
+
+    <h1>Production / Strapi Cloud data push</h1>
+    <p>Runbooks for pushing directory collection types from <strong>local Strapi</strong> to <strong>Strapi Cloud</strong> after mosc-temp import. Tenant: <code class="code-highlight">tenant_demo_002</code>.</p>
+
+    <div class="section-intro">
+      <p><strong>Generic guide:</strong> <a href="generic-production-cloud-data-push-guide.html">How cloud push works, script types, reuse vs clone</a></p>
+      <p><strong>Template script:</strong> <code class="script-name">scripts/push-catholicate-to-cloud.js</code></p>
+      <p><strong>Phase A (local import):</strong> <a href="../index.html">front_end_based_collection_types_import/index.html</a></p>
+    </div>
+
+    <h2>Collection type cloud push PRDs</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Section</th>
+          <th>Strapi UID</th>
+          <th>Push script</th>
+          <th>Status</th>
+          <th>PRD</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Catholicate</td>
+          <td><code>api::catholicate-entry.catholicate-entry</code></td>
+          <td><code>push:catholicate-to-cloud</code></td>
+          <td><span class="badge-done">Content pushed</span></td>
+          <td><a href="catholicate-production-cloud-push-prd.html">PRD</a></td>
+        </tr>
+        <tr>
+          <td>Ecumenical</td>
+          <td><code>api::ecumenical-article.ecumenical-article</code></td>
+          <td><code>push:ecumenical-to-cloud</code></td>
+          <td><span class="badge-done">Script ready</span></td>
+          <td><a href="ecumenical-production-cloud-push-prd.html">PRD</a></td>
+        </tr>
+        <tr>
+          <td>Saints</td>
+          <td><code>api::saint-entry.saint-entry</code></td>
+          <td><code>push:saints-to-cloud</code> (clone)</td>
+          <td><span class="badge-todo">Script pending</span></td>
+          <td><a href="saints-production-cloud-push-prd.html">PRD</a></td>
+        </tr>
+        <tr>
+          <td>Publications</td>
+          <td><code>api::publication-entry.publication-entry</code></td>
+          <td><code>push:publications-to-cloud</code> (clone)</td>
+          <td><span class="badge-todo">Script pending</span></td>
+          <td><a href="publications-production-cloud-push-prd.html">PRD</a></td>
+        </tr>
+        <tr>
+          <td>Theological seminaries</td>
+          <td><code>api::theological-seminary.theological-seminary</code></td>
+          <td><code>push:theological-seminaries-to-cloud</code> (extended clone)</td>
+          <td><span class="badge-todo">Script pending</span></td>
+          <td><a href="theological-seminaries-production-cloud-push-prd.html">PRD</a></td>
+        </tr>
+        <tr>
+          <td>Holy Synod</td>
+          <td><code>api::holy-synod-member.holy-synod-member</code></td>
+          <td><code>push:holy-synod-to-cloud</code> (extended clone)</td>
+          <td><span class="badge-todo">Script pending</span></td>
+          <td><a href="holy-synod-production-cloud-push-prd.html">PRD</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Push all (after scripts exist)</h2>
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Sequential cloud push – tenant_demo_002 (Strapi stopped locally)</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-all-push')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="cmd-all-push">npm run push:catholicate-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:ecumenical-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:publications-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:theological-seminaries-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:holy-synod-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

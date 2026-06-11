@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Production / Cloud data push – Overview</title>
+  <style>
+    :root { --bg: #0f1419; --surface: #1a2332; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    p { margin: 0.5rem 0 1rem; color: var(--muted); }
+    code, kbd { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #333; }
+    ul, ol { margin: 0.5rem 0 1rem; padding-left: 1.5rem; color: var(--muted); }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p, .section-intro li { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; white-space: pre-wrap; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; border: none; background: #0066cc; color: white; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    .badge-done { background: #28a745; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+    .badge-todo { background: #ffc107; color: #333; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Production cloud push index</a> · <a href="../index.html">Local import index</a></p>
+
+    <h1>Production / Strapi Cloud data push – Generic guide</h1>
+    <p>How directory collection types move from <strong>local Strapi</strong> (after mosc-temp import) to <strong>Strapi Cloud production</strong>, with tenant integrity and safe upserts.</p>
+
+    <div class="section-intro">
+      <p><strong>Strapi project root:</strong> <code class="code-highlight">C:\project_workspace\strapi-editorial-template</code></p>
+      <p><strong>Production (Cloud):</strong> <code class="code-highlight">STRAPI_CLOUD_URL</code> in <code>.env</code> (e.g. <code>https://awesome-birthday-82f0a4fa96.strapiapp.com</code>)</p>
+      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code> (always filter and link by tenant on push)</p>
+      <p><strong>Canonical example script:</strong> <code class="script-name">scripts/push-catholicate-to-cloud.js</code> · npm: <code>push:catholicate-to-cloud</code></p>
+    </div>
+
+    <h2>1. Two-phase workflow</h2>
+    <table>
+      <thead><tr><th>Phase</th><th>Direction</th><th>Script pattern</th><th>When</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>A – Local import</strong></td>
+          <td>mosc-temp → local Strapi DB</td>
+          <td><code class="script-name">import-*-from-mosc-temp.js</code><br><code>npm run import:&lt;section&gt;</code></td>
+          <td>First time content is scraped from Next.js pages into local Content Manager. Documented in <a href="../index.html">front_end_based_collection_types_import</a>.</td>
+        </tr>
+        <tr>
+          <td><strong>B – Cloud push</strong></td>
+          <td>Local Strapi DB → Strapi Cloud</td>
+          <td><code class="script-name">push-*-to-cloud.js</code><br><code>npm run push:&lt;section&gt;-to-cloud</code></td>
+          <td>After local data is verified. This folder documents phase B.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>2. Script types in this repo</h2>
+    <table>
+      <thead><tr><th>Script</th><th>Purpose</th><th>Use for directory CMS types?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code class="script-name">push-catholicate-to-cloud.js</code></td>
+          <td>Read one collection from embedded local Strapi; upsert to Cloud REST API; upload images from <code>public/uploads</code>; resolve/create tenant.</td>
+          <td><strong>Yes – template</strong> for slug+tenant directory entries (clone per type).</td>
+        </tr>
+        <tr>
+          <td><code class="script-name">push-liturgy-days-to-cloud.js</code></td>
+          <td>Same cloud helpers; upsert key is <code>date + tenant</code> (not slug).</td>
+          <td>Liturgy calendar only.</td>
+        </tr>
+        <tr>
+          <td><code class="script-name">rest_api_push_to_cloud.js</code></td>
+          <td>Full <code>strapi export</code> tar → batched REST push of all types + optional media re-upload.</td>
+          <td>Full environment sync; heavy; use when pushing everything at once.</td>
+        </tr>
+        <tr>
+          <td><code class="script-name">import-*-from-mosc-temp.js</code></td>
+          <td>Phase A only (not cloud).</td>
+          <td>Run before cloud push.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>3. Reuse vs separate push scripts</h2>
+    <p>There is <strong>no single generic push script</strong> for all directory types yet. Use this decision table:</p>
+    <table>
+      <thead><tr><th>Schema pattern</th><th>Push script</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>name, slug, excerpt, body, image, order, tenant</code><br>(Catholicate, Ecumenical, Saints, Publications)</td>
+          <td>Clone <code class="script-name">push-catholicate-to-cloud.js</code></td>
+          <td>Change 3 constants: <code>UID</code>, <code>PLURAL</code>, log labels. Same upsert key: <code>slug + tenantId</code>. Same image upload block.</td>
+        </tr>
+        <tr>
+          <td>Standard fields + <code>subtitle, location, established, address, email, phones, website</code><br>(Theological Seminaries)</td>
+          <td><code class="script-name">push-theological-seminaries-to-cloud.js</code></td>
+          <td>Clone catholicate script; extend <code>payload</code> with extra attributes.</td>
+        </tr>
+        <tr>
+          <td>Standard fields + <code>memberType, address, email, phones</code><br>(Holy Synod)</td>
+          <td><code class="script-name">push-holy-synod-to-cloud.js</code></td>
+          <td>Clone catholicate script; include <code>memberType</code> enum in payload.</td>
+        </tr>
+        <tr>
+          <td>Unique upsert key (e.g. liturgy <code>date</code>)</td>
+          <td>Custom script</td>
+          <td>Follow <code class="script-name">push-liturgy-days-to-cloud.js</code> pattern instead.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>3.1 What to change when cloning the Catholicate script</h3>
+    <ol>
+      <li>Copy <code>scripts/push-catholicate-to-cloud.js</code> → <code>scripts/push-&lt;section&gt;-to-cloud.js</code></li>
+      <li>Set <code>UID</code> (e.g. <code>api::saint-entry.saint-entry</code>) and <code>PLURAL</code> (e.g. <code>saint-entries</code>)</li>
+      <li>Rename helper <code>getCloudCatholicateKeys</code> → <code>getCloudEntryKeys</code> (same logic)</li>
+      <li>Adjust <code>payload</code> to match schema (see per-type PRD)</li>
+      <li>Add <code>"push:&lt;section&gt;-to-cloud": "node ./scripts/push-&lt;section&gt;-to-cloud.js"</code> to <code>package.json</code></li>
+      <li>Optional: add <code>scripts/verify-&lt;section&gt;-cloud.js</code> (copy <code>_tmp-verify-cloud-catholicate.js</code>)</li>
+    </ol>
+
+    <h2>4. Environment variables (.env)</h2>
+    <table>
+      <thead><tr><th>Variable</th><th>Required</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>STRAPI_CLOUD_URL</code></td><td>Yes</td><td>Cloud base URL, no trailing slash.</td></tr>
+        <tr><td><code>STRAPI_CLOUD_API_TOKEN</code></td><td>Yes</td><td>Full Access API token from Cloud → Settings → API Tokens.</td></tr>
+        <tr><td><code>TENANT_ID</code></td><td>Recommended</td><td>Default tenant when <code>--tenant-id</code> omitted.</td></tr>
+        <tr><td><code>DRY_RUN=1</code></td><td>Optional</td><td>Preview only; no HTTP writes.</td></tr>
+        <tr><td><code>REST_PUSH_UPLOADS_DIR</code></td><td>Optional</td><td>Override local uploads folder (default <code>public/uploads</code>).</td></tr>
+      </tbody>
+    </table>
+
+    <h2>5. Tenant integrity</h2>
+    <ul>
+      <li>Always pass <code>--tenant-id=tenant_demo_002</code> when pushing MOSC redesign content.</li>
+      <li>Local read filters by tenant relation; cloud upsert index is <code>${slug}_${tenantId}</code>.</li>
+      <li>If tenant missing on Cloud, script creates it from local tenant row (name, tenantId, domain, description).</li>
+      <li>Every entry payload includes <code>tenant: &lt;cloudTenantDocumentId&gt;</code>.</li>
+      <li>Verify with REST: <code>filters[tenant][tenantId][$eq]=tenant_demo_002</code> and <code>populate[0]=tenant</code>.</li>
+    </ul>
+
+    <h2>6. Standard push flow (per collection type)</h2>
+    <ol>
+      <li>Ensure phase A local import completed (<a href="../index.html">local import PRD</a>).</li>
+      <li><strong>Stop local Strapi dev server</strong> (embedded Strapi in push script needs DB lock).</li>
+      <li>Dry run: <code>set DRY_RUN=1&amp;&amp; node scripts/push-&lt;section&gt;-to-cloud.js --tenant-id=tenant_demo_002</code></li>
+      <li>Push: <code>node scripts/push-&lt;section&gt;-to-cloud.js --tenant-id=tenant_demo_002</code></li>
+      <li>Verify in Cloud Content Manager + REST (see per-type PRD).</li>
+      <li>If images failed: fix Cloud <code>/api/upload</code> or upload manually, then <code>--images-only</code> re-run.</li>
+    </ol>
+
+    <div class="warn"><strong>Images on Strapi Cloud:</strong> As of the Catholicate push (June 2026), <code>POST /api/upload</code> on production returned HTTP 500 for all files. Text fields and tenant links succeeded; images did not. Re-run with <code>--images-only</code> after upload is fixed, or attach media manually in Cloud admin.</div>
+
+    <h2>7. Generic AI prompt – Cloud push for a directory collection type</h2>
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Prompt template (customize [SECTION], [UID], [PLURAL])</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'prompt-cloud')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="prompt-cloud">We have already imported [SECTION] data from mosc-temp into the local Strapi database (see documentation/front_end_based_collection_types_import/[local-import-prd].html). Now push that collection type from the local Strapi database to Strapi Cloud production, preserving tenant_id tenant_demo_002.
+
+Use scripts/push-catholicate-to-cloud.js as the canonical example (npm run push:catholicate-to-cloud). It reads local entries via embedded Strapi, upserts to Cloud by slug+tenant, resolves/creates tenant on Cloud, and uploads images from public/uploads.
+
+Collection details:
+- Strapi UID: [UID]
+- REST plural: [PLURAL]
+- Content Manager: http://localhost:1337/admin/content-manager/collection-types/[UID]
+- Cloud env: STRAPI_CLOUD_URL and STRAPI_CLOUD_API_TOKEN in .env
+
+Tasks:
+1. Decide if we can clone push-catholicate-to-cloud.js (change UID, PLURAL, payload fields) or need a custom upsert key.
+2. Create scripts/push-[section]-to-cloud.js and npm script push:[section]-to-cloud.
+3. Run dry run then production push with --tenant-id=tenant_demo_002.
+4. Verify on Cloud with REST filters[tenant][tenantId][$eq]=tenant_demo_002.
+5. Document in documentation/front_end_based_collection_types_import/production_cloud_data_push/[section]-production-cloud-push-prd.html.
+
+Run the scripts yourself; do not ask me to run them. Stop local Strapi before push.</div>
+    </div>
+
+    <h2>8. Per-collection cloud push PRDs</h2>
+    <p>See <a href="index.html">production_cloud_data_push/index.html</a> for links to each collection type runbook.</p>
+
+    <h2>9. References</h2>
+    <ul>
+      <li><code class="script-name">scripts/push-catholicate-to-cloud.js</code> – implemented cloud push template</li>
+      <li><code class="script-name">scripts/lib/liturgy-cli.js</code> – <code>DRY_RUN</code>, <code>getTenantId()</code></li>
+      <li><code class="script-name">scripts/push-liturgy-days-to-cloud.js</code> – alternate upsert key pattern</li>
+      <li><code class="script-name">scripts/rest_api_push_to_cloud.js</code> – full export push</li>
+      <li><a href="../the-catholicate-import-prd.html">Local Catholicate import PRD</a></li>
+      <li><a href="../holy_synod/holy-synod-import-and-api-guide.html">Holy Synod full guide</a></li>
+    </ul>
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>
