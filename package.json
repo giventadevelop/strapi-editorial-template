@@ -45,6 +45,7 @@
     "push:liturgy-days-to-cloud": "node ./scripts/push-liturgy-days-to-cloud.js",
     "push:catholicate-to-cloud": "node ./scripts/push-catholicate-to-cloud.js",
     "push:catholicate-images-to-cloud": "node ./scripts/push-catholicate-images-to-cloud.js",
+    "push:catholicate-images-migration": "node ./scripts/push-catholicate-images-migration.js",
     "push:ecumenical-to-cloud": "node ./scripts/push-ecumenical-to-cloud.js",
     "push:saints-to-cloud": "node ./scripts/push-saints-to-cloud.js",
     "push:publications-to-cloud": "node ./scripts/push-publications-to-cloud.js",

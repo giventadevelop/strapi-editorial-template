@@ -38,15 +38,115 @@ module.exports = {
     // Directly updates publishedAt and tenant on published DB rows via raw knex.
     strapi.server.router.post('/api/migration/fix-published', async (ctx) => {
       if (!(await ensureMigrationAuthorized(strapi, ctx))) return;
-      const { tenantDocumentId, articles } = ctx.request.body || {};
+      const body = ctx.request.body || {};
+      const {
+        tenantDocumentId,
+        articles,
+        uploadMedia,
+        linkCatholicateImages,
+        tenantId: catholicateTenantId,
+      } = body;
 
-      if (!Array.isArray(articles) || articles.length === 0) {
-        ctx.status = 400;
-        ctx.body = { error: { status: 400, message: 'articles array is required.' } };
+      const knex = strapi.db.connection;
+      const fs = require('fs');
+      const path = require('path');
+
+      // Catholicate image migration (base64 upload + morph link) — works when /api/upload is broken.
+      if (Array.isArray(uploadMedia) && uploadMedia.length > 0) {
+        const uploadsDir = path.join(strapi.dirs.static.public, 'uploads');
+        fs.mkdirSync(uploadsDir, { recursive: true });
+        const created = [];
+        const errors = [];
+        for (const item of uploadMedia) {
+          const { name, hash, ext, mime, base64, size, width, height } = item || {};
+          if (!name || !hash || !ext || !base64) {
+            errors.push({ name: name || '?', error: 'name, hash, ext, and base64 are required.' });
+            continue;
+          }
+          const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
+          const filename = `${hash}${normalizedExt}`;
+          const diskPath = path.join(uploadsDir, filename);
+          try {
+            const buf = Buffer.from(base64, 'base64');
+            fs.writeFileSync(diskPath, buf);
+            const existing = await strapi.db.query('plugin::upload.file').findOne({
+              where: { hash },
+              select: ['id', 'documentId', 'document_id', 'url'],
+            });
+            if (existing) {
+              created.push({ id: existing.id, name, hash, reused: true });
+              continue;
+            }
+            const row = await strapi.db.query('plugin::upload.file').create({
+              data: {
+                name,
+                alternativeText: name,
+                caption: name,
+                hash,
+                ext: normalizedExt,
+                mime: mime || 'application/octet-stream',
+                size: size || buf.length,
+                width: width ?? null,
+                height: height ?? null,
+                url: `/uploads/${filename}`,
+                provider: 'local',
+              },
+            });
+            created.push({ id: row.id, name, hash, reused: false });
+          } catch (err) {
+            errors.push({ name, error: err.message });
+          }
+        }
+
+        let linkResults = null;
+        if (Array.isArray(linkCatholicateImages) && linkCatholicateImages.length > 0 && catholicateTenantId) {
+          linkResults = { linked: 0, skipped: 0, errors: [] };
+          const tenantRow = await knex('tenants').where({ tenant_id: catholicateTenantId }).select('id').first();
+          const contentUid = 'api::catholicate-entry.catholicate-entry';
+          const morphTable = 'files_related_mph';
+          const byHash = new Map(created.map((c) => [c.hash, c.id]));
+          for (const link of linkCatholicateImages) {
+            const { slug, hash, fileId } = link || {};
+            const resolvedId = fileId ?? (hash ? byHash.get(hash) : null);
+            if (!slug || resolvedId == null) {
+              linkResults.skipped++;
+              continue;
+            }
+            try {
+              if (!tenantRow) throw new Error(`Tenant not found: ${catholicateTenantId}`);
+              const entryRow = await knex('catholicate_entries as e')
+                .join('catholicate_entries_tenant_lnk as tl', 'tl.catholicate_entry_id', 'e.id')
+                .where({ 'e.slug': slug, 'tl.tenant_id': tenantRow.id })
+                .select('e.id')
+                .first();
+              if (!entryRow) throw new Error('Entry not found for tenant.');
+              await knex(morphTable)
+                .where({ related_id: entryRow.id, related_type: contentUid, field: 'image' })
+                .del();
+              await knex(morphTable).insert({
+                file_id: resolvedId,
+                related_id: entryRow.id,
+                related_type: contentUid,
+                field: 'image',
+                order: 1,
+              });
+              linkResults.linked++;
+            } catch (err) {
+              linkResults.errors.push({ slug, error: err.message });
+            }
+          }
+        }
+
+        ctx.body = { ok: errors.length === 0, created, errors, linkResults };
         return;
       }
 
-      const knex = strapi.db.connection;
+      if (!Array.isArray(articles) || articles.length === 0) {
+        ctx.status = 400;
+        ctx.body = { error: { status: 400, message: 'articles array is required (or send uploadMedia).' } };
+        return;
+      }
+
       const results = { updated: 0, tenantLinked: 0, skipped: 0, errors: [] };
 
       // Resolve tenant numeric ID from documentId
