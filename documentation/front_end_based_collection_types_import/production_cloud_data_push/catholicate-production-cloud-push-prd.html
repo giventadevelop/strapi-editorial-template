@@ -35,7 +35,7 @@
     <p><a href="index.html">← Cloud push index</a> · <a href="../the-catholicate-import-prd.html">Local import PRD</a> · <a href="generic-production-cloud-data-push-guide.html">Generic guide</a></p>
 
     <h1>Catholicate – Production / Cloud data push PRD</h1>
-    <p>Push <strong>Directory – The Catholicate</strong> from local Strapi to Strapi Cloud. Status: <strong>Implemented</strong> (9 entries on Cloud; images pending upload fix).</p>
+    <p>Push <strong>Directory – The Catholicate</strong> from local Strapi to Strapi Cloud. Status: <strong>Complete</strong> (9 entries + 9 distinct images on Cloud, June 2026).</p>
 
     <div class="section-intro">
       <p><strong>Strapi UID:</strong> <code class="code-highlight">api::catholicate-entry.catholicate-entry</code></p>
@@ -90,18 +90,31 @@
     <p><code>GET {STRAPI_CLOUD_URL}/api/catholicate-entries?pagination[pageSize]=100&amp;populate[0]=tenant&amp;populate[1]=image&amp;filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc</code></p>
     <p>Expect 9 entries; each <code>tenant.tenantId</code> = <code>tenant_demo_002</code>.</p>
 
-    <div class="warn"><strong>June 2026 — images blocked:</strong> Content is on Cloud (9 entries, tenant correct). Images show the same placeholder on <a href="https://www.mosc-temp.com/mosc-redesign/catholicate-cms">catholicate-cms</a> because Cloud <code>/api/upload</code> returns HTTP 500 (S3 provider misconfiguration). Local <code>.env</code> AWS keys are also invalid (<code>InvalidAccessKeyId</code>).</div>
+    <div class="ok"><strong>June 2026 — images fixed:</strong> 9 distinct images on Cloud via migration base64 upload. Frontend <a href="https://www.mosc-temp.com/mosc-redesign/catholicate-cms">catholicate-cms</a> shows unique card images.</div>
 
-    <h2>5b. Fix images (required steps)</h2>
-    <ol>
-      <li><strong>Strapi Cloud → Settings → Variables</strong> — set valid <code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_REGION=us-east-2</code>, <code>AWS_S3_BUCKET_NAME=eventapp-media-bucket</code>, <code>AWS_ACL=none</code> (bucket owner enforced).</li>
-      <li>Update the same AWS keys in local <code>.env</code>.</li>
-      <li>Deploy migration endpoints: <code>npx strapi login</code> then <code>npx strapi deploy --force</code> (adds <code>/api/migration/register-s3-media</code>).</li>
-      <li>Re-import local images: <code>node scripts/import-catholicate-from-mosc-temp.js --tenant-id=tenant_demo_002 --images-only --replace</code></li>
-      <li>Push images: <code>npm run push:catholicate-images-to-cloud -- --tenant-id=tenant_demo_002</code> (tries <code>/api/upload</code>, then S3 + register migration).</li>
-      <li>Verify: <code>node scripts/verify-catholicate-cloud.js</code> — each entry should show a distinct S3 URL.</li>
-    </ol>
-    <p>Shortcut when <code>/api/upload</code> works after step 1: <code>npm run push:catholicate-to-cloud -- --tenant-id=tenant_demo_002 --images-only</code></p>
+    <h2>5b. Cloud image upload fix</h2>
+    <p>When <code>POST /api/upload</code> returns HTTP 500 on Cloud, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a> (not <code>--images-only</code> on push script).</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish Catholicate images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img-fix')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img-fix">npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Images only (migration, manual)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img-mig')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img-mig">npm run push:collection-images-migration -- --collection=catholicate --tenant-id=tenant_demo_002</div>
+    </div>
+    <p>Prerequisites: content on Cloud; migration code deployed; local Strapi stopped; images in <code>public/uploads/</code>.</p>
+
+    <h2>5c. AI prompt — Cloud image upload fix (Catholicate)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy prompt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'prompt-img')">📋 Copy</button></div>
+      <div class="command-content" id="prompt-img" style="white-space:pre-wrap;">Upload the Cloud images for Catholicate using the Cloud image migration fix.
+
+Read cloud-image-upload-migration-fix.html and catholicate-production-cloud-push-prd.html § Cloud image upload fix.
+
+Run: npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002
+
+Verify 9 entries with distinct populate[image] URLs for tenant_demo_002. Run scripts yourself.</div>
+    </div>
 
     <h2>6. AI prompt (Catholicate cloud push)</h2>
     <div class="command-block">

@@ -38,6 +38,7 @@
 
     <div class="section-intro">
       <p><strong>Generic guide:</strong> <a href="generic-production-cloud-data-push-guide.html">How cloud push works, script types, reuse vs clone</a></p>
+      <p><strong>Image upload fix:</strong> <a href="cloud-image-upload-migration-fix.html">Cloud image upload migration fix</a> (when <code>/api/upload</code> fails)</p>
       <p><strong>Template script:</strong> <code class="script-name">scripts/push-catholicate-to-cloud.js</code></p>
       <p><strong>Phase A (local import):</strong> <a href="../index.html">front_end_based_collection_types_import/index.html</a></p>
     </div>
@@ -50,6 +51,7 @@
           <th>Strapi UID</th>
           <th>Push script</th>
           <th>Status</th>
+          <th>Image fix <code>--collection=</code></th>
           <th>PRD</th>
         </tr>
       </thead>
@@ -58,7 +60,8 @@
           <td>Catholicate</td>
           <td><code>api::catholicate-entry.catholicate-entry</code></td>
           <td><code>push:catholicate-to-cloud</code></td>
-          <td><span class="badge-done">Content pushed</span></td>
+          <td><span class="badge-done">Content + images</span></td>
+          <td><code>--collection=catholicate</code></td>
           <td><a href="catholicate-production-cloud-push-prd.html">PRD</a></td>
         </tr>
         <tr>
@@ -66,40 +69,63 @@
           <td><code>api::ecumenical-article.ecumenical-article</code></td>
           <td><code>push:ecumenical-to-cloud</code></td>
           <td><span class="badge-done">Script ready</span></td>
+          <td><code>--collection=ecumenical</code></td>
           <td><a href="ecumenical-production-cloud-push-prd.html">PRD</a></td>
         </tr>
         <tr>
           <td>Saints</td>
           <td><code>api::saint-entry.saint-entry</code></td>
-          <td><code>push:saints-to-cloud</code> (clone)</td>
+          <td><code>push:saints-to-cloud</code></td>
           <td><span class="badge-todo">Script pending</span></td>
+          <td><code>--collection=saints</code></td>
           <td><a href="saints-production-cloud-push-prd.html">PRD</a></td>
         </tr>
         <tr>
           <td>Publications</td>
           <td><code>api::publication-entry.publication-entry</code></td>
-          <td><code>push:publications-to-cloud</code> (clone)</td>
-          <td><span class="badge-todo">Script pending</span></td>
+          <td><code>push:publications-to-cloud</code></td>
+          <td><span class="badge-todo">Schema deploy</span></td>
+          <td><code>--collection=publications</code></td>
           <td><a href="publications-production-cloud-push-prd.html">PRD</a></td>
         </tr>
         <tr>
           <td>Theological seminaries</td>
           <td><code>api::theological-seminary.theological-seminary</code></td>
-          <td><code>push:theological-seminaries-to-cloud</code> (extended clone)</td>
+          <td><code>push:theological-seminaries-to-cloud</code></td>
           <td><span class="badge-todo">Script pending</span></td>
+          <td><code>--collection=theological-seminaries</code></td>
           <td><a href="theological-seminaries-production-cloud-push-prd.html">PRD</a></td>
         </tr>
         <tr>
           <td>Holy Synod</td>
           <td><code>api::holy-synod-member.holy-synod-member</code></td>
-          <td><code>push:holy-synod-to-cloud</code> (extended clone)</td>
+          <td><code>push:holy-synod-to-cloud</code></td>
           <td><span class="badge-todo">Script pending</span></td>
+          <td><code>--collection=holy-synod</code></td>
           <td><a href="holy-synod-production-cloud-push-prd.html">PRD</a></td>
+        </tr>
+        <tr>
+          <td>Institutions</td>
+          <td><code>api::institution.institution</code></td>
+          <td><code>push:institutions-to-cloud</code></td>
+          <td><span class="badge-done">Content pushed</span></td>
+          <td><code>--collection=institutions</code></td>
+          <td><a href="institutions-production-cloud-push-prd.html">PRD</a></td>
         </tr>
       </tbody>
     </table>
 
-    <h2>Push all (after scripts exist)</h2>
+    <h2>Finish Cloud images (one command)</h2>
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Template — replace --collection=</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="cmd-img">npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002</div>
+    </div>
+    <p>See <a href="cloud-image-upload-migration-fix.html">cloud-image-upload-migration-fix.html</a> for troubleshooting and AI prompts.</p>
+
+    <h2>Push all content (after scripts exist)</h2>
     <div class="command-block">
       <div class="command-header">
         <strong>Sequential cloud push – tenant_demo_002 (Strapi stopped locally)</strong>

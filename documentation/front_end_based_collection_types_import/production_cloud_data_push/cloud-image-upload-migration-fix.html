@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud image upload migration fix – Reference</title>
+  <style>
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    tr:hover td { background: rgba(88, 166, 255, 0.06); }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; color: #333; }
+    .ok { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; color: #155724; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p, .section-intro li { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-all; color: #0d3b66; white-space: pre-wrap; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; border: none; background: #0066cc; color: white; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    .badge-done { background: #28a745; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Cloud push index</a> · <a href="generic-production-cloud-data-push-guide.html">Generic guide</a></p>
+
+    <h1>Cloud image upload migration fix</h1>
+    <p>Reference for uploading <strong>media/images to Strapi Cloud</strong> when <code>POST /api/upload</code> fails (HTTP 500 / invalid S3). Proven on Catholicate (June 2026): 9 distinct images linked via base64 migration endpoint.</p>
+
+    <div class="ok">
+      <strong>When to use:</strong> Content and tenant links are already on Cloud, but <code>image</code> is missing or the frontend shows the same placeholder on every card. Say to Cursor: <em>“Upload the Cloud images for [collection] using the Cloud image migration fix.”</em>
+    </div>
+
+    <div class="section-intro">
+      <p><strong>How it works:</strong></p>
+      <ol>
+        <li>Script reads local image files from <code>public/uploads/</code> via DB morph table (<code>files_related_mph</code>).</li>
+        <li>POST <code>/api/migration/fix-published</code> with <code>uploadMedia</code> (base64) — writes files on Cloud server + creates <code>plugin::upload.file</code> rows (<code>provider: local</code>).</li>
+        <li>Same request links files to entries by <code>slug</code> + restores <code>tenant</code> join if missing.</li>
+      </ol>
+      <p><strong>Implementation:</strong> <code class="script-name">src/index.js</code> · <code class="script-name">scripts/push-collection-images-migration.js</code> · <code class="script-name">scripts/lib/cloud-image-migration-config.js</code></p>
+    </div>
+
+    <h2>1. Prerequisites</h2>
+    <ol>
+      <li>Phase A local import done (images in <code>public/uploads/</code>).</li>
+      <li>Phase B content push done: <code>npm run push:&lt;section&gt;-to-cloud -- --tenant-id=tenant_demo_002</code>.</li>
+      <li><code>.env</code>: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code> (Full Access).</li>
+      <li>Migration code <strong>deployed on Cloud</strong> (<code>git push origin main</code> or <code>npx strapi deploy --force</code>).</li>
+      <li><strong>Stop local Strapi dev server</strong> before running image scripts.</li>
+    </ol>
+
+    <div class="warn"><strong>Shell env override:</strong> If <code>STRAPI_CLOUD_URL</code> is set to <code>http://localhost:1337</code> in your terminal, scripts use <code>dotenv override: true</code> to read Cloud URL from <code>.env</code>.</div>
+
+    <h2>2. One-command fix (any registered collection)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-finish')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-finish">npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002</div>
+    </div>
+    <p>Replace <code>--collection=</code> with the key from the table below. Script probes migration endpoint → uploads → verifies distinct images.</p>
+
+    <h2>3. Collection registry</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Collection</th>
+          <th><code>--collection=</code></th>
+          <th>Content push npm</th>
+          <th>Per-type PRD</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Catholicate</td>
+          <td><code>catholicate</code></td>
+          <td><code>push:catholicate-to-cloud</code></td>
+          <td><a href="catholicate-production-cloud-push-prd.html">PRD</a></td>
+          <td><span class="badge-done">Images fixed</span></td>
+        </tr>
+        <tr>
+          <td>Ecumenical</td>
+          <td><code>ecumenical</code></td>
+          <td><code>push:ecumenical-to-cloud</code></td>
+          <td><a href="ecumenical-production-cloud-push-prd.html">PRD</a></td>
+          <td>Run after content push</td>
+        </tr>
+        <tr>
+          <td>Saints</td>
+          <td><code>saints</code></td>
+          <td><code>push:saints-to-cloud</code></td>
+          <td><a href="saints-production-cloud-push-prd.html">PRD</a></td>
+          <td>Run after content push</td>
+        </tr>
+        <tr>
+          <td>Publications</td>
+          <td><code>publications</code></td>
+          <td><code>push:publications-to-cloud</code></td>
+          <td><a href="publications-production-cloud-push-prd.html">PRD</a></td>
+          <td>Run after content push</td>
+        </tr>
+        <tr>
+          <td>Theological seminaries</td>
+          <td><code>theological-seminaries</code></td>
+          <td><code>push:theological-seminaries-to-cloud</code></td>
+          <td><a href="theological-seminaries-production-cloud-push-prd.html">PRD</a></td>
+          <td>Run after content push</td>
+        </tr>
+        <tr>
+          <td>Holy Synod</td>
+          <td><code>holy-synod</code></td>
+          <td><code>push:holy-synod-to-cloud</code></td>
+          <td><a href="holy-synod-production-cloud-push-prd.html">PRD</a></td>
+          <td>Run after content push</td>
+        </tr>
+        <tr>
+          <td>Institutions</td>
+          <td><code>institutions</code></td>
+          <td><code>push:institutions-to-cloud</code></td>
+          <td><a href="institutions-production-cloud-push-prd.html">PRD</a></td>
+          <td>Run after content push</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>4. Manual steps (if finish script fails)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Push images only (migration)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-migration')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-migration">npm run push:collection-images-migration -- --collection=catholicate --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Probe migration endpoint</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-probe')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-probe">npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002</div>
+    </div>
+    <p>Expected success output: <code>Created: N | Linked: N</code> and verification <code>0 missing</code>.</p>
+
+    <h2>5. REST verification</h2>
+    <p><code>GET {STRAPI_CLOUD_URL}/api/{rest-plural}?pagination[pageSize]=100&amp;populate[0]=image&amp;populate[1]=tenant&amp;filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc</code></p>
+    <p>Each entry should have a distinct <code>image.url</code> (e.g. <code>/uploads/Catholicos_1_….jpeg</code>). Count of unique URLs should match entry count (shared category images may repeat for Institutions).</p>
+
+    <h2>6. Troubleshooting</h2>
+    <table>
+      <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>articles array is required.</code> (no uploadMedia hint)</td>
+          <td>Migration code not deployed on Cloud</td>
+          <td><code>git push origin main</code> or <code>npx strapi login &amp;&amp; npx strapi deploy --force</code></td>
+        </tr>
+        <tr>
+          <td><code>POST /api/upload</code> HTTP 500</td>
+          <td>Invalid S3 credentials on Cloud</td>
+          <td>Use migration fix (this doc) OR fix AWS vars in Cloud dashboard</td>
+        </tr>
+        <tr>
+          <td>ECONNREFUSED localhost:1337</td>
+          <td>Shell <code>STRAPI_CLOUD_URL</code> overrides .env</td>
+          <td>Scripts use <code>dotenv override: true</code>; check <code>.env</code></td>
+        </tr>
+        <tr>
+          <td><code>Link errors: Entry not found</code></td>
+          <td>Content not on Cloud yet</td>
+          <td>Run <code>push:&lt;section&gt;-to-cloud</code> first</td>
+        </tr>
+        <tr>
+          <td>Same placeholder on frontend</td>
+          <td><code>image</code> null in API response</td>
+          <td>Re-run finish script; hard-refresh frontend / CDN</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>7. Generic AI prompt (any collection)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy prompt — replace [COLLECTION] and [collection-key]</strong><button type="button" class="copy-button" onclick="copyCommand(this,'prompt-generic')">📋 Copy</button></div>
+      <div class="command-content" id="prompt-generic">Upload the Cloud images for [COLLECTION] using the Cloud image migration fix.
+
+Read:
+- documentation/front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html
+- documentation/front_end_based_collection_types_import/production_cloud_data_push/[collection-key]-production-cloud-push-prd.html (§ Cloud image upload fix)
+
+Prerequisites: content already on Strapi Cloud for tenant_demo_002; local images in public/uploads; migration code deployed.
+
+Run (local Strapi stopped):
+npm run finish:collection-images-on-cloud -- --collection=[collection-key] --tenant-id=tenant_demo_002
+
+Verify REST populate[image] — distinct image.url per entry. Do not ask me to run commands; run them yourself.</div>
+    </div>
+
+    <h2>8. Adding a new collection type</h2>
+    <ol>
+      <li>Add registry entry in <code class="script-name">scripts/lib/cloud-image-migration-config.js</code> (<code>uid</code>, <code>table</code>, <code>tenantLinkTable</code>, <code>entryIdCol</code>, <code>restPlural</code>).</li>
+      <li>Add § <strong>Cloud image upload fix</strong> to the type’s production PRD HTML.</li>
+      <li>Add row to table in this doc and <a href="index.html">index.html</a>.</li>
+    </ol>
+
+    <div class="note"><strong>Cursor rule:</strong> <code>.cursor/rules/strapi-cloud-image-upload-migration.mdc</code> — agents load this when working on Cloud image pushes.</div>
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

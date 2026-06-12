@@ -143,13 +143,38 @@ module.exports = {
         }
 
         let linkResults = null;
-        if (Array.isArray(linkCatholicateImages) && linkCatholicateImages.length > 0 && catholicateTenantId) {
+        const linkCollectionImages = body.linkCollectionImages;
+        const legacyCatholicateLinks =
+          Array.isArray(linkCatholicateImages) && linkCatholicateImages.length > 0
+            ? {
+                uid: 'api::catholicate-entry.catholicate-entry',
+                table: 'catholicate_entries',
+                tenantLinkTable: 'catholicate_entries_tenant_lnk',
+                entryIdCol: 'catholicate_entry_id',
+                mediaField: 'image',
+                links: linkCatholicateImages,
+              }
+            : null;
+        const linkSpec =
+          linkCollectionImages?.uid && linkCollectionImages?.table
+            ? linkCollectionImages
+            : legacyCatholicateLinks;
+        const linkTenantId = catholicateTenantId || body.tenantId;
+
+        if (linkSpec?.links?.length > 0 && linkTenantId) {
           linkResults = { linked: 0, skipped: 0, errors: [] };
-          const tenantRow = await knex('tenants').where({ tenant_id: catholicateTenantId }).select('id').first();
-          const contentUid = 'api::catholicate-entry.catholicate-entry';
+          const tenantRow = await knex('tenants').where({ tenant_id: linkTenantId }).select('id').first();
+          const {
+            uid: contentUid,
+            table: entryTable,
+            tenantLinkTable,
+            entryIdCol,
+            mediaField = 'image',
+            links,
+          } = linkSpec;
           const morphTable = 'files_related_mph';
           const byHash = new Map(created.map((c) => [c.hash, c.id]));
-          for (const link of linkCatholicateImages) {
+          for (const link of links) {
             const { slug, hash, fileId } = link || {};
             const resolvedId = fileId ?? (hash ? byHash.get(hash) : null);
             if (!slug || resolvedId == null) {
@@ -157,31 +182,31 @@ module.exports = {
               continue;
             }
             try {
-              let entryRow = await knex('catholicate_entries').where({ slug }).select('id').first();
+              const entryRow = await knex(entryTable).where({ slug }).select('id').first();
               if (!entryRow) throw new Error('Entry not found.');
-              if (tenantRow) {
-                const existingTenantLink = await knex('catholicate_entries_tenant_lnk')
-                  .where({ catholicate_entry_id: entryRow.id })
+              if (tenantRow && tenantLinkTable && entryIdCol) {
+                const existingTenantLink = await knex(tenantLinkTable)
+                  .where({ [entryIdCol]: entryRow.id })
                   .first();
                 if (!existingTenantLink) {
-                  await knex('catholicate_entries_tenant_lnk').insert({
-                    catholicate_entry_id: entryRow.id,
+                  await knex(tenantLinkTable).insert({
+                    [entryIdCol]: entryRow.id,
                     tenant_id: tenantRow.id,
                   });
                 } else if (existingTenantLink.tenant_id !== tenantRow.id) {
-                  await knex('catholicate_entries_tenant_lnk')
-                    .where({ catholicate_entry_id: entryRow.id })
+                  await knex(tenantLinkTable)
+                    .where({ [entryIdCol]: entryRow.id })
                     .update({ tenant_id: tenantRow.id });
                 }
               }
               await knex(morphTable)
-                .where({ related_id: entryRow.id, related_type: contentUid, field: 'image' })
+                .where({ related_id: entryRow.id, related_type: contentUid, field: mediaField })
                 .del();
               await knex(morphTable).insert({
                 file_id: resolvedId,
                 related_id: entryRow.id,
                 related_type: contentUid,
-                field: 'image',
+                field: mediaField,
                 order: 1,
               });
               linkResults.linked++;

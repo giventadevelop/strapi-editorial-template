@@ -70,7 +70,20 @@
     <h2>4. REST verification</h2>
     <p><code>GET /api/holy-synod-members?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
 
-    <h2>5. AI prompt</h2>
+    <h2>5. Cloud image upload fix</h2>
+    <p>After content push, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a> for member portraits when Cloud <code>/api/upload</code> fails.</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish Holy Synod images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img">npm run finish:collection-images-on-cloud -- --collection=holy-synod --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>6. AI prompt — Cloud image upload fix (Holy Synod)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p-img')">📋 Copy</button></div>
+      <div class="command-content" id="p-img" style="white-space:pre-wrap;">Upload the Cloud images for Holy Synod using the Cloud image migration fix. Read cloud-image-upload-migration-fix.html and holy-synod-production-cloud-push-prd.html § Cloud image upload fix. Run: npm run finish:collection-images-on-cloud -- --collection=holy-synod --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>7. AI prompt (content push)</h2>
     <div class="command-block">
       <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
       <div class="command-content" id="p" style="white-space:pre-wrap;">Push Holy Synod members local → Cloud. Clone push-catholicate-to-cloud.js → push-holy-synod-to-cloud.js. UID api::holy-synod-member.holy-synod-member, plural holy-synod-members. Payload adds memberType (catholicos|metropolitan), address, email, phones. tenant tenant_demo_002. import:holy-synod first. See holy-synod-import-and-api-guide.html for local phase.</div>

@@ -159,10 +159,23 @@
       <li>Dry run: <code>set DRY_RUN=1&amp;&amp; node scripts/push-&lt;section&gt;-to-cloud.js --tenant-id=tenant_demo_002</code></li>
       <li>Push: <code>node scripts/push-&lt;section&gt;-to-cloud.js --tenant-id=tenant_demo_002</code></li>
       <li>Verify in Cloud Content Manager + REST (see per-type PRD).</li>
-      <li>If images failed: fix Cloud <code>/api/upload</code> or upload manually, then <code>--images-only</code> re-run.</li>
+      <li>If images failed on Cloud: use <a href="cloud-image-upload-migration-fix.html">Cloud image upload migration fix</a> (§ below) — not only <code>--images-only</code>.</li>
     </ol>
 
-    <div class="warn"><strong>Images on Strapi Cloud:</strong> As of the Catholicate push (June 2026), <code>POST /api/upload</code> on production returned HTTP 500 for all files. Text fields and tenant links succeeded; images did not. Re-run with <code>--images-only</code> after upload is fixed, or attach media manually in Cloud admin.</div>
+    <h2>6. Cloud image upload fix (when /api/upload fails)</h2>
+    <div class="ok" style="background:#d4edda;border-left:4px solid #28a745;padding:0.75rem 1rem;margin:1rem 0;color:#155724;">
+      <strong>Proven fix (June 2026):</strong> Base64 upload via <code>POST /api/migration/fix-published</code> bypasses broken Cloud S3. Catholicate: 9/9 distinct images linked.
+    </div>
+    <p>Full reference: <a href="cloud-image-upload-migration-fix.html"><strong>cloud-image-upload-migration-fix.html</strong></a> · Cursor rule: <code>.cursor/rules/strapi-cloud-image-upload-migration.mdc</code></p>
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Finish images for any registered collection</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img-fix')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="cmd-img-fix">npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002</div>
+    </div>
+    <p>Replace <code>catholicate</code> with: <code>ecumenical</code>, <code>saints</code>, <code>publications</code>, <code>theological-seminaries</code>, <code>holy-synod</code>, <code>institutions</code>. Each per-type PRD has § <strong>Cloud image upload fix</strong> and a copy-paste AI prompt.</p>
+    <p><strong>Order:</strong> (1) push content <code>push:&lt;section&gt;-to-cloud</code> → (2) deploy migration code if needed → (3) <code>finish:collection-images-on-cloud</code>.</p>
 
     <h2>7. Generic AI prompt – Cloud push for a directory collection type</h2>
     <div class="command-block">
@@ -191,10 +204,13 @@ Run the scripts yourself; do not ask me to run them. Stop local Strapi before pu
     </div>
 
     <h2>8. Per-collection cloud push PRDs</h2>
-    <p>See <a href="index.html">production_cloud_data_push/index.html</a> for links to each collection type runbook.</p>
+    <p>See <a href="index.html">production_cloud_data_push/index.html</a> for links to each collection type runbook. Image fix: <a href="cloud-image-upload-migration-fix.html">cloud-image-upload-migration-fix.html</a>.</p>
 
     <h2>9. References</h2>
     <ul>
+      <li><a href="cloud-image-upload-migration-fix.html">cloud-image-upload-migration-fix.html</a> – base64 image upload when S3 / <code>/api/upload</code> fails</li>
+      <li><code class="script-name">scripts/push-collection-images-migration.js</code> – generic image migration push</li>
+      <li><code class="script-name">scripts/finish-collection-images-on-cloud.js</code> – probe + push + verify images</li>
       <li><code class="script-name">scripts/push-catholicate-to-cloud.js</code> – implemented cloud push template</li>
       <li><code class="script-name">scripts/lib/liturgy-cli.js</code> – <code>DRY_RUN</code>, <code>getTenantId()</code></li>
       <li><code class="script-name">scripts/push-liturgy-days-to-cloud.js</code> – alternate upsert key pattern</li>

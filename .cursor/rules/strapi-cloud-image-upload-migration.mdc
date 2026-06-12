@@ -1,0 +1,56 @@
+---
+description: Fix Strapi Cloud image uploads when /api/upload returns 500 — use migration base64 upload for directory collection types
+globs: scripts/push-*-to-cloud.js, scripts/push-collection-images-migration.js, scripts/finish-collection-images-on-cloud.js, scripts/lib/cloud-image-migration-config.js, src/index.js, documentation/front_end_based_collection_types_import/production_cloud_data_push/**/*
+alwaysApply: false
+---
+
+- **When to use this fix**
+  - Content is already on Strapi Cloud (text + tenant links OK) but **images are missing** or all cards show the same placeholder.
+  - `POST /api/upload` on Cloud returns **HTTP 500** (broken S3 / `InvalidAccessKeyId`) or migration endpoints are required.
+  - Local images exist under `public/uploads/` from phase-A import.
+
+- **Canonical solution (June 2026 — proven on Catholicate)**
+  - **Do not rely on** Cloud `POST /api/upload` when S3 credentials are invalid.
+  - Use **`POST /api/migration/fix-published`** with `uploadMedia` (base64) + `linkCollectionImages` — implemented in [src/index.js](mdc:src/index.js).
+  - Generic scripts:
+    - [scripts/push-collection-images-migration.js](mdc:scripts/push-collection-images-migration.js)
+    - [scripts/finish-collection-images-on-cloud.js](mdc:scripts/finish-collection-images-on-cloud.js)
+    - Registry: [scripts/lib/cloud-image-migration-config.js](mdc:scripts/lib/cloud-image-migration-config.js)
+
+- **Standard command (any registered collection)**
+  ```bash
+  npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002
+  ```
+  - Replace `catholicate` with: `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `institutions`.
+  - **Stop local Strapi dev server** before running (embedded Strapi reads local DB).
+  - Requires migration code **deployed on Cloud** (`git push` or `npx strapi deploy --force`).
+
+- **Prerequisites**
+  - `.env`: `STRAPI_CLOUD_URL`, `STRAPI_CLOUD_API_TOKEN` (Full Access). Use `dotenv` with `override: true` if shell env sets `STRAPI_CLOUD_URL` to localhost.
+  - Phase A local import complete; content already pushed to Cloud via `push:*-to-cloud`.
+  - `STRAPI_IMPORT_NODE_ENV=staging` or scripts default to `staging` for local DB.
+
+- **Workflow order**
+  1. Push **content + tenant** first: `npm run push:<section>-to-cloud -- --tenant-id=tenant_demo_002`
+  2. Deploy code if migration endpoint not live (probe returns `"articles array is required."` without `uploadMedia` hint).
+  3. Push **images**: `npm run finish:collection-images-on-cloud -- --collection=<key> --tenant-id=tenant_demo_002`
+  4. Verify REST: `populate[image]=*` + `filters[tenant][tenantId][$eq]=tenant_demo_002` — each entry should have a **distinct** `image.url`.
+
+- **Adding a new collection type**
+  1. Add entry to [cloud-image-migration-config.js](mdc:scripts/lib/cloud-image-migration-config.js) (`uid`, `table`, `tenantLinkTable`, `entryIdCol`, `restPlural`).
+  2. Document in `production_cloud_data_push/<section>-production-cloud-push-prd.html` § **Cloud image upload fix**.
+  3. Add AI prompt block: *"Upload the Cloud images for [Section] using the Cloud image migration fix."*
+
+- **AI invocation phrase (user → agent)**
+  - *"Upload the Cloud images for [collection] using the Cloud image migration fix."*
+  - Agent reads: [cloud-image-upload-migration-fix.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html) + per-type PRD § Cloud image upload fix.
+  - Agent runs `finish:collection-images-on-cloud` with the matching `--collection` key; does not ask user to run scripts.
+
+- **Alternative (when S3 is fixed on Cloud)**
+  - Set valid `AWS_*` in Strapi Cloud → Settings → Variables.
+  - Re-run: `npm run push:<section>-to-cloud -- --tenant-id=tenant_demo_002 --images-only`
+
+- **References**
+  - Master doc: [cloud-image-upload-migration-fix.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html)
+  - Catholicate example (complete): [catholicate-production-cloud-push-prd.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/catholicate-production-cloud-push-prd.html)
+  - Production upload config: [config/env/production/plugins.js](mdc:config/env/production/plugins.js) (`UPLOAD_PROVIDER=local` fallback)
