@@ -24,13 +24,14 @@
     .command-content { padding: 12px 15px; font-family: monospace; font-size: 0.9em; color: #0d3b66; word-break: break-all; }
     .copy-button { padding: 6px 12px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; }
     .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    .ok { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; color: #155724; }
   </style>
 </head>
 <body>
   <div class="doc">
     <p><a href="index.html">← Cloud push index</a> · <a href="../saints-import-prd.html">Local import PRD</a></p>
     <h1>Saints – Production / Cloud data push PRD</h1>
-    <p>Push <strong>Directory – Saints</strong> to Strapi Cloud. Status: <strong>Script to create</strong> (clone Catholicate).</p>
+    <p>Push <strong>Directory – Saints</strong> to Strapi Cloud. Status: <strong>Complete</strong> (7 entries + 7 distinct images on Cloud, June 2026).</p>
 
     <div class="section-intro">
       <p><strong>UID:</strong> <code class="code-highlight">api::saint-entry.saint-entry</code></p>
@@ -62,8 +63,24 @@
 
     <h2>3. REST verification</h2>
     <p><code>GET /api/saint-entries?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
+    <p>Expect 7 entries for <code>tenant_demo_002</code>; each with a distinct <code>image.url</code>.</p>
 
-    <h2>4. AI prompt</h2>
+    <div class="ok"><strong>June 2026 — images fixed:</strong> 7 distinct images on Cloud via migration base64 upload + REST PUT fallback.</div>
+
+    <h2>4. Cloud image upload fix</h2>
+    <p>After content push, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a> when Cloud <code>/api/upload</code> fails.</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish Saints images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img">npm run finish:collection-images-on-cloud -- --collection=saints --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>5. AI prompt — Cloud image upload fix (Saints)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p-img')">📋 Copy</button></div>
+      <div class="command-content" id="p-img" style="white-space:pre-wrap;">Upload the Cloud images for Saints using the Cloud image migration fix. Read cloud-image-upload-migration-fix.html and saints-production-cloud-push-prd.html § Cloud image upload fix. Run: npm run finish:collection-images-on-cloud -- --collection=saints --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>6. AI prompt (content push)</h2>
     <div class="command-block">
       <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
       <div class="command-content" id="p" style="white-space:pre-wrap;">Push Saints from local Strapi to Cloud. Clone push-catholicate-to-cloud.js → push-saints-to-cloud.js. UID api::saint-entry.saint-entry, plural saint-entries, tenant tenant_demo_002. Run import:saints first. Add npm push:saints-to-cloud. Follow catholicate-production-cloud-push-prd.html pattern.</div>

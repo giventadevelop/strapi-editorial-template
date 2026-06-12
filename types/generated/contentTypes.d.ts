@@ -1284,6 +1284,89 @@ export interface ApiInstitutionInstitution extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiKalpanaEditionKalpanaEdition
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'kalpana_editions';
+  info: {
+    description: 'Annual Kalpana calendar/directory edition by year';
+    displayName: 'Downloads \u2013 Kalpana Editions';
+    pluralName: 'kalpana-editions';
+    singularName: 'kalpana-edition';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    available: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    cardImage: Schema.Attribute.Media<'images'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    externalLink: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::kalpana-edition.kalpana-edition'
+    > &
+      Schema.Attribute.Private;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'title'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    year: Schema.Attribute.String & Schema.Attribute.Required;
+  };
+}
+
+export interface ApiKalpanaPageKalpanaPage extends Struct.SingleTypeSchema {
+  collectionName: 'kalpana_pages';
+  info: {
+    description: 'Kalpana landing page: hero image, intro text, and about section';
+    displayName: 'Downloads \u2013 Kalpana Page';
+    pluralName: 'kalpana-pages';
+    singularName: 'kalpana-page';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    aboutDescription: Schema.Attribute.Text;
+    aboutFeatures: Schema.Attribute.JSON;
+    aboutTitle: Schema.Attribute.String &
+      Schema.Attribute.DefaultTo<'About Kalpana'>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    heroImage: Schema.Attribute.Media<'images'>;
+    introParagraph1: Schema.Attribute.Text;
+    introParagraph2: Schema.Attribute.Text;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::kalpana-page.kalpana-page'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiLiturgyDayLiturgyDay extends Struct.CollectionTypeSchema {
   collectionName: 'liturgy_days';
   info: {
@@ -2436,6 +2519,8 @@ declare module '@strapi/strapi' {
       'api::holy-synod-member.holy-synod-member': ApiHolySynodMemberHolySynodMember;
       'api::homepage.homepage': ApiHomepageHomepage;
       'api::institution.institution': ApiInstitutionInstitution;
+      'api::kalpana-edition.kalpana-edition': ApiKalpanaEditionKalpanaEdition;
+      'api::kalpana-page.kalpana-page': ApiKalpanaPageKalpanaPage;
       'api::liturgy-day.liturgy-day': ApiLiturgyDayLiturgyDay;
       'api::managing-committee.managing-committee': ApiManagingCommitteeManagingCommittee;
       'api::parish.parish': ApiParishParish;

@@ -78,9 +78,22 @@
     <p><code>GET /api/publication-entries?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
     <p>Expect 1 entry (<code>malankara-sabha-magazine-masika</code>); <code>tenant.tenantId</code> = <code>tenant_demo_002</code>.</p>
 
-    <div class="warn" style="background:#fff3cd;border-left:4px solid #ffc107;padding:0.75rem 1rem;margin:1rem 0;color:#333;"><strong>June 2026:</strong> Local import ready (1 row). Cloud push blocked: <code>/api/publication-entries</code> returns HTTP 404 until schema deploy. After deploy, run push command above.</div>
+    <div class="warn" style="background:#fff3cd;border-left:4px solid #ffc107;padding:0.75rem 1rem;margin:1rem 0;color:#333;"><strong>June 2026:</strong> Local import ready (1 row). Cloud push blocked until <code>/api/publication-entries</code> schema is deployed. After content push, use § Cloud image upload fix for images.</div>
 
-    <h2>5. AI prompt</h2>
+    <h2>5. Cloud image upload fix</h2>
+    <p>After content push, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a> when Cloud <code>/api/upload</code> fails.</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish Publications images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img">npm run finish:collection-images-on-cloud -- --collection=publications --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>6. AI prompt — Cloud image upload fix (Publications)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p-img')">📋 Copy</button></div>
+      <div class="command-content" id="p-img" style="white-space:pre-wrap;">Upload the Cloud images for Publications using the Cloud image migration fix. Read cloud-image-upload-migration-fix.html and publications-production-cloud-push-prd.html § Cloud image upload fix. Run: npm run finish:collection-images-on-cloud -- --collection=publications --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>7. AI prompt (content push)</h2>
     <div class="command-block">
       <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
       <div class="command-content" id="p" style="white-space:pre-wrap;">Push Publications from local Strapi to Cloud. Clone push-catholicate-to-cloud.js → push-publications-to-cloud.js. UID api::publication-entry.publication-entry, plural publication-entries, tenant tenant_demo_002. import:publications first. npm push:publications-to-cloud. Same tenant slug upsert as Catholicate.</div>

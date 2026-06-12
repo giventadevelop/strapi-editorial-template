@@ -43,6 +43,8 @@ const SUBJECTS = [
   'api::spiritual-organisation.spiritual-organisation',
   'api::pilgrim-centre.pilgrim-centre',
   'api::seminary.seminary',
+  'api::kalpana-page.kalpana-page',
+  'api::kalpana-edition.kalpana-edition',
 ];
 
 const ACTIONS = [

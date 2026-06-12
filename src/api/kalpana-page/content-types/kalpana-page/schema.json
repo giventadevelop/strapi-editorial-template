@@ -1,0 +1,54 @@
+{
+  "kind": "singleType",
+  "collectionName": "kalpana_pages",
+  "info": {
+    "singularName": "kalpana-page",
+    "pluralName": "kalpana-pages",
+    "displayName": "Downloads – Kalpana Page",
+    "description": "Kalpana landing page: hero image, intro text, and about section"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "heroImage": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Hero image for the Kalpana downloads page"
+    },
+    "introParagraph1": {
+      "type": "text",
+      "description": "First intro paragraph below the hero image"
+    },
+    "introParagraph2": {
+      "type": "text",
+      "description": "Second intro paragraph below the hero image"
+    },
+    "aboutTitle": {
+      "type": "string",
+      "default": "About Kalpana"
+    },
+    "aboutDescription": {
+      "type": "text",
+      "description": "About section lead paragraph"
+    },
+    "aboutFeatures": {
+      "type": "json",
+      "description": "Bullet list items for the about section (array of strings)"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

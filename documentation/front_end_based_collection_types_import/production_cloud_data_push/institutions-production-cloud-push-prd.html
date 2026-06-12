@@ -113,9 +113,23 @@
 
     <div class="note"><strong>Legacy Cloud data:</strong> If old directory.mosc.in institution rows exist on Cloud for the same tenant, upsert updates matching slugs and creates new ones. Orphans with different slugs remain until cleared via Cloud admin or <code>clear_cloud_data.js</code>.</div>
 
-    <div class="ok"><strong>June 2026 push result:</strong> 219 created, 0 skipped. Cloud tenant total: 222 (includes 3 legacy rows with old slugs from directory.mosc.in — safe to delete in Cloud admin if unwanted). Images: Cloud <code>/api/upload</code> returned errors — re-run <code>--images-only</code> when fixed.</div>
+    <div class="ok"><strong>June 2026 push result:</strong> 219 created, 0 skipped. Images: use § Cloud image upload fix below (Cloud <code>/api/upload</code> returns errors).</div>
 
-    <h2>7. AI prompt (Institutions cloud push)</h2>
+    <h2>6. Cloud image upload fix</h2>
+    <p>After content push, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a>. Category images may repeat across rows (shared files); verify at least one image per entry that should have one.</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish Institutions images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img-fix')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img-fix">npm run finish:collection-images-on-cloud -- --collection=institutions --tenant-id=tenant_demo_002</div>
+    </div>
+    <p>Expect several minutes (219 entries). Local Strapi must be stopped.</p>
+
+    <h2>7. AI prompt — Cloud image upload fix (Institutions)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy prompt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'prompt-img')">📋 Copy</button></div>
+      <div class="command-content" id="prompt-img" style="white-space:pre-wrap;">Upload the Cloud images for Institutions using the Cloud image migration fix. Read cloud-image-upload-migration-fix.html and institutions-production-cloud-push-prd.html § Cloud image upload fix. Run: npm run finish:collection-images-on-cloud -- --collection=institutions --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>8. AI prompt (Institutions content push)</h2>
     <div class="command-block">
       <div class="command-header"><strong>Copy prompt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'prompt')">📋 Copy</button></div>
       <div class="command-content" id="prompt" style="white-space:pre-wrap;">Push Institutions from local Strapi to Strapi Cloud. Clone push-publications-to-cloud.js → push-institutions-to-cloud.js. UID api::institution.institution, plural institutions, tenant tenant_demo_002. Local import first (import:institutions --replace, 219 rows). Payload: name, slug, address, email, phones, website, description, order, tenant + image upload. npm run push:institutions-to-cloud. Verify with scripts/verify-institutions-cloud.js. Document in production_cloud_data_push/institutions-production-cloud-push-prd.html.</div>

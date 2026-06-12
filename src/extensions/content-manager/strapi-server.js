@@ -41,6 +41,8 @@ const TENANT_SCOPED_UIDS = new Set([
   'api::spiritual-organisation.spiritual-organisation',
   'api::pilgrim-centre.pilgrim-centre',
   'api::seminary.seminary',
+  'api::kalpana-page.kalpana-page',
+  'api::kalpana-edition.kalpana-edition',
 ]);
 
 /** Get admin user id for this request (state or Bearer token). */
