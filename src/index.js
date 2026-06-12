@@ -51,6 +51,50 @@ module.exports = {
       const fs = require('fs');
       const path = require('path');
 
+      if (body.linkCatholicateTenants?.tenantId && Array.isArray(body.linkCatholicateTenants.slugs)) {
+        const { tenantId, slugs } = body.linkCatholicateTenants;
+        const tenantRow = await knex('tenants').where({ tenant_id: tenantId }).select('id').first();
+        if (!tenantRow) {
+          ctx.status = 400;
+          ctx.body = { error: { status: 400, message: `Tenant not found: ${tenantId}` } };
+          return;
+        }
+        const results = { linked: 0, skipped: 0, errors: [] };
+        for (const slug of slugs) {
+          if (!slug) {
+            results.skipped++;
+            continue;
+          }
+          try {
+            const entryRow = await knex('catholicate_entries').where({ slug }).select('id').first();
+            if (!entryRow) throw new Error('Entry not found.');
+            const existing = await knex('catholicate_entries_tenant_lnk')
+              .where({ catholicate_entry_id: entryRow.id })
+              .first();
+            if (existing) {
+              if (existing.tenant_id !== tenantRow.id) {
+                await knex('catholicate_entries_tenant_lnk')
+                  .where({ catholicate_entry_id: entryRow.id })
+                  .update({ tenant_id: tenantRow.id });
+                results.linked++;
+              } else {
+                results.skipped++;
+              }
+            } else {
+              await knex('catholicate_entries_tenant_lnk').insert({
+                catholicate_entry_id: entryRow.id,
+                tenant_id: tenantRow.id,
+              });
+              results.linked++;
+            }
+          } catch (err) {
+            results.errors.push({ slug, error: err.message });
+          }
+        }
+        ctx.body = { ok: results.errors.length === 0, results };
+        return;
+      }
+
       // Catholicate image migration (base64 upload + morph link) — works when /api/upload is broken.
       if (Array.isArray(uploadMedia) && uploadMedia.length > 0) {
         const uploadsDir = path.join(strapi.dirs.static.public, 'uploads');
@@ -113,13 +157,23 @@ module.exports = {
               continue;
             }
             try {
-              if (!tenantRow) throw new Error(`Tenant not found: ${catholicateTenantId}`);
-              const entryRow = await knex('catholicate_entries as e')
-                .join('catholicate_entries_tenant_lnk as tl', 'tl.catholicate_entry_id', 'e.id')
-                .where({ 'e.slug': slug, 'tl.tenant_id': tenantRow.id })
-                .select('e.id')
-                .first();
-              if (!entryRow) throw new Error('Entry not found for tenant.');
+              let entryRow = await knex('catholicate_entries').where({ slug }).select('id').first();
+              if (!entryRow) throw new Error('Entry not found.');
+              if (tenantRow) {
+                const existingTenantLink = await knex('catholicate_entries_tenant_lnk')
+                  .where({ catholicate_entry_id: entryRow.id })
+                  .first();
+                if (!existingTenantLink) {
+                  await knex('catholicate_entries_tenant_lnk').insert({
+                    catholicate_entry_id: entryRow.id,
+                    tenant_id: tenantRow.id,
+                  });
+                } else if (existingTenantLink.tenant_id !== tenantRow.id) {
+                  await knex('catholicate_entries_tenant_lnk')
+                    .where({ catholicate_entry_id: entryRow.id })
+                    .update({ tenant_id: tenantRow.id });
+                }
+              }
               await knex(morphTable)
                 .where({ related_id: entryRow.id, related_type: contentUid, field: 'image' })
                 .del();

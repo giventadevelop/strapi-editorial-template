@@ -22,12 +22,15 @@
  *   DRY_RUN=1         Preview counts; no HTTP writes
  */
 
-try {
-  require('dotenv').config();
-} catch (_) {}
-
 const fs = require('fs');
 const path = require('path');
+
+try {
+  require('dotenv').config({
+    path: path.join(__dirname, '..', '.env'),
+    override: true,
+  });
+} catch (_) {}
 const FormData = require('form-data');
 
 const { DRY_RUN, getTenantId } = require('./lib/liturgy-cli');
@@ -88,32 +91,31 @@ async function createTenantOnCloud(localTenant) {
 }
 
 async function getCloudCatholicateKeys(tenantIdFilter) {
-  const map = new Map();
+  const bySlugTenant = new Map();
+  const bySlug = new Map();
   let page = 1;
   const pageSize = 100;
   while (true) {
-    let url = `/api/${PLURAL}?pagination[page]=${page}&pagination[pageSize]=${pageSize}&populate[tenant]=*`;
-    if (tenantIdFilter) {
-      url += `&filters[tenant][tenantId][$eq]=${encodeURIComponent(tenantIdFilter)}`;
-    }
+    const url = `/api/${PLURAL}?pagination[page]=${page}&pagination[pageSize]=${pageSize}&populate[tenant]=*`;
     const data = await cloudFetch(url);
     const list = Array.isArray(data?.data) ? data.data : (data?.results ?? []);
     if (list.length === 0) break;
     for (const row of list) {
       const slug = row.slug ?? row.attributes?.slug;
+      const documentId = row.documentId ?? row.document_id ?? row.id;
+      if (!slug || !documentId) continue;
+      bySlug.set(slug, documentId);
       const tenantId =
         row.tenant?.tenantId ??
         row.tenant?.tenant_id ??
         row.tenant?.attributes?.tenantId ??
         row.tenant?.attributes?.tenant_id;
-      if (slug && tenantId) {
-        map.set(`${slug}_${tenantId}`, row.documentId ?? row.document_id ?? row.id);
-      }
+      if (tenantId) bySlugTenant.set(`${slug}_${tenantId}`, documentId);
     }
     if (list.length < pageSize) break;
     page++;
   }
-  return map;
+  return { bySlugTenant, bySlug };
 }
 
 function resolveLocalUploadPath(image) {
@@ -267,7 +269,7 @@ async function main() {
   }
 
   let cloudTenants = await getCloudTenants();
-  const cloudKeys = await getCloudCatholicateKeys(tenantIdFilter);
+  const { bySlugTenant: cloudKeys, bySlug: cloudBySlug } = await getCloudCatholicateKeys(tenantIdFilter);
 
   let created = 0;
   let updated = 0;
@@ -304,7 +306,7 @@ async function main() {
 
     const cloudTenantDocId = cloudTenant.documentId ?? cloudTenant.id;
     const key = `${doc.slug}_${tenantId}`;
-    const existingCloudDocId = cloudKeys.get(key);
+    const existingCloudDocId = cloudKeys.get(key) ?? cloudBySlug.get(doc.slug);
 
     const payload = {
       name: doc.name,

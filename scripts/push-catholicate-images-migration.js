@@ -2,40 +2,84 @@
 
 /**
  * Push catholicate images via POST /api/migration/fix-published (uploadMedia + linkCatholicateImages).
- * Requires the extended fix-published handler deployed on Strapi Cloud.
+ * Reads local file metadata via DB (files_related_mph) — avoids Documents API quirks in scripts.
  *
  * Usage: node scripts/push-catholicate-images-migration.js --tenant-id=tenant_demo_002
  */
 
-try {
-  require('dotenv').config();
-} catch (_) {}
-
 const fs = require('fs');
 const path = require('path');
+
+try {
+  require('dotenv').config({
+    path: path.join(__dirname, '..', '.env'),
+    override: true,
+  });
+} catch (_) {}
 const { getTenantId } = require('./lib/liturgy-cli');
 
 const CLOUD_URL = (process.env.STRAPI_CLOUD_URL || '').replace(/\/$/, '');
 const API_TOKEN = process.env.STRAPI_CLOUD_API_TOKEN || '';
 const UPLOADS_DIR = path.resolve(__dirname, '..', 'public', 'uploads');
-const UID = 'api::catholicate-entry.catholicate-entry';
+const CONTENT_UID = 'api::catholicate-entry.catholicate-entry';
 
-function resolveLocalUploadPath(image) {
-  if (!image) return null;
-  const url = image.url ?? image.attributes?.url;
-  if (!url || typeof url !== 'string') return null;
-  const relative = url.replace(/^\//, '').replace(/^uploads\//, '');
-  const candidates = [
-    path.join(UPLOADS_DIR, relative),
-    path.join(UPLOADS_DIR, path.basename(url)),
-  ];
-  if (image.hash && image.ext) {
-    candidates.unshift(path.join(UPLOADS_DIR, `${image.hash}${image.ext}`));
+function resolveDiskPath(file) {
+  if (!file) return null;
+  const candidates = [];
+  if (file.hash && file.ext) {
+    candidates.push(path.join(UPLOADS_DIR, `${file.hash}${file.ext}`));
+  }
+  if (file.url) {
+    const relative = String(file.url).replace(/^\//, '').replace(/^uploads\/?/i, '');
+    candidates.push(path.join(UPLOADS_DIR, relative), path.join(UPLOADS_DIR, path.basename(file.url)));
   }
   for (const candidate of candidates) {
     if (candidate && fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
   }
   return null;
+}
+
+async function loadLocalCatholicateImages(app, tenantId) {
+  const knex = app.db.connection;
+  const tenantRow = await knex('tenants').where({ tenant_id: tenantId }).select('id').first();
+  if (!tenantRow) throw new Error(`Local tenant not found: ${tenantId}`);
+
+  const rows = await knex('catholicate_entries as e')
+    .join('catholicate_entries_tenant_lnk as tl', 'tl.catholicate_entry_id', 'e.id')
+    .leftJoin('files_related_mph as m', function joinMorph() {
+      this.on('m.related_id', 'e.id').andOn('m.related_type', knex.raw('?', [CONTENT_UID])).andOn(
+        'm.field',
+        knex.raw('?', ['image'])
+      );
+    })
+    .leftJoin('files as f', 'f.id', 'm.file_id')
+    .where('tl.tenant_id', tenantRow.id)
+    .select(
+      'e.slug',
+      'f.id as file_id',
+      'f.name',
+      'f.hash',
+      'f.ext',
+      'f.mime',
+      'f.size',
+      'f.width',
+      'f.height',
+      'f.url'
+    )
+    .orderBy('e.id', 'asc');
+
+  const filtered = rows.filter((r) => r.hash && r.slug);
+  const bySlug = new Map();
+  const score = (name = '') => {
+    if (/^Catholicos[-_]/i.test(name)) return 100;
+    if (/MOSC_Logo/i.test(name)) return 90;
+    return 0;
+  };
+  for (const row of filtered) {
+    const prev = bySlug.get(row.slug);
+    if (!prev || score(row.name) > score(prev.name)) bySlug.set(row.slug, row);
+  }
+  return [...bySlug.values()];
 }
 
 async function main() {
@@ -45,51 +89,42 @@ async function main() {
   }
 
   const tenantId = getTenantId({ defaultValue: 'tenant_demo_002' });
+  const prevNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = process.env.STRAPI_IMPORT_NODE_ENV || 'staging';
+
   const { createStrapi, compileStrapi } = require('@strapi/strapi');
-  process.env.NODE_ENV = 'development';
   const app = await createStrapi(await compileStrapi()).load();
   app.log.level = 'error';
 
-  const tenant = await app.db.query('api::tenant.tenant').findOne({
-    where: { tenantId },
-    select: ['id', 'documentId'],
-  });
-  const docId = tenant?.documentId ?? tenant?.document_id;
-  const filters =
-    docId != null
-      ? { $or: [{ tenant: tenant.id }, { tenant: { documentId: docId } }] }
-      : { tenant: tenant.id };
-  const result = await app.documents(UID).findMany({
-    filters,
-    limit: 50,
-    populate: { image: true },
-    sort: 'order:asc',
-  });
-  const list = result?.results ?? result?.data ?? [];
-  await app.destroy();
+  let rows = [];
+  try {
+    rows = await loadLocalCatholicateImages(app, tenantId);
+  } finally {
+    await app.destroy();
+    if (prevNodeEnv !== undefined) process.env.NODE_ENV = prevNodeEnv;
+  }
 
   const uploadMedia = [];
   const linkCatholicateImages = [];
 
-  for (const doc of list) {
-    if (!doc.image) continue;
-    const localPath = resolveLocalUploadPath(doc.image);
-    if (!localPath) {
-      console.warn('Missing file for', doc.slug);
+  for (const row of rows) {
+    const diskPath = resolveDiskPath(row);
+    if (!diskPath) {
+      console.warn('Missing disk file for', row.slug, row.hash);
       continue;
     }
-    const buf = fs.readFileSync(localPath);
+    const buf = fs.readFileSync(diskPath);
     uploadMedia.push({
-      name: doc.image.name,
-      hash: doc.image.hash,
-      ext: doc.image.ext,
-      mime: doc.image.mime,
-      size: doc.image.size || buf.length,
-      width: doc.image.width,
-      height: doc.image.height,
+      name: row.name,
+      hash: row.hash,
+      ext: row.ext,
+      mime: row.mime,
+      size: row.size || buf.length,
+      width: row.width,
+      height: row.height,
       base64: buf.toString('base64'),
     });
-    linkCatholicateImages.push({ slug: doc.slug, hash: doc.image.hash });
+    linkCatholicateImages.push({ slug: row.slug, hash: row.hash });
   }
 
   if (uploadMedia.length === 0) {
@@ -109,9 +144,6 @@ async function main() {
   const text = await res.text();
   if (!res.ok) {
     console.error('Migration failed:', res.status, text.slice(0, 500));
-    if (res.status === 400 && text.includes('articles array is required')) {
-      console.error('Deploy the latest src/index.js to Cloud first (git push or npx strapi deploy).');
-    }
     process.exit(1);
   }
 
