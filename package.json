@@ -56,6 +56,8 @@
     "push:theological-seminaries-to-cloud": "node ./scripts/push-theological-seminaries-to-cloud.js",
     "push:holy-synod-to-cloud": "node ./scripts/push-holy-synod-to-cloud.js",
     "push:kalpana-editions-to-cloud": "node ./scripts/push-kalpana-editions-to-cloud.js",
+    "push:kalpana-page-to-cloud": "node ./scripts/push-kalpana-page-to-cloud.js",
+    "complete:kalpana-cloud-import": "node ./scripts/complete-kalpana-cloud-import.js",
     "sync:liturgy-calendar-to-cloud": "node ./scripts/sync-liturgy-calendar-local-to-cloud.js",
     "normalize:category-slugs-cloud": "node ./scripts/normalize-production-category-slugs.mjs",
     "normalize:slugs-cloud": "node ./scripts/normalize-production-slugs.mjs",
