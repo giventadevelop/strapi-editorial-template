@@ -1,0 +1,63 @@
+{
+  "kind": "collectionType",
+  "collectionName": "kalpana_editions",
+  "info": {
+    "singularName": "kalpana-edition",
+    "pluralName": "kalpana-editions",
+    "displayName": "Downloads – Kalpana Editions",
+    "description": "Annual Kalpana calendar/directory edition by year"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "description": "Edition title (e.g. Kalpana 2026)"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title",
+      "required": true
+    },
+    "year": {
+      "type": "string",
+      "required": true,
+      "description": "Edition year (e.g. 2026)"
+    },
+    "externalLink": {
+      "type": "string",
+      "description": "URL to view or download the edition PDF"
+    },
+    "available": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the edition is available for viewing/download"
+    },
+    "cardImage": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Card thumbnail for the edition grid"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order (newest first when sorted descending by year)"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

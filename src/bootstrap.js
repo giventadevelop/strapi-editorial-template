@@ -366,6 +366,8 @@ async function ensureEditorTenantScopedPermissions() {
     'api::spiritual-organisation.spiritual-organisation',
     'api::pilgrim-centre.pilgrim-centre',
     'api::seminary.seminary',
+    'api::kalpana-page.kalpana-page',
+    'api::kalpana-edition.kalpana-edition',
   ];
   const actions = [
     'plugin::content-manager.explorer.create',
@@ -508,6 +510,8 @@ async function hideTenantFieldInContentManagerLayout() {
     'api::spiritual-organisation.spiritual-organisation',
     'api::pilgrim-centre.pilgrim-centre',
     'api::seminary.seminary',
+    'api::kalpana-page.kalpana-page',
+    'api::kalpana-edition.kalpana-edition',
   ];
   try {
     const store = strapi.store({ type: 'plugin', name: 'content-manager' });
@@ -571,6 +575,8 @@ async function registerTenantDocumentMiddleware() {
     'api::spiritual-organisation.spiritual-organisation',
     'api::pilgrim-centre.pilgrim-centre',
     'api::seminary.seminary',
+    'api::kalpana-page.kalpana-page',
+    'api::kalpana-edition.kalpana-edition',
   ];
 
   async function getAdminUserIdFromContext() {
@@ -961,6 +967,8 @@ function registerTenantPublishMiddleware() {
     'api::spiritual-organisation.spiritual-organisation',
     'api::pilgrim-centre.pilgrim-centre',
     'api::seminary.seminary',
+    'api::kalpana-page.kalpana-page',
+    'api::kalpana-edition.kalpana-edition',
   ];
 
   strapi.documents.use(async (context, next) => {

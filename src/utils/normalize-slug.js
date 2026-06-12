@@ -93,6 +93,7 @@ const SLUG_CONTENT_TYPE_UIDS = [
   'api::pilgrim-centre.pilgrim-centre',
   'api::institution.institution',
   'api::seminary.seminary',
+  'api::kalpana-edition.kalpana-edition',
 ];
 
 function registerSlugNormalizeDocumentMiddleware(strapi) {
