@@ -43,6 +43,7 @@ const TENANT_SCOPED_UIDS = new Set([
   'api::seminary.seminary',
   'api::kalpana-page.kalpana-page',
   'api::kalpana-edition.kalpana-edition',
+  'api::kalpana-document.kalpana-document',
 ]);
 
 /** Get admin user id for this request (state or Bearer token). */

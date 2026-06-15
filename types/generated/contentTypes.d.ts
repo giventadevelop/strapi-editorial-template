@@ -1284,6 +1284,51 @@ export interface ApiInstitutionInstitution extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiKalpanaDocumentKalpanaDocument
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'kalpana_documents';
+  info: {
+    description: 'Individual Kalpana circular PDF linked to an annual edition';
+    displayName: 'Downloads \u2013 Kalpana Documents';
+    pluralName: 'kalpana-documents';
+    singularName: 'kalpana-document';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    edition: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::kalpana-edition.kalpana-edition'
+    >;
+    kalpanaNumber: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::kalpana-document.kalpana-document'
+    > &
+      Schema.Attribute.Private;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    pdf: Schema.Attribute.Media<'files'>;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'title'> & Schema.Attribute.Required;
+    sourceUrl: Schema.Attribute.String;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiKalpanaEditionKalpanaEdition
   extends Struct.CollectionTypeSchema {
   collectionName: 'kalpana_editions';
@@ -2519,6 +2564,7 @@ declare module '@strapi/strapi' {
       'api::holy-synod-member.holy-synod-member': ApiHolySynodMemberHolySynodMember;
       'api::homepage.homepage': ApiHomepageHomepage;
       'api::institution.institution': ApiInstitutionInstitution;
+      'api::kalpana-document.kalpana-document': ApiKalpanaDocumentKalpanaDocument;
       'api::kalpana-edition.kalpana-edition': ApiKalpanaEditionKalpanaEdition;
       'api::kalpana-page.kalpana-page': ApiKalpanaPageKalpanaPage;
       'api::liturgy-day.liturgy-day': ApiLiturgyDayLiturgyDay;

@@ -45,6 +45,7 @@ const SUBJECTS = [
   'api::seminary.seminary',
   'api::kalpana-page.kalpana-page',
   'api::kalpana-edition.kalpana-edition',
+  'api::kalpana-document.kalpana-document',
 ];
 
 const ACTIONS = [

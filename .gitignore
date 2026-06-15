@@ -82,6 +82,10 @@ ssl
 nbproject
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Import download caches (PDFs live in Strapi Media Library after import)
+scripts/data/kalpana-pdfs/
+
 .tsbuildinfo
 .eslintcache
 
