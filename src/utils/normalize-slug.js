@@ -94,6 +94,7 @@ const SLUG_CONTENT_TYPE_UIDS = [
   'api::institution.institution',
   'api::seminary.seminary',
   'api::kalpana-edition.kalpana-edition',
+  'api::kalpana-document.kalpana-document',
 ];
 
 function registerSlugNormalizeDocumentMiddleware(strapi) {

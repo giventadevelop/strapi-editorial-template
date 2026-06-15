@@ -368,6 +368,7 @@ async function ensureEditorTenantScopedPermissions() {
     'api::seminary.seminary',
     'api::kalpana-page.kalpana-page',
     'api::kalpana-edition.kalpana-edition',
+    'api::kalpana-document.kalpana-document',
   ];
   const actions = [
     'plugin::content-manager.explorer.create',
@@ -512,6 +513,7 @@ async function hideTenantFieldInContentManagerLayout() {
     'api::seminary.seminary',
     'api::kalpana-page.kalpana-page',
     'api::kalpana-edition.kalpana-edition',
+    'api::kalpana-document.kalpana-document',
   ];
   try {
     const store = strapi.store({ type: 'plugin', name: 'content-manager' });
@@ -577,6 +579,7 @@ async function registerTenantDocumentMiddleware() {
     'api::seminary.seminary',
     'api::kalpana-page.kalpana-page',
     'api::kalpana-edition.kalpana-edition',
+    'api::kalpana-document.kalpana-document',
   ];
 
   async function getAdminUserIdFromContext() {
@@ -697,6 +700,9 @@ async function ensureContentApiPublicPermissions() {
     { controller: 'theological-seminary', actions: ['find', 'findOne'] },
     { controller: 'publication-entry', actions: ['find', 'findOne'] },
     { controller: 'liturgy-day', actions: ['find', 'findOne'] },
+    { controller: 'kalpana-page', actions: ['find'] },
+    { controller: 'kalpana-edition', actions: ['find', 'findOne'] },
+    { controller: 'kalpana-document', actions: ['find', 'findOne'] },
   ];
   for (const { controller, actions } of toEnsure) {
     for (const action of actions) {
@@ -969,6 +975,7 @@ function registerTenantPublishMiddleware() {
     'api::seminary.seminary',
     'api::kalpana-page.kalpana-page',
     'api::kalpana-edition.kalpana-edition',
+    'api::kalpana-document.kalpana-document',
   ];
 
   strapi.documents.use(async (context, next) => {

@@ -157,6 +157,13 @@ async function main() {
   );
   if (!editionsOk) process.exit(1);
 
+  const documentsOk = run(
+    'node',
+    ['./scripts/push-kalpana-documents-to-cloud.js', `--tenant-id=${TENANT_ID}`],
+    'Push Kalpana documents'
+  );
+  if (!documentsOk) process.exit(1);
+
   const pageOk = run(
     'node',
     ['./scripts/push-kalpana-page-to-cloud.js', `--tenant-id=${TENANT_ID}`],

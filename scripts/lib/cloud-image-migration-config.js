@@ -102,6 +102,16 @@ const COLLECTIONS = {
     mediaField: 'cardImage',
     pushContentScript: 'push:kalpana-editions-to-cloud',
   },
+  'kalpana-documents': {
+    label: 'Kalpana Documents',
+    uid: 'api::kalpana-document.kalpana-document',
+    table: 'kalpana_documents',
+    tenantLinkTable: 'kalpana_documents_tenant_lnk',
+    entryIdCol: 'kalpana_document_id',
+    restPlural: 'kalpana-documents',
+    mediaField: 'pdf',
+    pushContentScript: 'push:kalpana-documents-to-cloud',
+  },
 };
 
 function getCollectionKey(argv = process.argv) {

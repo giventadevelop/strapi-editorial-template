@@ -113,7 +113,10 @@ function parseKalpanaEditions(raw) {
       editions.push({
         year,
         title,
-        externalLink: link && link !== '#' ? link : null,
+        externalLink:
+          link && link !== '#'
+            ? link
+            : `/mosc-redesign/kalpana-cms/kalpana-${year}`,
         available: availableMatch ? availableMatch[1] === 'true' : true,
       });
     }
@@ -434,7 +437,7 @@ async function main() {
       title: edition.title,
       slug: edition.slug,
       year: edition.year,
-      externalLink: edition.externalLink,
+      externalLink: `/mosc-redesign/kalpana-cms/${edition.slug}`,
       available: edition.available,
       order: edition.order,
       tenant: tenant.id,

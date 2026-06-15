@@ -1,0 +1,64 @@
+{
+  "kind": "collectionType",
+  "collectionName": "kalpana_documents",
+  "info": {
+    "singularName": "kalpana-document",
+    "pluralName": "kalpana-documents",
+    "displayName": "Downloads – Kalpana Documents",
+    "description": "Individual Kalpana circular PDF linked to an annual edition"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true,
+      "description": "Display title (e.g. Kalpana No. 278 Christmas Kalpana 2025)"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title",
+      "required": true,
+      "description": "Lowercase kebab-case identifier (auto-normalized on save)"
+    },
+    "pdf": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["files"],
+      "description": "Kalpana PDF file"
+    },
+    "sourceUrl": {
+      "type": "string",
+      "description": "Original mosc.in PDF URL (used for import deduplication)"
+    },
+    "kalpanaNumber": {
+      "type": "string",
+      "description": "Parsed Kalpana number when available (e.g. 278, 95A)"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order within the edition year page"
+    },
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::kalpana-edition.kalpana-edition",
+      "description": "Annual Kalpana edition (year)"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}
