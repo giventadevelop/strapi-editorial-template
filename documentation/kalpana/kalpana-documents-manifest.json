@@ -1,0 +1,46 @@
+{
+  "generatedAt": "2026-06-15T04:04:10.452Z",
+  "tenantId": "tenant_demo_002",
+  "years": {
+    "2015": {
+      "source": "clone",
+      "pageUrl": "https://mosc.in/downloads/kalpana/kalpana/",
+      "clonePath": "C:\\project_workspace\\mosc-temp\\code_clone_ref\\mosc_in\\downloads\\kalpana\\kalpana\\index.html",
+      "documentCount": 4,
+      "documents": [
+        {
+          "title": "Kalpana 259/2015",
+          "slug": "kalpana-259-2015-43d5d87d",
+          "pdfUrl": "https://mosc.in/uploads/2015/01/Kalpana-259.pdf",
+          "kalpanaNumber": null,
+          "order": 4
+        },
+        {
+          "title": "Kalpana 251/2015",
+          "slug": "kalpana-251-2015-110ced1d",
+          "pdfUrl": "https://mosc.in/uploads/2015/01/Merit-Award-2015-Kalpana1.pdf",
+          "kalpanaNumber": null,
+          "order": 3
+        },
+        {
+          "title": "Kalpana 246/2015",
+          "slug": "kalpana-246-2015-1e811e9a",
+          "pdfUrl": "http://catholicatenews.in/~mosc/wp-content/uploads/2015/01/Kalpana-2461.pdf",
+          "kalpanaNumber": null,
+          "order": 2
+        },
+        {
+          "title": "St. Marys thiruvithamkodu",
+          "slug": "st-marys-thiruvithamkodu-1b3623c2",
+          "pdfUrl": "http://malankaraorthodoxchurch.in/images/stories/File/St._Marys_thiruvithamkodu.pdf",
+          "kalpanaNumber": null,
+          "order": 1
+        }
+      ]
+    }
+  },
+  "totals": {
+    "years": 1,
+    "documents": 4
+  }
+}
