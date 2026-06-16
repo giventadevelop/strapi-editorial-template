@@ -30,6 +30,7 @@ const SUBJECTS = [
   'api::saint-entry.saint-entry',
   'api::catholicate-entry.catholicate-entry',
   'api::theological-seminary.theological-seminary',
+  'api::training-program.training-program',
   'api::publication-entry.publication-entry',
   'api::retired-bishop.retired-bishop',
   'api::diocese.diocese',

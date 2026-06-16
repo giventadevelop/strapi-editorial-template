@@ -1989,6 +1989,51 @@ export interface ApiTheologicalSeminaryTheologicalSeminary
   };
 }
 
+export interface ApiTrainingProgramTrainingProgram
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'training_programs';
+  info: {
+    description: 'Training program: summary, body, contact, and image';
+    displayName: 'Directory \u2013 Training';
+    pluralName: 'training-programs';
+    singularName: 'training-program';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    address: Schema.Attribute.Text;
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    email: Schema.Attribute.String;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::training-program.training-program'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    phones: Schema.Attribute.Text;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    website: Schema.Attribute.String;
+  };
+}
+
 export interface ApiWorkingCommitteeWorkingCommittee
   extends Struct.CollectionTypeSchema {
   collectionName: 'working_committees';
@@ -2580,6 +2625,7 @@ declare module '@strapi/strapi' {
       'api::spiritual-organisation.spiritual-organisation': ApiSpiritualOrganisationSpiritualOrganisation;
       'api::tenant.tenant': ApiTenantTenant;
       'api::theological-seminary.theological-seminary': ApiTheologicalSeminaryTheologicalSeminary;
+      'api::training-program.training-program': ApiTrainingProgramTrainingProgram;
       'api::working-committee.working-committee': ApiWorkingCommitteeWorkingCommittee;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
