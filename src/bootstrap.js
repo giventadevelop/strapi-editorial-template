@@ -394,7 +394,11 @@ async function ensureEditorTenantScopedPermissions() {
 
     for (const subject of subjects) {
       const ct = strapi.contentTypes[subject];
-      const fieldNames = ct?.attributes ? Object.keys(ct.attributes) : [];
+      if (!ct) {
+        strapi.log.warn(`Editor permission grant skipped (content type not loaded): ${subject}`);
+        continue;
+      }
+      const fieldNames = ct.attributes ? Object.keys(ct.attributes) : [];
       for (const action of actions) {
         const actionProperties =
           action === 'plugin::content-manager.explorer.delete'

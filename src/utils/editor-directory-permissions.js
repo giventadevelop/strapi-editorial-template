@@ -9,6 +9,40 @@ const EDITOR_DIRECTORY_ACTIONS = [
 
 const TRAINING_PROGRAM_SUBJECT = 'api::training-program.training-program';
 
+/** Same list as grant-editor-directory-permissions.js and bootstrap ensureEditorTenantScopedPermissions. */
+const EDITOR_DIRECTORY_SUBJECTS = [
+  'api::article.article',
+  'api::advertisement-slot.advertisement-slot',
+  'api::flash-news-item.flash-news-item',
+  'api::directory-home.directory-home',
+  'api::bishop.bishop',
+  'api::catholicos.catholicos',
+  'api::diocesan-bishop.diocesan-bishop',
+  'api::holy-synod-member.holy-synod-member',
+  'api::ecumenical-article.ecumenical-article',
+  'api::saint-entry.saint-entry',
+  'api::catholicate-entry.catholicate-entry',
+  'api::theological-seminary.theological-seminary',
+  'api::training-program.training-program',
+  'api::publication-entry.publication-entry',
+  'api::retired-bishop.retired-bishop',
+  'api::diocese.diocese',
+  'api::parish.parish',
+  'api::priest.priest',
+  'api::directory-entry.directory-entry',
+  'api::liturgy-day.liturgy-day',
+  'api::institution.institution',
+  'api::church-dignitary.church-dignitary',
+  'api::working-committee.working-committee',
+  'api::managing-committee.managing-committee',
+  'api::spiritual-organisation.spiritual-organisation',
+  'api::pilgrim-centre.pilgrim-centre',
+  'api::seminary.seminary',
+  'api::kalpana-page.kalpana-page',
+  'api::kalpana-edition.kalpana-edition',
+  'api::kalpana-document.kalpana-document',
+];
+
 function propertiesForAction(action, fieldNames) {
   if (action === 'plugin::content-manager.explorer.delete') return {};
   if (
@@ -127,6 +161,7 @@ async function grantEditorContentManagerPermissions(strapi, subjects, options = 
 
 module.exports = {
   EDITOR_DIRECTORY_ACTIONS,
+  EDITOR_DIRECTORY_SUBJECTS,
   TRAINING_PROGRAM_SUBJECT,
   grantEditorContentManagerPermissions,
 };
