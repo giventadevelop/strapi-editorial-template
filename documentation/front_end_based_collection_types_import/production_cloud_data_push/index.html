@@ -112,6 +112,14 @@
           <td><code>--collection=institutions</code></td>
           <td><a href="institutions-production-cloud-push-prd.html">PRD</a></td>
         </tr>
+        <tr>
+          <td>Training</td>
+          <td><code>api::training-program.training-program</code></td>
+          <td><code>push:training-to-cloud</code></td>
+          <td><span class="badge-done">Script ready</span></td>
+          <td><code>--collection=training</code></td>
+          <td><a href="training-production-cloud-push-prd.html">PRD</a></td>
+        </tr>
       </tbody>
     </table>
 
@@ -131,7 +139,7 @@
         <strong>Sequential cloud push – tenant_demo_002 (Strapi stopped locally)</strong>
         <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-all-push')">📋 Copy</button>
       </div>
-      <div class="command-content" id="cmd-all-push">npm run push:catholicate-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:ecumenical-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:publications-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:theological-seminaries-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:holy-synod-to-cloud -- --tenant-id=tenant_demo_002</div>
+      <div class="command-content" id="cmd-all-push">npm run push:catholicate-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:ecumenical-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:publications-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:theological-seminaries-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:holy-synod-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:training-to-cloud -- --tenant-id=tenant_demo_002</div>
     </div>
   </div>
   <script>
