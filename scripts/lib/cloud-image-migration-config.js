@@ -92,6 +92,17 @@ const COLLECTIONS = {
     verifyScript: 'scripts/verify-institutions-cloud.js',
     prd: 'institutions-production-cloud-push-prd.html',
   },
+  training: {
+    label: 'Training',
+    uid: 'api::training-program.training-program',
+    table: 'training_programs',
+    tenantLinkTable: 'training_programs_tenant_lnk',
+    entryIdCol: 'training_program_id',
+    restPlural: 'training-programs',
+    mediaField: 'image',
+    pushContentScript: 'push:training-to-cloud',
+    prd: 'training-production-cloud-push-prd.html',
+  },
   'kalpana-editions': {
     label: 'Kalpana Editions',
     uid: 'api::kalpana-edition.kalpana-edition',

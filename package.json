@@ -20,6 +20,7 @@
     "import:publications": "node ./scripts/import-publications-from-mosc-temp.js",
     "import:institutions": "node ./scripts/import-institutions-from-mosc-temp.js",
     "import:training": "node ./scripts/import-training-programs-from-mosc-temp.js",
+    "push:training-to-cloud": "node ./scripts/push-training-to-cloud.js",
     "import:kalpana": "node ./scripts/import-kalpana-from-mosc-temp.js",
     "import:kalpana-documents": "node ./scripts/import-kalpana-documents-from-mosc-in.js",
     "grant:editor-ads": "node ./scripts/grant-editor-ad-permissions.js",

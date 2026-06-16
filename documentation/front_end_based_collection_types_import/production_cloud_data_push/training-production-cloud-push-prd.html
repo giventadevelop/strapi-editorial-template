@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Training – Production Cloud Push PRD</title>
+  <style>
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; color: #333; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; padding: 10px 15px; }
+    .command-content { padding: 12px 15px; font-family: monospace; font-size: 0.9em; color: #0d3b66; word-break: break-all; }
+    .copy-button { padding: 6px 12px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Cloud push index</a> · <a href="generic-production-cloud-data-push-guide.html">Generic guide</a></p>
+    <h1>Training – Production / Cloud data push PRD</h1>
+    <p>Push <strong>Directory – Training</strong> programs from local Strapi to Strapi Cloud. Status: <strong>Implemented</strong>.</p>
+
+    <div class="section-intro">
+      <p><strong>Frontend route:</strong> <code class="code-highlight">/mosc-redesign/training</code></p>
+      <p><strong>Strapi UID:</strong> <code class="code-highlight">api::training-program.training-program</code></p>
+      <p><strong>REST plural:</strong> <code class="code-highlight">training-programs</code></p>
+      <p><strong>Local CM:</strong> <code>http://localhost:1337/admin/content-manager/collection-types/api::training-program.training-program</code></p>
+      <p><strong>Cloud CM:</strong> <code>{STRAPI_CLOUD_URL}/admin/content-manager/collection-types/api::training-program.training-program</code></p>
+      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code> · <strong>Upsert:</strong> slug + tenantId</p>
+      <p><strong>Expected row count:</strong> 3 programs (Sruti, Divyabodhanam, St. Basil Bible School)</p>
+    </div>
+
+    <h2>1. Script strategy</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Base template</td><td><code class="script-name">push-theological-seminaries-to-cloud.js</code> (contact fields + extended payload)</td></tr>
+        <tr><td>Script path</td><td><code class="script-name">scripts/push-training-to-cloud.js</code></td></tr>
+        <tr><td>npm</td><td><code>push:training-to-cloud</code></td></tr>
+        <tr><td>Local import first</td><td><code>npm run import:training -- --tenant-id=tenant_demo_002 --replace</code></td></tr>
+        <tr><td>Image fix registry</td><td><code>--collection=training</code> in <code class="script-name">cloud-image-migration-config.js</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. Cloud payload fields</h2>
+    <table>
+      <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>name, slug, excerpt, body, order, tenant</td><td>Standard directory fields</td></tr>
+        <tr><td>address, email, phones, website</td><td>Contact block from detail pages</td></tr>
+        <tr><td>image</td><td>Card/featured image; upload + link (or migration fix below)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. Prerequisites</h2>
+    <ol>
+      <li>Phase A complete: <code>npm run import:training -- --tenant-id=tenant_demo_002 --replace</code> (3 rows + images in <code>public/uploads/</code>).</li>
+      <li><code>.env</code>: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code> (Full Access).</li>
+      <li><strong>Deploy schema to Cloud</strong> so <code>training-program</code> exists on production (<code>npx strapi deploy --force</code> or git push).</li>
+      <li>Local Strapi dev server <strong>stopped</strong> before push (embedded Strapi loads local DB).</li>
+      <li>Cloud REST returns HTTP 200 on <code>/api/training-programs</code>.</li>
+    </ol>
+
+    <div class="warn"><strong>Schema first:</strong> Training is a new collection type. Deploy code to Strapi Cloud before running the push script, or creates will fail with HTTP 404.</div>
+
+    <h2>4. Commands (Windows single-line)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Dry run</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-dry')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-dry">set DRY_RUN=1&amp;&amp; npm run push:training-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Push / update content + images</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-push')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-push">npm run push:training-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Images only (retry after Cloud upload fix)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img">npm run push:training-to-cloud -- --tenant-id=tenant_demo_002 --images-only</div>
+    </div>
+
+    <h2>5. REST verification (production)</h2>
+    <p><code>GET {STRAPI_CLOUD_URL}/api/training-programs?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
+    <p>Expect <strong>3</strong> entries with slugs:</p>
+    <ul>
+      <li><code>sruti-school-of-liturgical-music</code></li>
+      <li><code>divyabodhanam</code></li>
+      <li><code>st-basil-bible-school</code></li>
+    </ul>
+
+    <h2>6. Cloud image upload fix</h2>
+    <p>After content push, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a> when Cloud <code>/api/upload</code> fails (HTTP 500 / missing S3).</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish Training images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img-fix')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img-fix">npm run finish:collection-images-on-cloud -- --collection=training --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="note"><strong>Order:</strong> (1) <code>push:training-to-cloud</code> → (2) deploy migration code if needed → (3) <code>finish:collection-images-on-cloud --collection=training</code>.</div>
+
+    <h2>7. AI prompt — Cloud image upload fix (Training)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy prompt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p-img')">📋 Copy</button></div>
+      <div class="command-content" id="p-img" style="white-space:pre-wrap;">Upload the Cloud images for Training using the Cloud image migration fix. Read cloud-image-upload-migration-fix.html and training-production-cloud-push-prd.html § Cloud image upload fix. Run: npm run finish:collection-images-on-cloud -- --collection=training --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>8. AI prompt (Training content push)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy prompt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
+      <div class="command-content" id="p" style="white-space:pre-wrap;">Push Training programs from local Strapi to Strapi Cloud. UID api::training-program.training-program, REST plural training-programs, tenant tenant_demo_002. Local import first: npm run import:training -- --tenant-id=tenant_demo_002 --replace (3 programs from mosc-temp training pages). Deploy training-program schema to Cloud, then npm run push:training-to-cloud -- --tenant-id=tenant_demo_002. Payload: name, slug, excerpt, body, address, email, phones, website, order, tenant + image. Verify GET /api/training-programs?filters[tenant][tenantId][$eq]=tenant_demo_002. See training-production-cloud-push-prd.html.</div>
+    </div>
+  </div>
+  <script>
+    function copyCommand(btn, id) { navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(() => { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = '📋 Copy', 2000); }); }
+  </script>
+</body>
+</html>
