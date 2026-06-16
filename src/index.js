@@ -488,6 +488,27 @@ module.exports = {
 
       ctx.body = { ok: results.errors.length === 0, results };
     });
+
+    // POST /api/migration/grant-editor-permissions
+    // Grant Editor role CM permissions for one or more content types (e.g. training-program on Cloud).
+    strapi.server.router.post('/api/migration/grant-editor-permissions', async (ctx) => {
+      if (!(await ensureMigrationAuthorized(strapi, ctx))) return;
+      const {
+        grantEditorContentManagerPermissions,
+        TRAINING_PROGRAM_SUBJECT,
+      } = require('./utils/editor-directory-permissions');
+      const body = ctx.request.body || {};
+      const subjects = Array.isArray(body.subjects) && body.subjects.length > 0
+        ? body.subjects
+        : [TRAINING_PROGRAM_SUBJECT];
+      try {
+        const result = await grantEditorContentManagerPermissions(strapi, subjects);
+        ctx.body = { ok: true, ...result };
+      } catch (err) {
+        ctx.status = 400;
+        ctx.body = { ok: false, error: { message: err.message } };
+      }
+    });
   },
 
   /**
