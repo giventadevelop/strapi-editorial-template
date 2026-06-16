@@ -26,6 +26,7 @@
     "grant:editor-ads": "node ./scripts/grant-editor-ad-permissions.js",
     "grant:editor-directory": "node ./scripts/grant-editor-directory-permissions.js",
     "grant:editor-training-on-cloud": "node ./scripts/grant-editor-training-on-cloud.js",
+    "grant:editor-directory-on-cloud": "node ./scripts/grant-editor-directory-on-cloud.js",
     "assign:editor-directory-tenant": "node ./scripts/assign-editor-to-directory-tenant.js",
     "delete:directory_entries": "node ./scripts/delete_directory_entries.js",
     "delete:articles": "node ./scripts/delete_articles.js",
@@ -95,7 +96,7 @@
     "xlsx-js-style": "^1.2.0"
   },
   "engines": {
-    "node": ">=20.0.0 <=22.x.x",
+    "node": ">=20.0.0 <=24.x.x",
     "npm": ">=6.0.0"
   },
   "optionalDependencies": {

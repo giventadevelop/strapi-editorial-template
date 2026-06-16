@@ -45,7 +45,31 @@ module.exports = {
         uploadMedia,
         linkCatholicateImages,
         tenantId: catholicateTenantId,
+        grantEditorPermissions,
       } = body;
+
+      if (grantEditorPermissions) {
+        const {
+          grantEditorContentManagerPermissions,
+          TRAINING_PROGRAM_SUBJECT,
+          EDITOR_DIRECTORY_SUBJECTS,
+        } = require('./utils/editor-directory-permissions');
+        const req = grantEditorPermissions;
+        const subjects =
+          Array.isArray(req?.subjects) && req.subjects.length > 0
+            ? req.subjects
+            : req?.allDirectory
+              ? EDITOR_DIRECTORY_SUBJECTS
+              : [TRAINING_PROGRAM_SUBJECT];
+        try {
+          const result = await grantEditorContentManagerPermissions(strapi, subjects);
+          ctx.body = { ok: true, ...result };
+        } catch (err) {
+          ctx.status = 400;
+          ctx.body = { ok: false, error: { message: err.message } };
+        }
+        return;
+      }
 
       const knex = strapi.db.connection;
       const fs = require('fs');
