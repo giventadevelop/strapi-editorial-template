@@ -25,6 +25,7 @@
     "import:kalpana-documents": "node ./scripts/import-kalpana-documents-from-mosc-in.js",
     "grant:editor-ads": "node ./scripts/grant-editor-ad-permissions.js",
     "grant:editor-directory": "node ./scripts/grant-editor-directory-permissions.js",
+    "grant:editor-training-on-cloud": "node ./scripts/grant-editor-training-on-cloud.js",
     "assign:editor-directory-tenant": "node ./scripts/assign-editor-to-directory-tenant.js",
     "delete:directory_entries": "node ./scripts/delete_directory_entries.js",
     "delete:articles": "node ./scripts/delete_articles.js",
