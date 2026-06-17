@@ -708,6 +708,8 @@ async function ensureContentApiPublicPermissions() {
     { controller: 'training-program', actions: ['find', 'findOne'] },
     { controller: 'publication-entry', actions: ['find', 'findOne'] },
     { controller: 'liturgy-day', actions: ['find', 'findOne'] },
+    { controller: 'institution', actions: ['find', 'findOne'] },
+    { controller: 'spiritual-organisation', actions: ['find', 'findOne'] },
     { controller: 'kalpana-page', actions: ['find'] },
     { controller: 'kalpana-edition', actions: ['find', 'findOne'] },
     { controller: 'kalpana-document', actions: ['find', 'findOne'] },
