@@ -103,6 +103,17 @@ const COLLECTIONS = {
     pushContentScript: 'push:training-to-cloud',
     prd: 'training-production-cloud-push-prd.html',
   },
+  'spiritual-organisations': {
+    label: 'Spiritual Organisations',
+    uid: 'api::spiritual-organisation.spiritual-organisation',
+    table: 'spiritual_organisations',
+    tenantLinkTable: 'spiritual_organisations_tenant_lnk',
+    entryIdCol: 'spiritual_organisation_id',
+    restPlural: 'spiritual-organisations',
+    mediaField: 'image',
+    pushContentScript: 'push:spiritual-organisations-to-cloud',
+    prd: 'spiritual-organisations-production-cloud-push-prd.html',
+  },
   'kalpana-editions': {
     label: 'Kalpana Editions',
     uid: 'api::kalpana-edition.kalpana-edition',
