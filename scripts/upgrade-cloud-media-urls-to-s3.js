@@ -2,9 +2,7 @@
 
 /**
  * Upgrade Cloud plugin::upload.file rows from /uploads/ (local) to S3 URLs.
- * Files must already exist in S3 (run push:all-collection-images-s3-to-cloud first).
- *
- * Requires deployed register-s3-media with local→S3 upgrade (src/index.js).
+ * Reads media metadata from Strapi Cloud (not local DB). Files must exist in S3.
  *
  * Usage:
  *   npm run upgrade:cloud-media-urls-to-s3 -- --tenant-id=tenant_demo_002
@@ -22,75 +20,99 @@ const {
 } = require('./lib/cloud-image-migration-config');
 const { getTenantId } = require('./lib/liturgy-cli');
 const {
-  pushCollectionImagesS3,
   registerS3OnCloud,
   resolveLocalUploadPath,
   CLOUD_URL,
   API_TOKEN,
 } = require('./lib/push-collection-images-s3');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 
 const S3_PREFIX = (process.env.S3_UPLOAD_PREFIX || 'strapi-editorial-media/prod').replace(/\/+$/, '');
 
 function parseOnly(argv) {
   const arg = argv.find((a) => a.startsWith('--only='));
   if (arg) return arg.split('=')[1].split(',').map((s) => s.trim()).filter(Boolean);
+  const idx = argv.indexOf('--only');
+  if (idx >= 0 && argv[idx + 1]) {
+    return argv[idx + 1].split(',').map((s) => s.trim()).filter(Boolean);
+  }
   return null;
 }
 
-async function collectMediaFromCollection(config, tenantIdFilter) {
-  const mediaField = config.mediaField || 'image';
-  const { createStrapi, compileStrapi } = require('@strapi/strapi');
-  const app = await createStrapi(await compileStrapi()).load();
-  app.log.level = 'error';
-  const tenant = await app.db.query('api::tenant.tenant').findOne({
-    where: { tenantId: tenantIdFilter },
-    select: ['id', 'documentId'],
-  });
-  if (!tenant) {
-    await app.destroy();
-    return [];
-  }
-  const docId = tenant.documentId ?? tenant.document_id;
-  const filters =
-    docId != null
-      ? { $or: [{ tenant: tenant.id }, { tenant: { documentId: docId } }] }
-      : { tenant: tenant.id };
-  const result = await app.documents(config.uid).findMany({
-    filters,
-    limit: 500,
-    populate: { [mediaField]: true },
-  });
-  const list = result?.results ?? result?.data ?? [];
-  await app.destroy();
+function needsS3Upgrade(media) {
+  if (!media?.hash || !media?.ext) return false;
+  const url = media.url || '';
+  return (
+    url.startsWith('/uploads/') ||
+    media.provider === 'local' ||
+    !url.includes('amazonaws.com')
+  );
+}
 
+async function cloudFetch(pathname) {
+  const res = await fetch(`${CLOUD_URL}${pathname}`, {
+    headers: { Authorization: `Bearer ${API_TOKEN}` },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${pathname}`);
+  return res.json();
+}
+
+async function collectMediaFromCloud(config, tenantIdFilter) {
+  const mediaField = config.mediaField || 'image';
   const payloads = [];
   const seen = new Set();
-  for (const doc of list) {
-    const media = doc[mediaField];
-    if (!media?.hash || !media?.ext) continue;
-    if (seen.has(media.hash)) continue;
-    const mediaPath = resolveLocalUploadPath(media);
-    if (!mediaPath) continue;
-    seen.add(media.hash);
-    payloads.push({ media, mediaPath, slug: doc.slug });
+  let page = 1;
+
+  while (true) {
+    const url =
+      `/api/${config.restPlural}?pagination[page]=${page}&pagination[pageSize]=100` +
+      `&populate[0]=${mediaField}&populate[1]=tenant` +
+      `&filters[tenant][tenantId][$eq]=${encodeURIComponent(tenantIdFilter)}`;
+    const data = await cloudFetch(url);
+    const list = Array.isArray(data?.data) ? data.data : [];
+    if (list.length === 0) break;
+
+    for (const row of list) {
+      const media = row[mediaField];
+      if (!needsS3Upgrade(media)) continue;
+      if (seen.has(media.hash)) continue;
+      seen.add(media.hash);
+      payloads.push({ media, slug: row.slug });
+    }
+
+    if (list.length < 100) break;
+    page++;
   }
+
   return payloads;
 }
 
-async function ensureS3(media, mediaPath) {
-  const region = process.env.AWS_REGION || 'us-east-2';
-  const client = new S3Client({
-    region,
+function getS3Client() {
+  return new S3Client({
+    region: process.env.AWS_REGION || 'us-east-2',
     credentials: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     },
   });
-  const bucket = process.env.AWS_S3_BUCKET_NAME || 'eventapp-media-bucket';
+}
+
+async function ensureS3(media) {
   const ext = media.ext?.startsWith('.') ? media.ext : `.${media.ext}`;
   const relativePath = `${media.hash}${ext}`;
   const key = `${S3_PREFIX}/${relativePath}`;
+  const bucket = process.env.AWS_S3_BUCKET_NAME || 'eventapp-media-bucket';
+  const client = getS3Client();
+
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return relativePath;
+  } catch (_) {}
+
+  const mediaPath = resolveLocalUploadPath(media);
+  if (!mediaPath) {
+    throw new Error(`Not in S3 and no local file for ${media.hash}`);
+  }
   const body = require('fs').readFileSync(mediaPath);
   await client.send(
     new PutObjectCommand({
@@ -115,14 +137,13 @@ async function registerBatch(items) {
     relativePath,
   }));
 
-  const body = JSON.stringify({ upgradeS3Media: files, prefix: S3_PREFIX });
   const fixRes = await fetch(`${CLOUD_URL}/api/migration/fix-published`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${API_TOKEN}`,
       'Content-Type': 'application/json',
     },
-    body,
+    body: JSON.stringify({ upgradeS3Media: files, prefix: S3_PREFIX }),
   });
   const fixText = await fixRes.text();
   if (fixRes.ok) {
@@ -152,25 +173,27 @@ async function main() {
 
   let totalUpgraded = 0;
   let totalErrors = 0;
+  let totalSkipped = 0;
 
   for (const key of keys) {
     const config = getCollectionConfig(key);
     if (!config) continue;
     console.log('\n---', config.label, '---');
-    const items = await collectMediaFromCollection(config, tenantId);
+    const items = await collectMediaFromCloud(config, tenantId);
     if (items.length === 0) {
-      console.log('No local media to upgrade.');
+      console.log('No Cloud media needing S3 upgrade.');
       continue;
     }
+    console.log('Local-path media to upgrade:', items.length);
 
     const staged = [];
     for (const item of items) {
       try {
-        const relativePath = await ensureS3(item.media, item.mediaPath);
+        const relativePath = await ensureS3(item.media);
         staged.push({ ...item, relativePath });
       } catch (e) {
-        console.warn('S3 put failed:', item.slug, e.message);
-        totalErrors++;
+        console.warn('Skip:', item.slug, e.message);
+        totalSkipped++;
       }
     }
 
@@ -183,7 +206,7 @@ async function main() {
         const reused = created.filter((c) => c.reused && !c.upgraded).length;
         totalUpgraded += upgraded;
         console.log(
-          `Batch ${Math.floor(i / 25) + 1}: registered ${created.length} | upgraded ${upgraded} | already S3 ${reused}`
+          `Batch ${Math.floor(i / 25) + 1}: ${created.length} files | upgraded ${upgraded} | already S3 ${reused}`
         );
         if (reg?.errors?.length) {
           for (const err of reg.errors) console.warn(' ', err.name, err.error);
@@ -201,6 +224,7 @@ async function main() {
   }
 
   console.log('\nTotal upgraded to S3 URLs:', totalUpgraded);
+  console.log('Skipped (missing S3/local file):', totalSkipped);
   console.log('Errors:', totalErrors);
   console.log('Verify: node scripts/verify-cloud-image-urls.js');
   process.exit(totalErrors > 0 && totalUpgraded === 0 ? 1 : 0);
