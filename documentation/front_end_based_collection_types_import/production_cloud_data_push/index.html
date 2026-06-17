@@ -126,10 +126,17 @@
     <h2>Finish Cloud images (one command)</h2>
     <div class="command-block">
       <div class="command-header">
-        <strong>Template — replace --collection=</strong>
+        <strong>After deploy — fix all frontend-imported directory images</strong>
+        <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img-all')">📋 Copy</button>
+      </div>
+      <div class="command-content" id="cmd-img-all">npm run finish:all-collection-images-on-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header">
+        <strong>Single collection — replace --collection=</strong>
         <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button>
       </div>
-      <div class="command-content" id="cmd-img">npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002</div>
+      <div class="command-content" id="cmd-img">npm run finish:collection-images-on-cloud -- --collection=training --tenant-id=tenant_demo_002</div>
     </div>
     <p>See <a href="cloud-image-upload-migration-fix.html">cloud-image-upload-migration-fix.html</a> for troubleshooting and AI prompts.</p>
 

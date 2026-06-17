@@ -21,7 +21,8 @@ alwaysApply: false
   ```bash
   npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002
   ```
-  - Replace `catholicate` with: `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `institutions`.
+  - Replace `catholicate` with: `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `institutions`, `training`, `kalpana-editions`, `kalpana-documents`.
+  - **After every Strapi Cloud deploy**, re-run images for affected types (batch): `npm run finish:all-collection-images-on-cloud -- --tenant-id=tenant_demo_002`
   - **Stop local Strapi dev server** before running (embedded Strapi reads local DB).
   - Requires migration code **deployed on Cloud** (`git push` or `npx strapi deploy --force`).
 
