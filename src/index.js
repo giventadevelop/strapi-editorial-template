@@ -71,6 +71,20 @@ module.exports = {
         return;
       }
 
+      if (Array.isArray(body.upgradeS3Media) && body.upgradeS3Media.length > 0) {
+        const { registerOrUpgradeS3Files } = require('./utils/s3-media-register');
+        try {
+          const result = await registerOrUpgradeS3Files(strapi, body.upgradeS3Media, {
+            prefix: body.prefix,
+          });
+          ctx.body = result;
+        } catch (err) {
+          ctx.status = 400;
+          ctx.body = { ok: false, error: { message: err.message } };
+        }
+        return;
+      }
+
       const knex = strapi.db.connection;
       const fs = require('fs');
       const path = require('path');
@@ -384,70 +398,8 @@ module.exports = {
         return;
       }
 
-      const bucket = process.env.AWS_S3_BUCKET_NAME || 'eventapp-media-bucket';
-      const region = process.env.AWS_REGION || 'us-east-2';
-      const rootPath = (prefix || process.env.S3_UPLOAD_PREFIX || 'strapi-editorial-media/prod').replace(/\/+$/, '');
-      const baseUrl = `https://${bucket}.s3.${region}.amazonaws.com`;
-
-      const created = [];
-      const errors = [];
-
-      for (const item of files) {
-        const { name, hash, ext, mime, size, width, height, relativePath } = item || {};
-        if (!name || !hash || !ext) {
-          errors.push({ name: name || '?', error: 'name, hash, and ext are required.' });
-          continue;
-        }
-        const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
-        const rel = relativePath || `${hash}${normalizedExt}`;
-        const s3Key = rootPath ? `${rootPath}/${rel}` : rel;
-        const s3Url = `${baseUrl}/${s3Key}`;
-
-        try {
-          const existing = await strapi.db.query('plugin::upload.file').findOne({
-            where: { hash },
-            select: ['id', 'documentId', 'document_id', 'url'],
-          });
-          if (existing) {
-            created.push({
-              id: existing.id,
-              documentId: existing.documentId ?? existing.document_id,
-              url: existing.url,
-              name,
-              reused: true,
-            });
-            continue;
-          }
-
-          const row = await strapi.db.query('plugin::upload.file').create({
-            data: {
-              name,
-              alternativeText: name,
-              caption: name,
-              hash,
-              ext: normalizedExt,
-              mime: mime || 'application/octet-stream',
-              size: size || 0,
-              width: width ?? null,
-              height: height ?? null,
-              url: s3Url,
-              provider: 'aws-s3',
-              provider_metadata: { bucket, region, key: s3Key },
-            },
-          });
-          created.push({
-            id: row.id,
-            documentId: row.documentId ?? row.document_id,
-            url: row.url,
-            name,
-            reused: false,
-          });
-        } catch (err) {
-          errors.push({ name, error: err.message });
-        }
-      }
-
-      ctx.body = { ok: errors.length === 0, created, errors };
+      const { registerOrUpgradeS3Files } = require('./utils/s3-media-register');
+      ctx.body = await registerOrUpgradeS3Files(strapi, files, { prefix });
     });
 
     // POST /api/migration/link-catholicate-images

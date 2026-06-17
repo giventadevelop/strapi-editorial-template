@@ -54,6 +54,27 @@
       <p><strong>Implementation:</strong> <code class="script-name">src/index.js</code> · <code class="script-name">scripts/push-collection-images-migration.js</code> · <code class="script-name">scripts/lib/cloud-image-migration-config.js</code></p>
     </div>
 
+    <div class="warn">
+      <strong>After every Strapi Cloud deploy:</strong> Images for collections fixed via the migration workaround may show broken in admin and API until you re-run <code>finish:collection-images-on-cloud</code> (or the batch command below). Deploy replaces the Cloud app container; <code>public/uploads/</code> on disk is ephemeral. Database rows and <code>image.url</code> paths remain, but the binary files are gone.
+    </div>
+
+    <h2>Why Bishops / Dioceses / Parishes stay OK</h2>
+    <div class="section-intro">
+      <p>Those directory types were seeded earlier (often with working upload or S3-backed URLs). Front-end-imported types (Catholicate, Holy Synod, Training, Institutions, etc.) use the <strong>migration base64 fix</strong> because Cloud <code>POST /api/upload</code> fails when S3 is misconfigured. That fix stores files as <code>provider: local</code> on the Cloud server filesystem — which is <strong>wiped on redeploy</strong>.</p>
+      <p><strong>Permanent prevention:</strong> Configure valid <code>AWS_*</code> on Strapi Cloud and set <code>UPLOAD_PROVIDER=aws-s3</code> so new uploads land in S3 (<code>strapi-editorial-media/prod/</code>). Until then, treat <code>finish:*-on-cloud</code> as part of every production deploy checklist.</p>
+    </div>
+
+    <h2>Post-deploy checklist (all frontend-imported directory images)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Fix all registered collections (recommended after deploy)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-finish-all')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-finish-all">npm run finish:all-collection-images-on-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <p>Or run per collection (Training only):</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Training only</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-finish-training')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-finish-training">npm run finish:collection-images-on-cloud -- --collection=training --tenant-id=tenant_demo_002</div>
+    </div>
+
     <h2>1. Prerequisites</h2>
     <ol>
       <li>Phase A local import done (images in <code>public/uploads/</code>).</li>
@@ -140,6 +161,20 @@
           <td><a href="training-production-cloud-push-prd.html">PRD</a></td>
           <td>Run after content push</td>
         </tr>
+        <tr>
+          <td>Kalpana editions</td>
+          <td><code>kalpana-editions</code></td>
+          <td><code>push:kalpana-editions-to-cloud</code></td>
+          <td>—</td>
+          <td>Run after content push (<code>cardImage</code> field)</td>
+        </tr>
+        <tr>
+          <td>Kalpana documents</td>
+          <td><code>kalpana-documents</code></td>
+          <td><code>push:kalpana-documents-to-cloud</code></td>
+          <td>—</td>
+          <td>PDF field; run if documents missing after deploy</td>
+        </tr>
       </tbody>
     </table>
 
@@ -181,6 +216,11 @@
           <td><code>Link errors: Entry not found</code></td>
           <td>Content not on Cloud yet</td>
           <td>Run <code>push:&lt;section&gt;-to-cloud</code> first</td>
+        </tr>
+        <tr>
+          <td>Broken images after Cloud deploy</td>
+          <td>Ephemeral <code>public/uploads/</code> wiped; DB links remain</td>
+          <td><code>npm run finish:all-collection-images-on-cloud -- --tenant-id=tenant_demo_002</code></td>
         </tr>
         <tr>
           <td>Same placeholder on frontend</td>
