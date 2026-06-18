@@ -114,6 +114,21 @@ function readContactBlock(objStr) {
   };
 }
 
+function buildRichDescription(objStr) {
+  const parts = [];
+  const description = readQuotedField(objStr, 'description');
+  const mission = readQuotedField(objStr, 'mission');
+  const facilities = readQuotedField(objStr, 'facilities');
+  const spiritualNote = readQuotedField(objStr, 'spiritualNote');
+  const programs = readStringArray(objStr, 'programs');
+  if (description) parts.push(description);
+  if (mission) parts.push(`Mission: ${mission}`);
+  if (programs.length) parts.push(`Programs: ${programs.join(', ')}`);
+  if (facilities) parts.push(facilities);
+  if (spiritualNote) parts.push(spiritualNote);
+  return parts.length ? parts.join('\n\n') : null;
+}
+
 function parseInstitutionObject(objStr) {
   const name = readQuotedField(objStr, 'name');
   if (!name) return null;
@@ -121,7 +136,6 @@ function parseInstitutionObject(objStr) {
   const location = readQuotedField(objStr, 'location');
   const phone = readQuotedField(objStr, 'phone');
   const email = readQuotedField(objStr, 'email');
-  const description = readQuotedField(objStr, 'description');
   const contact = readContactBlock(objStr);
 
   return {
@@ -130,7 +144,7 @@ function parseInstitutionObject(objStr) {
     phones: contact?.phones || phone || null,
     email: contact?.email || email || null,
     website: contact?.website || null,
-    description: description || null,
+    description: buildRichDescription(objStr),
   };
 }
 
@@ -209,21 +223,34 @@ function parseFeaturedImage(raw) {
 function parseMedicalCollegePage(raw, hub) {
   const h2M = raw.match(/font-semibold text-3xl text-syro-blue mb-6">\s*([\s\S]*?)<\/h2>/);
   const locM = raw.match(/text-lg text-syro-blue mb-6">\s*([\s\S]*?)<\/p>/);
-  const phoneSpans = [];
-  const spanRe = /<span>([\d\s]+)<\/span>/g;
-  let sm;
-  while ((sm = spanRe.exec(raw)) !== null) {
-    const digits = sm[1].trim();
-    if (digits.length >= 8) phoneSpans.push(digits);
+  const phoneLines = [];
+  const deptRe = /<span className="font-medium">([^<]+)<\/span>\s*<span>([^<]+)<\/span>/g;
+  let dm;
+  while ((dm = deptRe.exec(raw)) !== null) {
+    const label = dm[1].replace(/:$/, '').trim();
+    const number = dm[2].trim();
+    if (number) phoneLines.push(`${label}: ${number}`);
+  }
+  if (phoneLines.length === 0) {
+    const spanRe = /<span>([\d\s]+)<\/span>/g;
+    let sm;
+    while ((sm = spanRe.exec(raw)) !== null) {
+      const digits = sm[1].trim();
+      if (digits.length >= 8) phoneLines.push(digits);
+    }
   }
   const websiteM = raw.match(/href="(https?:\/\/[^"]+)"/);
+  const intro = parsePageIntro(raw) || hub?.description || null;
+  const description = [intro, phoneLines.length ? `Contact numbers:\n${phoneLines.join('\n')}` : null]
+    .filter(Boolean)
+    .join('\n\n');
   return [
     {
       name: h2M?.[1]?.trim() || hub?.title || 'Malankara Medical Mission Hospital',
       address: locM?.[1]?.trim() || 'Kolencherry – 682 311',
-      phones: phoneSpans.length ? phoneSpans.join(', ') : null,
+      phones: phoneLines.length ? phoneLines.join(', ') : null,
       website: websiteM?.[1] || 'http://moscmm.org/',
-      description: parsePageIntro(raw) || hub?.description || null,
+      description: description || null,
     },
   ];
 }
