@@ -35,6 +35,7 @@ module.exports = [
       },
     },
   },
+  'global::active-tenant-header', // Editor: active tenant from X-Active-Tenant-Id header
   'global::request-context', // store request ctx for tenant injection in lifecycles
   'global::content-manager-article-relation', // Editor: request more articles in list/relation picker
   'global::content-manager-hide-tenant', // hide tenant/views/isFeatured for Editor UI

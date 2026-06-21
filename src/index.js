@@ -485,6 +485,35 @@ module.exports = {
         ctx.body = { ok: false, error: { message: err.message } };
       }
     });
+
+    /** Editor multi-tenant: list tenants assigned to logged-in admin user. */
+    strapi.server.router.get('/api/editor-tenant-context/assigned', async (ctx) => {
+      const { getAdminUserFromRequest, isEditorRole } = require('./utils/admin-request-auth');
+      const { getTenantsForEmail } = require('./utils/tenant-assignment');
+      const adminUser = await getAdminUserFromRequest(strapi, ctx);
+      if (!adminUser) {
+        ctx.status = 401;
+        ctx.body = { error: { status: 401, message: 'Admin authentication required.' } };
+        return;
+      }
+      if (!isEditorRole(adminUser)) {
+        ctx.body = { data: { isEditor: false, tenants: [], email: adminUser.email } };
+        return;
+      }
+      const tenants = await getTenantsForEmail(strapi, adminUser.email);
+      ctx.body = {
+        data: {
+          isEditor: true,
+          email: adminUser.email,
+          tenants: tenants.map((t) => ({
+            tenantId: t.tenantId,
+            name: t.name,
+            documentId: t.documentId,
+            id: t.id,
+          })),
+        },
+      };
+    });
   },
 
   /**

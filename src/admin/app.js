@@ -1,10 +1,8 @@
 import React from 'react';
+import TenantSwitcher from './components/TenantSwitcher';
 
 const ARTICLE_UID = 'api::article.article';
 
-/**
- * Format datetime for display (locale-friendly).
- */
 function formatPublishedAt(value) {
   if (value == null || value === '') return '—';
   try {
@@ -18,10 +16,6 @@ function formatPublishedAt(value) {
   }
 }
 
-/**
- * Side panel component: show "Published at" for Article edit view only.
- * Used by addEditViewSidePanel so the date is visible next to draft/published.
- */
 function PublishedAtPanel(props) {
   const { model, document, activeTab } = props || {};
   if (model !== ARTICLE_UID) {
@@ -46,8 +40,14 @@ export default {
   },
 
   bootstrap(app) {
-    // ----- List view: add "Published at" column for Article -----
-    // Note: payload does not include "model"; derive from URL (e.g. .../collection-types/api::article.article)
+    const contentManager = app.getPlugin('content-manager');
+    if (contentManager?.injectComponent) {
+      contentManager.injectComponent('listView', 'actions', {
+        name: 'TenantSwitcher',
+        Component: TenantSwitcher,
+      });
+    }
+
     const listViewHook = 'Admin/CM/pages/ListView/inject-column-in-table';
     app.registerHook(listViewHook, (payload) => {
       if (!payload) return payload;
@@ -84,7 +84,6 @@ export default {
       };
     });
 
-    // ----- Edit view: add "Published at" panel in sidebar (draft/published area) -----
     const plugin = app.getPlugin('content-manager');
     if (plugin?.apis?.addEditViewSidePanel) {
       plugin.apis.addEditViewSidePanel((panels) => [PublishedAtPanel, ...(panels || [])]);

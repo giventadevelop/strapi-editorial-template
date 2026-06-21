@@ -81,16 +81,16 @@ async function resolveEditorTenantFromUser(userId) {
   if (!adminUser?.email) return null;
   const isEditor = (adminUser.roles || []).some((r) => r.code === 'strapi-editor');
   if (!isEditor) return null;
-  const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
-    where: {},
-    populate: { tenant: true },
-  });
-  const mapping = mappings.find(
-    (m) => (m.adminUserEmail || '').toLowerCase() === String(adminUser.email).toLowerCase()
-  );
-  const tenant = mapping?.tenant;
-  if (!tenant) return null;
-  return { id: tenant.id, documentId: tenant.documentId ?? tenant.document_id };
+
+  const requestContext = require('../../utils/request-context');
+  const ctx = requestContext.get();
+  if (ctx) {
+    ctx.state = ctx.state || {};
+    ctx.state.user = ctx.state.user || { id: userId, email: adminUser.email };
+  }
+
+  const { resolveTenantFromRequestContext } = require('../../utils/tenant-assignment');
+  return resolveTenantFromRequestContext(strapi);
 }
 
 function addFiltersClause(params, filtersClause) {
