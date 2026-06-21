@@ -77,6 +77,7 @@
     "normalize:slugs-cloud": "node ./scripts/normalize-production-slugs.mjs",
     "inventory:tenant": "node scripts/inventory-tenant-records.js",
     "clone:tenant": "node scripts/clone-tenant-records.js",
+    "push:tenant-to-cloud": "node scripts/push-tenant-to-cloud.js",
     "list:editor-tenants": "node scripts/list-editor-tenant-assignments.js",
     "remove:editor-tenant": "node scripts/remove-editor-tenant-assignment.js",
     "test:bishop_upload": "node ./scripts/test_bishop_upload.js",

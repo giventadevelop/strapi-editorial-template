@@ -38,9 +38,11 @@
 
     <div class="section-intro">
       <p><strong>Generic guide:</strong> <a href="generic-production-cloud-data-push-guide.html">How cloud push works, script types, reuse vs clone</a></p>
+      <p><strong>Tenant clone + bulk Cloud port:</strong> <a href="../../multi_tenant/tenant-clone-and-cloud-port-runbook.html">Tenant Clone &amp; Cloud Port Runbook</a> (new tenant ID, issues, Kalpana)</p>
       <p><strong>Image upload fix:</strong> <a href="cloud-image-upload-migration-fix.html">Cloud image upload migration fix</a> (when <code>/api/upload</code> fails)</p>
       <p><strong>Template script:</strong> <code class="script-name">scripts/push-catholicate-to-cloud.js</code></p>
       <p><strong>Phase A (local import):</strong> <a href="../index.html">front_end_based_collection_types_import/index.html</a></p>
+      <p><strong>Kalpana (editions + PDFs):</strong> <a href="../../kalpana/kalpana-import-and-cloud-push.html">Kalpana import &amp; Cloud push PRD</a></p>
     </div>
 
     <h2>Collection type cloud push PRDs</h2>
@@ -128,6 +130,22 @@
           <td><code>--collection=spiritual-organisations</code></td>
           <td><a href="spiritual-organisations-production-cloud-push-prd.html">PRD</a></td>
         </tr>
+        <tr>
+          <td>Kalpana editions</td>
+          <td><code>api::kalpana-edition.kalpana-edition</code></td>
+          <td><code>push:kalpana-editions-to-cloud</code></td>
+          <td><span class="badge-done">Content + cardImage</span></td>
+          <td><code>--collection=kalpana-editions</code></td>
+          <td><a href="../../kalpana/kalpana-import-and-cloud-push.html">PRD</a></td>
+        </tr>
+        <tr>
+          <td>Kalpana documents (PDFs)</td>
+          <td><code>api::kalpana-document.kalpana-document</code></td>
+          <td><code>push:kalpana-documents-to-cloud</code></td>
+          <td><span class="badge-done">Content + pdf</span></td>
+          <td><code>--collection=kalpana-documents</code></td>
+          <td><a href="../../kalpana/kalpana-import-and-cloud-push.html">PRD</a></td>
+        </tr>
       </tbody>
     </table>
 
@@ -154,7 +172,7 @@
         <strong>Sequential cloud push – tenant_demo_002 (Strapi stopped locally)</strong>
         <button type="button" class="copy-button" onclick="copyCommand(this,'cmd-all-push')">📋 Copy</button>
       </div>
-      <div class="command-content" id="cmd-all-push">npm run push:catholicate-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:ecumenical-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:publications-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:theological-seminaries-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:holy-synod-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:training-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:spiritual-organisations-to-cloud -- --tenant-id=tenant_demo_002</div>
+      <div class="command-content" id="cmd-all-push">npm run push:catholicate-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:ecumenical-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:publications-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:theological-seminaries-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:holy-synod-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:training-to-cloud -- --tenant-id=tenant_demo_002 && npm run push:spiritual-organisations-to-cloud -- --tenant-id=tenant_demo_002 && npm run complete:kalpana-cloud-import -- --tenant-id=tenant_demo_002 --skip-deploy</div>
     </div>
   </div>
   <script>

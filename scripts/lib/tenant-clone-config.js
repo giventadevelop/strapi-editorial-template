@@ -71,9 +71,31 @@ const PLURAL_BY_UID = {
   'api::kalpana-edition.kalpana-edition': 'kalpana-editions',
   'api::kalpana-document.kalpana-document': 'kalpana-documents',
   'api::institution.institution': 'institutions',
+  'api::catholicos.catholicos': 'catholicos-entries',
+  'api::diocesan-bishop.diocesan-bishop': 'diocesan-bishops',
+  'api::retired-bishop.retired-bishop': 'retired-bishops',
+  'api::directory-entry.directory-entry': 'directory-entries',
+  'api::church-dignitary.church-dignitary': 'church-dignitaries',
+  'api::working-committee.working-committee': 'working-committees',
+  'api::managing-committee.managing-committee': 'managing-committees',
+  'api::spiritual-organisation.spiritual-organisation': 'spiritual-organisations',
+  'api::pilgrim-centre.pilgrim-centre': 'pilgrim-centres',
+  'api::seminary.seminary': 'seminaries',
+  'api::holy-synod-member.holy-synod-member': 'holy-synod-members',
+  'api::ecumenical-article.ecumenical-article': 'ecumenical-articles',
+  'api::saint-entry.saint-entry': 'saint-entries',
+  'api::catholicate-entry.catholicate-entry': 'catholicate-entries',
+  'api::theological-seminary.theological-seminary': 'theological-seminaries',
+  'api::training-program.training-program': 'training-programs',
+  'api::publication-entry.publication-entry': 'publication-entries',
+  'api::flash-news-item.flash-news-item': 'flash-news-items',
+  'api::advertisement-slot.advertisement-slot': 'advertisement-slots',
 };
 
-function pluralFromUid(uid) {
+function pluralFromUid(uid, strapi = null) {
+  if (strapi?.contentTypes?.[uid]?.info?.pluralName) {
+    return strapi.contentTypes[uid].info.pluralName;
+  }
   if (PLURAL_BY_UID[uid]) return PLURAL_BY_UID[uid];
   const match = uid.match(/^api::([^.]+)\./);
   if (!match) return uid;

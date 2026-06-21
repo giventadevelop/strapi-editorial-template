@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kalpana Downloads – Import &amp; Cloud Push PRD</title>
+  <style>
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    tr:hover td { background: rgba(88, 166, 255, 0.06); }
+    .note { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; border-radius: 0 6px 6px 0; color: #0d3b66; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; color: #333; }
+    .ok { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; color: #155724; }
+    .caution { background: #f8d7da; border-left: 4px solid #dc3545; padding: 0.75rem 1rem; margin: 1rem 0; color: #721c24; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p, .section-intro li { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); flex-wrap: wrap; gap: 8px; }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-word; color: #0d3b66; white-space: pre-wrap; }
+    .copy-button { padding: 6px 12px; border-radius: 4px; cursor: pointer; border: none; background: #0066cc; color: white; font-size: 0.85em; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    .badge-done { background: #28a745; color: #fff; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="../front_end_based_collection_types_import/production_cloud_data_push/index.html">← Cloud push index</a> · <a href="../multi_tenant/tenant-clone-and-cloud-port-runbook.html">Tenant clone runbook §8</a> · <a href="../front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html">Image migration fix</a></p>
+
+    <h1>Kalpana Downloads – Import &amp; Cloud Push PRD</h1>
+    <p>End-to-end guide for <strong>Downloads – Kalpana Editions</strong> and <strong>Downloads – Kalpana Documents</strong> (PDFs): local import from mosc.in / mosc-temp, then push to Strapi Cloud. Status: <span class="badge-done">Scripts complete</span> (June 2026 — proven on <code class="code-highlight">tenant_demo_002</code> and <code class="code-highlight">mosc_malankara_orthodox_2</code>).</p>
+
+    <div class="section-intro">
+      <p><strong>Two collection types + one single type:</strong></p>
+      <table>
+        <thead><tr><th>Admin (local)</th><th>Strapi UID</th><th>REST plural</th><th>Media field</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><a href="http://localhost:1337/admin/content-manager/collection-types/api::kalpana-edition.kalpana-edition">Kalpana Editions</a></td>
+            <td><code>api::kalpana-edition.kalpana-edition</code></td>
+            <td><code>kalpana-editions</code></td>
+            <td><code>cardImage</code> (thumbnail)</td>
+          </tr>
+          <tr>
+            <td><a href="http://localhost:1337/admin/content-manager/collection-types/api::kalpana-document.kalpana-document">Kalpana Documents</a></td>
+            <td><code>api::kalpana-document.kalpana-document</code></td>
+            <td><code>kalpana-documents</code></td>
+            <td><code>pdf</code></td>
+          </tr>
+          <tr>
+            <td>Kalpana Page (single type)</td>
+            <td><code>api::kalpana-page.kalpana-page</code></td>
+            <td>—</td>
+            <td>hero images on page</td>
+          </tr>
+        </tbody>
+      </table>
+      <p><strong>Default tenant:</strong> <code class="code-highlight">tenant_demo_002</code> · <strong>Upsert keys:</strong> editions = <code>slug + tenantId</code>; documents = <code>sourceUrl + tenant</code> (fallback <code>slug + tenant</code>)</p>
+      <p><strong>Import order:</strong> Editions first → Documents second (documents relate to an edition by slug).</p>
+    </div>
+
+    <h2>1. Two-phase workflow</h2>
+    <table>
+      <thead><tr><th>Phase</th><th>Direction</th><th>Scripts</th><th>npm</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>A – Local import</strong></td>
+          <td>mosc-temp / mosc.in → local Strapi</td>
+          <td><code class="script-name">import-kalpana-from-mosc-temp.js</code><br><code class="script-name">import-kalpana-documents-from-mosc-in.js</code></td>
+          <td><code>import:kalpana</code><br><code>import:kalpana-documents</code></td>
+        </tr>
+        <tr>
+          <td><strong>B – Cloud push</strong></td>
+          <td>Local DB → Strapi Cloud</td>
+          <td><code class="script-name">push-kalpana-editions-to-cloud.js</code><br><code class="script-name">push-kalpana-documents-to-cloud.js</code><br><code class="script-name">complete-kalpana-cloud-import.js</code> (orchestrator)</td>
+          <td><code>push:kalpana-editions-to-cloud</code><br><code>push:kalpana-documents-to-cloud</code><br><code>complete:kalpana-cloud-import</code></td>
+        </tr>
+        <tr>
+          <td><strong>C – Media on Cloud</strong></td>
+          <td><code>public/uploads/</code> → Cloud + link</td>
+          <td>Migration + <code class="script-name">link-cloud-images-rest.js</code></td>
+          <td><code>finish:collection-images-on-cloud</code> · <code>finish:kalpana-documents-on-cloud</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>2. Phase A – Local import</h2>
+
+    <h3>2.1 Kalpana Editions + Page</h3>
+    <p>Reads edition list from mosc-temp Next.js page; creates/updates <code>kalpana-edition</code> rows and the <code>kalpana-page</code> single type.</p>
+    <table>
+      <thead><tr><th>Item</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Script</td><td><code class="script-name">scripts/import-kalpana-from-mosc-temp.js</code></td></tr>
+        <tr><td>Source</td><td><code>{MOSC_TEMP_DIR}/src/app/mosc-redesign/(syro)/downloads/kalpana/page.tsx</code></td></tr>
+        <tr><td>Card images</td><td><code>{MOSC_TEMP_DIR}/public/images/downloads/</code> → Strapi Media Library</td></tr>
+        <tr><td>Env</td><td><code>MOSC_TEMP_DIR</code> (default <code>C:\project_workspace\mosc-temp</code>), <code>TENANT_ID</code></td></tr>
+        <tr><td>Flags</td><td><code>--tenant-id=</code>, <code>--replace</code> (delete tenant editions first), <code>DRY_RUN=1</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="command-block">
+      <div class="command-header"><strong>Import editions (replace existing for tenant)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-import-editions')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-import-editions">npm run import:kalpana -- --tenant-id=tenant_demo_002 --replace</div>
+    </div>
+
+    <h3>2.2 Kalpana Documents (PDFs)</h3>
+    <p>Scrapes PDF links per year (2015–2026), downloads to cache, uploads PDFs, creates <code>kalpana-document</code> rows linked to editions.</p>
+    <table>
+      <thead><tr><th>Item</th><th>Value</th></tr></thead>
+      <tbody>
+        <tr><td>Script</td><td><code class="script-name">scripts/import-kalpana-documents-from-mosc-in.js</code></td></tr>
+        <tr><td>Live scrape</td><td>2025, 2026 from <code>https://mosc.in/downloads/kalpana/kalpana-{year}/</code></td></tr>
+        <tr><td>Clone HTML</td><td>2015–2024 from <code>{MOSC_TEMP_DIR}/code_clone_ref/mosc_in/downloads/kalpana/</code></td></tr>
+        <tr><td>PDF cache</td><td><code>scripts/data/kalpana-pdfs/</code></td></tr>
+        <tr><td>Manifest</td><td><code>documentation/kalpana/kalpana-documents-manifest.json</code> (with <code>--manifest-only</code>)</td></tr>
+        <tr><td>Flags</td><td><code>--replace</code>, <code>--year=YYYY</code>, <code>--limit=N</code>, <code>--skip-download</code>, <code>--skip-upload</code>, <code>--manifest-only</code></td></tr>
+      </tbody>
+    </table>
+
+    <div class="command-block">
+      <div class="command-header"><strong>Import all PDF documents (after editions)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-import-docs')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-import-docs">npm run import:kalpana-documents -- --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <div class="command-block">
+      <div class="command-header"><strong>Preview manifest only (no Strapi writes)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-manifest')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-manifest">npm run import:kalpana-documents -- --manifest-only</div>
+    </div>
+
+    <div class="warn"><strong>Run editions before documents.</strong> Document import resolves <code>edition</code> relation by matching edition <code>slug</code> (e.g. <code>kalpana-2026</code>). If editions are missing, documents are skipped or orphaned.</div>
+
+    <h2>3. Phase B – Cloud push</h2>
+
+    <h3>3.1 One-command orchestrator (recommended first time)</h3>
+    <p>Probes Cloud for Kalpana schema, optionally deploys config, then pushes editions → documents → page.</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Complete Kalpana Cloud import</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-complete')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-complete">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run complete:kalpana-cloud-import -- --tenant-id=tenant_demo_002 --skip-deploy</div>
+    </div>
+    <p>Use <code>--skip-deploy</code> when schema is already on Cloud (<code>npx strapi login</code> + <code>npm run deploy</code> done). Without it, script tries transfer token or CLI deploy.</p>
+
+    <h3>3.2 Per-type push scripts</h3>
+    <table>
+      <thead><tr><th>Type</th><th>Script</th><th>npm</th><th>Media</th><th>Retry flag</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Editions</td>
+          <td><code class="script-name">push-kalpana-editions-to-cloud.js</code></td>
+          <td><code>push:kalpana-editions-to-cloud</code></td>
+          <td><code>cardImage</code> from <code>public/uploads/</code></td>
+          <td><code>--images-only</code></td>
+        </tr>
+        <tr>
+          <td>Documents</td>
+          <td><code class="script-name">push-kalpana-documents-to-cloud.js</code></td>
+          <td><code>push:kalpana-documents-to-cloud</code></td>
+          <td><code>pdf</code> upload + link</td>
+          <td><code>--pdfs-only</code></td>
+        </tr>
+        <tr>
+          <td>Page (single)</td>
+          <td><code class="script-name">push-kalpana-page-to-cloud.js</code></td>
+          <td><code>push:kalpana-page-to-cloud</code></td>
+          <td>page hero images</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="command-block">
+      <div class="command-header"><strong>Push editions (dry run)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-ed-dry')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-ed-dry">$env:DRY_RUN='1'; npm run push:kalpana-editions-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <div class="command-block">
+      <div class="command-header"><strong>Push editions + cardImage</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-ed-push')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-ed-push">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run push:kalpana-editions-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <div class="command-block">
+      <div class="command-header"><strong>Push documents + PDFs</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-doc-push')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-doc-push">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run push:kalpana-documents-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <div class="command-block">
+      <div class="command-header"><strong>PDFs only (records already on Cloud)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-pdfs-only')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-pdfs-only">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; node scripts/push-kalpana-documents-to-cloud.js --tenant-id=tenant_demo_002 --pdfs-only</div>
+    </div>
+
+    <h3>3.3 Bulk tenant port (alternative)</h3>
+    <p>If data was cloned to a new tenant locally (e.g. <code>mosc_malankara_orthodox_2</code>), use bulk push then media link:</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Bulk content (no media)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-bulk')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-bulk">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run push:tenant-to-cloud -- --tenant-id=mosc_malankara_orthodox_2 --delay-ms=80</div>
+    </div>
+    <p>See <a href="../multi_tenant/tenant-clone-and-cloud-port-runbook.html">tenant clone runbook</a> for clone + inventory steps.</p>
+
+    <h2>4. Prerequisites</h2>
+    <ol>
+      <li><strong>Phase A complete</strong> for the target tenant (editions + documents visible in local admin URLs above).</li>
+      <li><code>.env</code>: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code> (Full Access).</li>
+      <li><strong>Stop local Strapi dev server</strong> before Cloud push scripts (embedded Strapi loads SQLite).</li>
+      <li>PDF/image files under <code>public/uploads/</code> and/or <code>scripts/data/kalpana-pdfs/</code>.</li>
+      <li>Kalpana content types <strong>deployed on Cloud</strong> (<code>/api/kalpana-editions</code> returns 200, not 404).</li>
+      <li>For Cloud fetch on Windows: <code>$env:NODE_TLS_REJECT_UNAUTHORIZED='0'</code> if TLS errors occur.</li>
+    </ol>
+
+    <h2>5. Cloud image / PDF upload fix</h2>
+    <p>Kalpana uses <strong>non-standard media fields</strong>. Do not use <code>image</code> in REST PUT for these types.</p>
+    <table>
+      <thead><tr><th>Registry key</th><th>mediaField</th><th>Finish command</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>kalpana-editions</code></td>
+          <td><code>cardImage</code></td>
+          <td><code>npm run finish:collection-images-on-cloud -- --collection=kalpana-editions --tenant-id=TENANT</code></td>
+        </tr>
+        <tr>
+          <td><code>kalpana-documents</code></td>
+          <td><code>pdf</code></td>
+          <td><code>npm run finish:kalpana-documents-on-cloud -- --tenant-id=TENANT</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="caution">
+      <strong>Known issue (June 2026):</strong> Migration endpoint may report <code>Created: N | Linked: N</code> but REST verification shows all media MISSING. Morph DB link does not surface on Strapi 5 REST. <strong>Workaround:</strong> REST PUT via <code>scripts/lib/link-cloud-images-rest.js</code> with correct <code>mediaField</code>. See <a href="../front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html#rest-fallback">image migration fix §5</a>.
+    </div>
+
+    <div class="command-block">
+      <div class="command-header"><strong>Finish edition thumbnails on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-finish-ed')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-finish-ed">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; $env:TENANT_ID='tenant_demo_002'; npm run finish:collection-images-on-cloud -- --collection=kalpana-editions --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <div class="command-block">
+      <div class="command-header"><strong>Finish document PDFs on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-finish-doc')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-finish-doc">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; $env:TENANT_ID='tenant_demo_002'; npm run finish:kalpana-documents-on-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <div class="warn"><strong>TENANT_ID env:</strong> If <code>TENANT_ID=tenant_demo_002</code> is in <code>.env</code> but you push another tenant, set <code>$env:TENANT_ID='your_tenant'</code> before finish scripts.</div>
+
+    <h2>6. REST verification (Cloud)</h2>
+    <p><strong>Editions</strong> (~12 per tenant):</p>
+    <p><code>GET {STRAPI_CLOUD_URL}/api/kalpana-editions?pagination[pageSize]=20&amp;populate[0]=cardImage&amp;populate[1]=tenant&amp;filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=year:desc</code></p>
+    <p><strong>Documents</strong> (~350 per tenant):</p>
+    <p><code>GET {STRAPI_CLOUD_URL}/api/kalpana-documents?pagination[pageSize]=5&amp;populate[0]=pdf&amp;populate[1]=tenant&amp;populate[2]=edition&amp;filters[tenant][tenantId][$eq]=tenant_demo_002</code></p>
+    <p>Expect non-null <code>cardImage.url</code> on editions and <code>pdf.url</code> on documents.</p>
+
+    <h2>7. Troubleshooting</h2>
+    <table>
+      <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>/api/kalpana-editions</code> → 404 on Cloud</td>
+          <td>Schema not deployed</td>
+          <td><code>npx strapi login</code> + <code>npm run deploy</code>, or <code>complete:kalpana-cloud-import</code> without <code>--skip-deploy</code></td>
+        </tr>
+        <tr>
+          <td>Documents import skips rows</td>
+          <td>Edition slugs missing locally</td>
+          <td>Run <code>import:kalpana</code> first with <code>--replace</code></td>
+        </tr>
+        <tr>
+          <td><code>Invalid key image</code> on Kalpana PUT</td>
+          <td>REST linker used <code>image</code> instead of <code>cardImage</code> / <code>pdf</code></td>
+          <td>Use updated <code>link-cloud-images-rest.js</code> (June 2026 fix)</td>
+        </tr>
+        <tr>
+          <td>Finish script targets wrong tenant</td>
+          <td><code>TENANT_ID</code> in <code>.env</code></td>
+          <td>Set <code>$env:TENANT_ID</code> explicitly</td>
+        </tr>
+        <tr>
+          <td>PDF upload fails on Cloud</td>
+          <td><code>POST /api/upload</code> / S3 misconfig</td>
+          <td>Use migration base64 path (<a href="../front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html">image fix doc</a>) or <code>--pdfs-only</code> retry</td>
+        </tr>
+        <tr>
+          <td>Kalpana page wrong after clone</td>
+          <td>Single type — one per instance</td>
+          <td><code>push:kalpana-page-to-cloud</code> separately; not included in tenant clone</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>8. Expected counts (tenant_demo_002 reference)</h2>
+    <table>
+      <thead><tr><th>Type</th><th>Typical count</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Kalpana editions</td><td>12</td><td>One row per year (2015–2026)</td></tr>
+        <tr><td>Kalpana documents</td><td>~350</td><td>PDFs across all years</td></tr>
+        <tr><td>Kalpana page</td><td>1</td><td>Single type</td></tr>
+      </tbody>
+    </table>
+
+    <div class="ok"><strong>June 2026 — mosc_malankara_orthodox_2:</strong> Bulk push + REST media link: 12/12 edition <code>cardImage</code>, 348/348 document <code>pdf</code> on Cloud.</div>
+
+    <h2>9. AI prompt – Kalpana import + Cloud push</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy prompt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'prompt-full')">📋 Copy</button></div>
+      <div class="command-content" id="prompt-full">Import and push Kalpana Downloads to Strapi per documentation/kalpana/kalpana-import-and-cloud-push.html.
+
+Local (tenant tenant_demo_002):
+1. npm run import:kalpana -- --tenant-id=tenant_demo_002 --replace
+2. npm run import:kalpana-documents -- --tenant-id=tenant_demo_002
+Verify in admin: api::kalpana-edition and api::kalpana-document collection types.
+
+Cloud (stop local Strapi first):
+3. npm run complete:kalpana-cloud-import -- --tenant-id=tenant_demo_002 --skip-deploy
+   OR push:kalpana-editions-to-cloud then push:kalpana-documents-to-cloud
+4. If media missing: finish:collection-images-on-cloud --collection=kalpana-editions and finish:kalpana-documents-on-cloud; use REST fallback with cardImage and pdf fields (not image).
+
+Use NODE_TLS_REJECT_UNAUTHORIZED=0 on Windows if needed. Run commands yourself; verify REST populate.</div>
+    </div>
+
+    <h2>10. Related docs &amp; scripts</h2>
+    <table>
+      <thead><tr><th>Topic</th><th>Location</th></tr></thead>
+      <tbody>
+        <tr><td>Cloud push index</td><td><code>documentation/front_end_based_collection_types_import/production_cloud_data_push/index.html</code></td></tr>
+        <tr><td>Image migration + REST fallback</td><td><code>documentation/.../cloud-image-upload-migration-fix.html</code></td></tr>
+        <tr><td>Tenant clone + bulk port</td><td><code>documentation/multi_tenant/tenant-clone-and-cloud-port-runbook.html</code></td></tr>
+        <tr><td>Collection registry</td><td><code>scripts/lib/cloud-image-migration-config.js</code></td></tr>
+        <tr><td>PDF manifest sample</td><td><code>documentation/kalpana/kalpana-documents-manifest.json</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const text = el.textContent.trim();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () {
+          btn.textContent = '✓ Copied';
+          setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+        });
+      }
+    }
+  </script>
+</body>
+</html>

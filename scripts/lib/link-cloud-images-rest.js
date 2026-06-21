@@ -58,7 +58,7 @@ async function findCloudFileByHash(CLOUD_URL, API_TOKEN, hash) {
  * @param {string} opts.restPlural
  * @param {Array<{slug:string, hash:string}>} opts.links
  */
-async function linkImagesViaRest({ cloudUrl, apiToken, restPlural, links }) {
+async function linkImagesViaRest({ cloudUrl, apiToken, restPlural, links, mediaField = 'image' }) {
   const bySlug = await getCloudEntriesBySlug(cloudUrl, apiToken, restPlural);
   const results = { linked: 0, skipped: 0, errors: [] };
 
@@ -74,7 +74,7 @@ async function linkImagesViaRest({ cloudUrl, apiToken, restPlural, links }) {
       if (!file?.id) throw new Error(`Cloud file not found for hash ${hash}.`);
       await cloudFetch(cloudUrl, apiToken, `/api/${restPlural}/${documentId}`, {
         method: 'PUT',
-        body: JSON.stringify({ data: { image: file.id } }),
+        body: JSON.stringify({ data: { [mediaField]: file.id } }),
       });
       results.linked++;
     } catch (err) {
