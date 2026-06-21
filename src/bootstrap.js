@@ -625,16 +625,8 @@ async function registerTenantDocumentMiddleware() {
     const isEditor = (adminUser.roles || []).some((r) => r.code === 'strapi-editor');
     if (!isEditor) return null;
 
-    const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
-      where: {},
-      populate: { tenant: true },
-    });
-    const mapping = mappings.find(
-      (m) => (m.adminUserEmail || '').toLowerCase() === String(adminUser.email).toLowerCase()
-    );
-    const tenant = mapping?.tenant;
-    if (!tenant) return null;
-    return { id: tenant.id, documentId: tenant.documentId ?? tenant.document_id };
+    const { resolveTenantFromRequestContext } = require('./utils/tenant-assignment');
+    return resolveTenantFromRequestContext(strapi);
   }
 
   strapi.documents.use(async (context, next) => {
@@ -1020,10 +1012,36 @@ function registerTenantPublishMiddleware() {
   });
 }
 
+async function ensureEditorTenantAssignmentKeys() {
+  try {
+    const rows = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
+      populate: { tenant: true },
+    });
+    for (const row of rows || []) {
+      const email = row.adminUserEmail;
+      const tenantId = row.tenant?.tenantId ?? row.tenant?.tenant_id;
+      if (!email || !tenantId) continue;
+      const key = `${String(email).trim().toLowerCase()}__${tenantId}`;
+      if (row.assignmentKey !== key) {
+        await strapi.db.query('api::editor-tenant.editor-tenant').update({
+          where: { id: row.id },
+          data: {
+            assignmentKey: key,
+            adminUserEmail: String(email).trim().toLowerCase(),
+          },
+        });
+      }
+    }
+  } catch (err) {
+    strapi.log.warn('ensureEditorTenantAssignmentKeys:', err.message);
+  }
+}
+
 module.exports = async () => {
   await seedExampleApp();
   await ensureContentApiPublicPermissions();
   await registerTenantRBACConditions();
+  await ensureEditorTenantAssignmentKeys();
   await ensureEditorTenantScopedPermissions();
   await hideTenantFieldInContentManagerLayout();
   await ensureFlashNewsItemTitleFirst();

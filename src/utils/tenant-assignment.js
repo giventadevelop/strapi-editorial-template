@@ -1,10 +1,45 @@
 'use strict';
 
 const requestContext = require('./request-context');
+const { getActiveTenantIdFromRequest } = require('./active-tenant-context');
 
-/**
- * Resolve tenant for an admin user. Returns { id, documentId }.
- */
+function normalizeTenantRef(tenant) {
+  if (!tenant) return null;
+  const id = tenant.id;
+  const documentId = tenant.documentId ?? tenant.document_id;
+  const tenantId = tenant.tenantId ?? tenant.tenant_id;
+  if (id == null && documentId == null) return null;
+  return {
+    id: id ?? undefined,
+    documentId: documentId ?? undefined,
+    tenantId: tenantId ?? undefined,
+    name: tenant.name,
+  };
+}
+
+/** All tenant assignments for an admin email. */
+async function getTenantsForEmail(strapi, email) {
+  if (!email) return [];
+  const emailLower = String(email).toLowerCase();
+  const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
+    where: {},
+    populate: { tenant: true },
+  });
+  const out = [];
+  for (const mapping of mappings) {
+    if ((mapping.adminUserEmail || '').toLowerCase() !== emailLower) continue;
+    const ref = normalizeTenantRef(mapping.tenant);
+    if (ref) out.push(ref);
+  }
+  return out;
+}
+
+/** Case-insensitive lookup — first assignment (legacy). Prefer resolveTenantFromRequestContext. */
+async function getTenantForEmail(strapi, email) {
+  const list = await getTenantsForEmail(strapi, email);
+  return list[0] ?? null;
+}
+
 async function getTenantForAdminUser(strapi, adminUserId) {
   if (!adminUserId) return null;
   const adminUser = await strapi.db.query('admin::user').findOne({
@@ -13,23 +48,6 @@ async function getTenantForAdminUser(strapi, adminUserId) {
   });
   if (!adminUser?.email) return null;
   return getTenantForEmail(strapi, adminUser.email);
-}
-
-/** Case-insensitive lookup by admin email. Returns { id, documentId } or null. */
-async function getTenantForEmail(strapi, email) {
-  if (!email) return null;
-  const emailLower = String(email).toLowerCase();
-  const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
-    where: {},
-    populate: { tenant: true },
-  });
-  const mapping = mappings.find((m) => (m.adminUserEmail || '').toLowerCase() === emailLower);
-  const tenant = mapping?.tenant;
-  if (!tenant) return null;
-  const id = tenant.id;
-  const documentId = tenant.documentId ?? tenant.document_id;
-  if (id == null && documentId == null) return null;
-  return { id: id ?? undefined, documentId: documentId ?? undefined };
 }
 
 async function getAdminUserIdFromContext(strapi) {
@@ -54,18 +72,37 @@ async function getAdminUserIdFromContext(strapi) {
   }
 }
 
+/**
+ * Resolve active tenant for editor: X-Active-Tenant-Id header if assigned, else first assignment.
+ */
 async function resolveTenantFromRequestContext(strapi) {
   const ctx = requestContext.get();
   const user = ctx?.state?.user || ctx?.state?.admin;
-  if (user?.email) {
-    const t = await getTenantForEmail(strapi, user.email);
-    if (t) return t;
+  let email = user?.email;
+
+  if (!email) {
+    const adminUserId = await getAdminUserIdFromContext(strapi);
+    if (adminUserId != null) {
+      const adminUser = await strapi.db.query('admin::user').findOne({
+        where: { id: adminUserId },
+        select: ['email'],
+      });
+      email = adminUser?.email;
+    }
   }
-  const adminUserId = await getAdminUserIdFromContext(strapi);
-  if (adminUserId != null) {
-    return getTenantForAdminUser(strapi, adminUserId);
+
+  if (!email) return null;
+
+  const assigned = await getTenantsForEmail(strapi, email);
+  if (!assigned.length) return null;
+
+  const activeTenantId = getActiveTenantIdFromRequest(ctx);
+  if (activeTenantId) {
+    const match = assigned.find((t) => t.tenantId === activeTenantId);
+    if (match) return match;
   }
-  return null;
+
+  return assigned[0];
 }
 
 function getTenantJoinTable(strapi, uid) {
@@ -86,9 +123,6 @@ function getTenantJoinTable(strapi, uid) {
   }
 }
 
-/**
- * Ensure a content row has a tenant link. Returns tenant numeric id if linked/updated.
- */
 async function ensureTenantLinkOnRow(strapi, uid, rowId, tenantNumericId, joinTable) {
   if (!rowId || tenantNumericId == null || !joinTable) return false;
   const knex = strapi.db.connection;
@@ -111,9 +145,6 @@ async function ensureTenantLinkOnRow(strapi, uid, rowId, tenantNumericId, joinTa
   return true;
 }
 
-/**
- * Before publish: ensure draft row has tenant (from editor mapping or existing published link).
- */
 async function ensureDraftTenantBeforePublish(strapi, uid, documentId, locale) {
   const ct = strapi.contentType(uid);
   const joinTable = getTenantJoinTable(strapi, uid);
@@ -158,9 +189,6 @@ async function ensureDraftTenantBeforePublish(strapi, uid, documentId, locale) {
   await ensureTenantLinkOnRow(strapi, uid, draftRow.id, tenantNumericId, joinTable);
 }
 
-/**
- * After publish: copy draft tenant link to published row (Strapi 5 does not always copy relations).
- */
 async function copyTenantDraftToPublished(strapi, uid, documentId, locale) {
   const ct = strapi.contentType(uid);
   const joinTable = getTenantJoinTable(strapi, uid);
@@ -227,10 +255,12 @@ function applyTenantToEventData(event, tenant) {
 module.exports = {
   getTenantForAdminUser,
   getTenantForEmail,
+  getTenantsForEmail,
   resolveTenantFromRequestContext,
   getTenantJoinTable,
   ensureTenantLinkOnRow,
   ensureDraftTenantBeforePublish,
   copyTenantDraftToPublished,
   applyTenantToEventData,
+  getAdminUserIdFromContext,
 };

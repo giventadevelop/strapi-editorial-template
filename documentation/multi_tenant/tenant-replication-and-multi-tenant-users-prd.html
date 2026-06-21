@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="PRD: Replicate all tenant_demo_002 records to a new tenant and support editors assigned to multiple tenant IDs in Strapi 5.">
+  <title>PRD: Tenant Replication &amp; Multi-Tenant Editor Access</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { font-size: 2.5em; color: #1a1a1a; border-bottom: 3px solid #0066cc; padding-bottom: 0.5rem; }
+    h2 { font-size: 1.8em; color: #2d2d2d; margin-top: 2rem; border-left: 4px solid #0066cc; padding-left: 15px; }
+    h3 { font-size: 1.4em; color: #333; margin-top: 1.5rem; }
+    h4 { font-size: 1.2em; color: #555; }
+    ul, ol { margin: 0.5rem 0; }
+    li { margin: 0.25rem 0; }
+    a { color: #0066cc; }
+    code { background-color: #e8f4f8 !important; color: #0d3b66 !important; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; border: 1px solid #b8d4e3; }
+    pre, pre code { background-color: #e8f4f8 !important; color: #0d3b66 !important; border-color: #b8d4e3; }
+    pre { padding: 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 4px; margin: 15px 0; border: 1px solid #b8d4e3; }
+    pre code { background-color: transparent !important; padding: 0; }
+    .note, .info { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .caution { background: #f8d7da; border-left: 4px solid #dc3545; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .success { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .note code, .info code, .warn code, .caution code, .success code,
+    .note .code-highlight, .info .code-highlight, .warn .code-highlight,
+    .caution .code-highlight, .success .code-highlight {
+      background-color: #e8f4f8; color: #0d3b66; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; border: 1px solid #b8d4e3;
+    }
+    table { border-collapse: collapse; width: 100%; margin: 15px 0; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: bold; text-transform: uppercase; font-size: 0.9em; letter-spacing: 0.5px; }
+    tr:nth-child(even) { background-color: #f8f9fa; }
+    tr:hover { background-color: #e3f2fd; transition: background-color 0.2s ease; }
+    td code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; font-family: 'Courier New', monospace; border: 1px solid #b8d4e3; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1); }
+    .section-container { background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 8px rgba(0, 102, 204, 0.1); }
+    .section-container.parameters { background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%); border-left-color: #ff9800; }
+    .section-container.usage { background: linear-gradient(135deg, #f0e6ff 0%, #e6ccff 100%); border-left-color: #9c27b0; }
+    .section-container.output { background: linear-gradient(135deg, #e6ffe6 0%, #ccffcc 100%); border-left-color: #28a745; }
+    .section-header { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; padding: 12px 20px; margin: -20px -20px 20px -20px; border-radius: 8px 8px 0 0; font-size: 1.2em; font-weight: bold; display: flex; align-items: center; gap: 10px; }
+    .section-header.parameters { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); }
+    .section-header.usage { background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); }
+    .section-header.output { background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); }
+    .parameters-list { background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%); border-left: 4px solid #ff9800; border-radius: 8px; padding: 15px 20px; margin: 15px 0; }
+    .parameters-list code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; border: 1px solid #b8d4e3; }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3); }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-block.verify { background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-color: #4caf50; }
+    .command-block.advance { background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); border-color: #ff9800; }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); flex-wrap: wrap; gap: 8px; }
+    .command-type { font-weight: bold; color: #333; }
+    .command-header-buttons { display: flex; gap: 8px; }
+    .command-parameters { padding: 15px; background: rgba(255, 255, 255, 0.5); border-bottom: 1px solid rgba(0,0,0,0.1); }
+    .command-parameters h5 { margin: 0 0 12px 0; font-size: 0.9em; color: #333; font-weight: bold; }
+    .parameter-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .parameter-group.single { grid-template-columns: 1fr; }
+    .parameter-input { display: flex; flex-direction: column; gap: 4px; }
+    .parameter-input label { font-size: 0.8em; color: #555; font-weight: 600; }
+    .parameter-input input, .parameter-input select { padding: 8px 12px; border: 2px solid #ddd; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 0.9em; }
+    .parameter-input input:focus, .parameter-input select:focus { outline: none; border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1); }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-word; color: #0d3b66; background: #e8f4f8; }
+    .command-single-line { padding: 12px 15px; background: #e8f4f8; border-top: 1px solid #b8d4e3; }
+    .command-single-line-label { font-size: 0.8em; color: #555; margin-bottom: 6px; font-weight: 600; }
+    .command-single-line code { display: block; word-break: break-word; white-space: pre-wrap; }
+    .copy-button, .copy-button-template { background-color: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: bold; transition: all 0.3s ease; }
+    .copy-button-template { background-color: #6c757d; }
+    .copy-button:hover { background-color: #0052a3; }
+    .copy-button-template:hover { background-color: #5a6268; }
+    .copy-button.copied, .copy-button-template.copied { background-color: #28a745; }
+    .prompt-block { border: 2px solid #9c27b0; border-radius: 8px; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); }
+    .prompt-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); }
+    .prompt-body { padding: 15px; white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 0.9em; color: #0d3b66; background: #e8f4f8; margin: 0; border-top: 1px solid #b8d4e3; }
+    .meta { color: #666; font-size: 0.9rem; margin-top: 2rem; border-top: 1px solid #b8d4e3; padding-top: 1rem; }
+    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 0.85em; font-weight: bold; background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+    @media (max-width: 768px) { body { padding: 10px; } .parameter-group { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <p><a href="../index.html">← Documentation index</a></p>
+
+  <h1>PRD: Tenant Replication &amp; Multi-Tenant Editor Access</h1>
+  <div class="section-intro">
+    <p><strong>Product Requirements Document</strong> — Defines requirements, constraints, and effort estimates for two related capabilities in the Strapi editorial template:</p>
+    <ol>
+      <li><strong>Tenant replication</strong> — Copy all content scoped to <code class="code-highlight">tenant_demo_002</code> to a new tenant in one operation.</li>
+      <li><strong>Multi-tenant editors</strong> — Allow a single admin user (editor) to be associated with more than one <code class="code-highlight">tenantId</code>.</li>
+    </ol>
+    <p><strong>Status:</strong> <span class="status-badge" style="background:#d4edda;color:#155724;border-color:#28a745;">Implemented (Phase 1 + Phase 2)</span> · <strong>Reference tenant:</strong> <code class="code-highlight">tenant_demo_002</code> · <strong>Strapi version:</strong> 5.x</p>
+  </div>
+
+  <nav class="section-intro" aria-label="Table of contents">
+    <h3 id="toc">Table of Contents</h3>
+    <ol>
+      <li><a href="#summary">Executive Summary</a></li>
+      <li><a href="#goals">Goals &amp; Non-Goals</a></li>
+      <li><a href="#current-architecture">Current Multi-Tenant Architecture</a></li>
+      <li><a href="#epic-clone">Epic 1: Replicate tenant_demo_002 to a New Tenant</a></li>
+      <li><a href="#epic-multi-user">Epic 2: One User → Multiple Tenants</a></li>
+      <li><a href="#effort">Effort Estimates &amp; Options</a></li>
+      <li><a href="#phases">Recommended Implementation Phases</a></li>
+      <li><a href="#verification">Verification &amp; Test Plan</a></li>
+      <li><a href="#future-scripts">Planned Scripts (Future)</a></li>
+      <li><a href="#references">References</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="summary">1. Executive Summary</h2>
+  <table>
+    <thead>
+      <tr><th>Question</th><th>Answer</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Can we replicate all <code>tenant_demo_002</code> records to another tenant in one shot <em>today</em>?</td>
+        <td><strong>No.</strong> There is no existing clone script. Per-type import/push scripts and partial export exist, but nothing performs a full tenant-to-tenant copy within the same Strapi instance.</td>
+      </tr>
+      <tr>
+        <td>Can one editor be linked to multiple tenant IDs <em>today</em>?</td>
+        <td><strong>No.</strong> <code>Editor Tenant Assignment</code> enforces one email → one tenant (<code>adminUserEmail</code> is unique).</td>
+      </tr>
+      <tr>
+        <td>Fastest workaround for multi-tenant editing?</td>
+        <td>Create <strong>separate admin accounts</strong> (one per tenant) — supported now via <code class="script-name">assign-editor-to-directory-tenant.js</code>.</td>
+      </tr>
+      <tr>
+        <td>Estimated effort — full tenant clone script</td>
+        <td><strong>5–10 dev days</strong> (same instance), plus validation on Cloud/local.</td>
+      </tr>
+      <tr>
+        <td>Estimated effort — multi-tenant editor (with tenant switcher)</td>
+        <td><strong>1–2 weeks</strong> for production-ready admin UX.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="goals">2. Goals &amp; Non-Goals</h2>
+  <div class="section-container">
+    <div class="section-header">🎯 Goals</div>
+    <ul>
+      <li>Document a repeatable path to duplicate an entire tenant’s CMS content (starting from <code>tenant_demo_002</code>).</li>
+      <li>Clarify schema, relation, slug, media, and single-type blockers before implementation.</li>
+      <li>Define requirements for editors who manage content across multiple tenants.</li>
+      <li>Provide effort estimates and phased delivery options for stakeholders.</li>
+    </ul>
+  </div>
+  <div class="section-container parameters">
+    <div class="section-header parameters">🚫 Non-Goals (this PRD)</div>
+    <ul>
+      <li>Implementing the clone script or schema changes (analysis and requirements only).</li>
+      <li>Changing frontend Next.js apps — frontends already filter by <code>filters[tenant][tenantId][$eq]=...</code>.</li>
+      <li>Duplicating global types (<code>category</code>, <code>author</code>, <code>homepage</code>, <code>global</code>) unless explicitly scoped in a later phase.</li>
+      <li>Cross-instance migration to a brand-new Strapi Cloud project (covered as an alternative, not primary scope).</li>
+    </ul>
+  </div>
+
+  <h2 id="current-architecture">3. Current Multi-Tenant Architecture</h2>
+  <div class="section-intro">
+    <p>This project uses <strong>shared-database, row-level multi-tenancy</strong>: one Strapi instance, one database, content rows scoped by a <code>tenant</code> manyToOne relation.</p>
+  </div>
+
+  <h3>3.1 Core entities</h3>
+  <table>
+    <thead>
+      <tr><th>Content type</th><th>UID</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Tenant</td><td><code>api::tenant.tenant</code></td><td>Registry: <code>tenantId</code> (unique), <code>name</code>, <code>slug</code>, <code>domain</code></td></tr>
+      <tr><td>Editor Tenant Assignment</td><td><code>api::editor-tenant.editor-tenant</code></td><td>Maps <code>adminUserEmail</code> → <code>tenant</code> (one per email)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 Tenant-scoped collection types (~30)</h3>
+  <p>All use REST filter: <code>filters[tenant][tenantId][$eq]=tenant_demo_002</code></p>
+  <table>
+    <thead>
+      <tr><th>Domain</th><th>Content types (plural REST paths)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Editorial</td><td><code>articles</code>, <code>advertisement-slots</code>, <code>flash-news-items</code></td></tr>
+      <tr><td>Directory</td><td><code>bishops</code>, <code>dioceses</code>, <code>parishes</code>, <code>priests</code>, <code>directory-entries</code>, <code>institutions</code>, <code>church-dignitaries</code>, <code>working-committees</code>, <code>managing-committees</code>, <code>spiritual-organisations</code>, <code>pilgrim-centres</code>, <code>seminaries</code>, <code>catholicos-entries</code>, <code>diocesan-bishops</code>, <code>retired-bishops</code></td></tr>
+      <tr><td>Content hubs</td><td><code>holy-synod-members</code>, <code>ecumenical-articles</code>, <code>saint-entries</code>, <code>catholicate-entries</code>, <code>theological-seminaries</code>, <code>training-programs</code>, <code>publication-entries</code></td></tr>
+      <tr><td>Liturgy &amp; Kalpana</td><td><code>liturgy-days</code>, <code>kalpana-editions</code>, <code>kalpana-documents</code></td></tr>
+      <tr><td>Single types (see blocker)</td><td><code>directory-home</code>, <code>kalpana-page</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.3 Shared (not tenant-scoped)</h3>
+  <p><code>categories</code>, <code>authors</code>, <code>homepage</code>, <code>global</code>, <code>about</code>, <code>sidebar-promotional-block</code></p>
+
+  <h3>3.4 Isolation today</h3>
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Tenant isolation?</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Admin Content Manager (Editor role)</td><td>Yes — filtered by assigned tenant (<code>src/bootstrap.js</code>, CM extension)</td></tr>
+      <tr><td>Admin Document Service (Editor mutations)</td><td>Yes — cross-tenant update/delete returns 403</td></tr>
+      <tr><td>Public Content API</td><td><strong>No server-side filter</strong> — client must pass tenant filter</td></tr>
+      <tr><td>Super Admin</td><td>Sees all tenants</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.5 Existing tooling (partial coverage)</h3>
+  <table>
+    <thead>
+      <tr><th>Script</th><th>Scope</th><th>Clone tenant?</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code class="script-name">export_news_tenant_demo.js</code></td><td>Articles + referenced categories</td><td>Partial</td></tr>
+      <tr><td><code class="script-name">rest_api_push_to_cloud.js</code></td><td>Full export → Cloud</td><td>Full instance, not tenant-filtered</td></tr>
+      <tr><td><code class="script-name">push-*-to-cloud.js</code> (many)</td><td>One collection, <code>--tenant-id</code></td><td>Local → Cloud, not tenant → tenant</td></tr>
+      <tr><td><code class="script-name">assign-editor-to-directory-tenant.js</code></td><td>One email → one tenant</td><td>Assignment only</td></tr>
+      <tr><td><code class="script-name">verify-editor-tenant-liturgy.js</code></td><td>Verify mappings + counts</td><td>Read-only</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="epic-clone">4. Epic 1: Replicate tenant_demo_002 to a New Tenant</h2>
+
+  <h3>4.1 User story</h3>
+  <div class="section-intro">
+    <p><strong>As a</strong> Super Admin,<br>
+    <strong>I want</strong> to clone all CMS content from <code>tenant_demo_002</code> to a new tenant (e.g. <code>tenant_demo_003</code>) in one operation,<br>
+    <strong>So that</strong> a new site/brand can launch with the same structure and content without manual re-import per collection.</p>
+  </div>
+
+  <h3>4.2 Feasibility: one-shot clone</h3>
+  <div class="caution">
+    <strong>Not available today.</strong> A new script (proposed name: <code class="script-name">clone-tenant-records.js</code>) must be built. Strapi export/import and existing push scripts do not filter by source tenant for a full clone.
+  </div>
+
+  <h3>4.3 Technical requirements for clone</h3>
+  <div class="section-container">
+    <div class="section-header">Functional requirements</div>
+    <ol>
+      <li>Accept <code>--source-tenant-id</code> and <code>--target-tenant-id</code> (target must exist or be created with <code>--create-target</code>).</li>
+      <li>Process content types in <strong>dependency order</strong> (see §4.4).</li>
+      <li>Maintain <code>oldDocumentId → newDocumentId</code> map per UID; rewrite internal relations using the map.</li>
+      <li>Set <code>tenant</code> on every cloned row to the target tenant (Document Service + join tables).</li>
+      <li>Handle <strong>draft &amp; publish</strong> for <code>articles</code>: copy draft and published rows; ensure tenant links on both (see publish middleware in <code>src/bootstrap.js</code>).</li>
+      <li>Handle <strong>media</strong>: option to reuse same S3 files (recommended) or duplicate upload records.</li>
+      <li>Support <code>--dry-run</code> (counts only) and <code>--types=articles,dioceses</code> (subset).</li>
+      <li>Emit summary report: created/skipped/failed per type.</li>
+    </ol>
+  </div>
+
+  <h3>4.4 Clone dependency order</h3>
+  <p>Based on <code class="script-name">rest_api_push_to_cloud.js</code> Phase 1 ordering and internal relation graph:</p>
+  <pre><code>1. tenants (create target if --create-target)
+2. dioceses
+3. parishes, priests, bishops (diocesan/retired/catholicos), directory-entries
+4. institutions, church-dignitaries, committees, spiritual-organisations, pilgrim-centres, seminaries
+5. holy-synod-members, ecumenical-articles, saint-entries, catholicate-entries
+6. theological-seminaries, training-programs, publication-entries
+7. kalpana-editions → kalpana-documents
+8. liturgy-days
+9. flash-news-items, advertisement-slots
+10. articles (last among editorial — references global category/author)
+11. directory-home, kalpana-page (single types — see blocker)</code></pre>
+
+  <h3>4.5 Blockers &amp; decisions</h3>
+  <table>
+    <thead>
+      <tr><th>Blocker</th><th>Impact</th><th>Decision required</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Global slug uniqueness</strong></td>
+        <td>UID <code>slug</code> fields are unique per content type across the whole instance, not per tenant. Cloning without suffix/prefix will fail on duplicate slugs.</td>
+        <td>Suffix strategy: <code>{slug}-{targetTenantSuffix}</code> or prefix with tenant slug.</td>
+      </tr>
+      <tr>
+        <td><strong>Single types</strong> (<code>directory-home</code>, <code>kalpana-page</code>)</td>
+        <td>Strapi allows only <strong>one document</strong> per single type per locale. Cannot have separate Directory Home per tenant on same instance.</td>
+        <td>Convert to collection type, OR skip clone for single types, OR use separate Strapi instance per tenant.</td>
+      </tr>
+      <tr>
+        <td><strong>Shared categories/authors</strong></td>
+        <td>Cloned articles keep pointing at existing global categories/authors.</td>
+        <td>Accept shared taxonomy OR add tenant to category/author (schema change).</td>
+      </tr>
+      <tr>
+        <td><strong>Media relations</strong></td>
+        <td>Strapi 5 Document Service may reject media <code>connect</code> on create.</td>
+        <td>Use <code>files_related_mph</code> pattern from <code class="script-name">data_import_seed_directory_mosc_in.js</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>Volume</strong></td>
+        <td>Liturgy days + directory entries may be thousands of rows.</td>
+        <td>Batch creates, progress logging, resumable checkpoints.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>4.6 Alternative approaches</h3>
+  <table>
+    <thead>
+      <tr><th>Approach</th><th>Pros</th><th>Cons</th><th>Effort</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>A. Custom clone script (same instance)</strong></td>
+        <td>One command; stays on current Cloud project</td>
+        <td>Slug + single-type constraints</td>
+        <td>5–10 days</td>
+      </tr>
+      <tr>
+        <td><strong>B. New Strapi instance</strong></td>
+        <td>Clean slugs; no collision with source tenant</td>
+        <td>Second Cloud project, DNS, env setup</td>
+        <td>3–7 days</td>
+      </tr>
+      <tr>
+        <td><strong>C. Manual per-type scripts</strong></td>
+        <td>Reuse existing <code>push-*</code> patterns</td>
+        <td>Not one-shot; easy to miss types</td>
+        <td>3–5 days + high error risk</td>
+      </tr>
+      <tr>
+        <td><strong>D. Super Admin duplicate in CM</strong></td>
+        <td>No code</td>
+        <td>Not scalable for hundreds/thousands of entries</td>
+        <td>Not viable</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warn">
+    <strong>Recommendation:</strong> Choose <strong>Approach A</strong> if the new tenant must live on the same Strapi Cloud project as <code>tenant_demo_002</code>. Resolve single-type and slug strategy in a design review before coding. Choose <strong>Approach B</strong> if the new tenant is effectively a separate product/site.
+  </div>
+
+  <h2 id="epic-multi-user">5. Epic 2: One User → Multiple Tenants</h2>
+
+  <h3>5.1 User story</h3>
+  <div class="section-intro">
+    <p><strong>As a</strong> Super Admin,<br>
+    <strong>I want</strong> one editor account to manage content for multiple tenants (e.g. <code>tenant_demo_002</code> and <code>directory_mosc_001</code>),<br>
+    <strong>So that</strong> the same person does not need separate login credentials per site.</p>
+  </div>
+
+  <h3>5.2 Current constraint</h3>
+  <div class="caution">
+    <code>adminUserEmail</code> on <code>Editor Tenant Assignment</code> is <strong>unique</strong>. Assignment logic in <code>src/utils/tenant-assignment.js</code> and <code>src/bootstrap.js</code> resolves <strong>exactly one</strong> tenant per email. Documented in <code>.cursor/rules/multi-tenant-assignment.mdc</code> as many-to-one (user → tenant).
+  </div>
+
+  <h3>5.3 Requirements for multi-tenant editors</h3>
+  <div class="section-container usage">
+    <div class="section-header usage">Schema &amp; data model</div>
+    <ul>
+      <li>Allow multiple <code>editor-tenant</code> rows per email OR replace with many-to-many join (email ↔ tenant).</li>
+      <li>Remove or relax <code>unique: true</code> on <code>adminUserEmail</code>; add composite unique on <code>(adminUserEmail, tenant)</code> if using collection rows.</li>
+    </ul>
+  </div>
+  <div class="section-container">
+    <div class="section-header">Runtime behavior</div>
+    <ul>
+      <li><strong>Active tenant context</strong> — Editor session must track which tenant is “active” for list/create operations.</li>
+      <li><strong>Content Manager</strong> — Tenant switcher in admin UI; lists and create forms scoped to active tenant.</li>
+      <li><strong>Document middleware</strong> — Filter <code>findMany</code> by active tenant (not all assigned tenants unless merged view is explicitly requested).</li>
+      <li><strong>Lifecycles</strong> — <code>beforeCreate</code> assigns tenant from active context, not first mapping found.</li>
+      <li><strong>Mutations</strong> — Block update/delete/publish when document tenant ≠ active tenant.</li>
+    </ul>
+  </div>
+  <div class="section-container parameters">
+    <div class="section-header parameters">Scripts &amp; ops</div>
+    <ul>
+      <li>Extend <code class="script-name">assign-editor-to-directory-tenant.js</code> to <strong>add</strong> a tenant without replacing existing assignment.</li>
+      <li>New script: list/remove tenant assignments per email.</li>
+      <li>Update grant scripts and verify scripts for multi-tenant cases.</li>
+    </ul>
+  </div>
+
+  <h3>5.4 Workaround (no code change)</h3>
+  <div class="success">
+    <strong>Supported today:</strong> Create two Strapi admin users (e.g. <code>editor.news@example.com</code> → <code>tenant_demo_002</code>, <code>editor.directory@example.com</code> → <code>directory_mosc_001</code>). Same person can use two browsers or profiles. Effort: ~30 minutes per editor.
+  </div>
+
+  <h3>5.5 UX options for implementation</h3>
+  <table>
+    <thead>
+      <tr><th>Option</th><th>Editor sees</th><th>Complexity</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>1. Tenant switcher (recommended)</strong></td><td>One tenant at a time; explicit switch in admin header</td><td>Medium–high</td></tr>
+      <tr><td><strong>2. Merged list</strong></td><td>All assigned tenants’ content in one list (with tenant column)</td><td>Medium; create still ambiguous</td></tr>
+      <tr><td><strong>3. Separate accounts</strong></td><td>One tenant per login</td><td>None (current)</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="effort">6. Effort Estimates &amp; Options</h2>
+  <table>
+    <thead>
+      <tr><th>Deliverable</th><th>Scope</th><th>Estimate</th><th>Dependencies</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Tenant inventory report</td>
+        <td>Count rows per type for <code>tenant_demo_002</code> (read-only script)</td>
+        <td>0.5–1 day</td>
+        <td>None</td>
+      </tr>
+      <tr>
+        <td><code>clone-tenant-records.js</code> MVP</td>
+        <td>Clone collection types; skip single types; slug suffix; dry-run</td>
+        <td>5–7 days</td>
+        <td>Slug + single-type decisions</td>
+      </tr>
+      <tr>
+        <td>Clone script hardening</td>
+        <td>Articles D&amp;P, media morph, resume, Cloud run</td>
+        <td>2–3 days</td>
+        <td>MVP</td>
+      </tr>
+      <tr>
+        <td>Multi-tenant schema + backend</td>
+        <td>Schema, middleware, lifecycles, no UI</td>
+        <td>3–5 days</td>
+        <td>Design review</td>
+      </tr>
+      <tr>
+        <td>Admin tenant switcher UI</td>
+        <td>CM extension, session storage</td>
+        <td>3–5 days</td>
+        <td>Backend</td>
+      </tr>
+      <tr>
+        <td>Docs + runbooks</td>
+        <td>Update admin guide, this PRD → implemented</td>
+        <td>1 day</td>
+        <td>Features shipped</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="phases">7. Recommended Implementation Phases</h2>
+  <div class="section-container output">
+    <div class="section-header output">Phase 0 — Discovery (before build)</div>
+    <ol>
+      <li>Run tenant inventory for <code>tenant_demo_002</code> on local and Cloud.</li>
+      <li>Stakeholder decision: same instance vs new instance; single-type strategy; slug suffix rule.</li>
+      <li>Stakeholder decision: multi-tenant editor — switcher vs separate accounts.</li>
+    </ol>
+  </div>
+  <div class="section-container">
+    <div class="section-header">Phase 1 — Tenant clone MVP</div>
+    <ol>
+      <li>Implement <code class="script-name">clone-tenant-records.js</code> with dependency order and ID map.</li>
+      <li>Test on local SQLite with small subset (<code>--types=flash-news-items</code>).</li>
+      <li>Full dry-run against production API (read-only token).</li>
+      <li>Execute clone to target tenant; verify with existing <code>verify-*</code> scripts.</li>
+    </ol>
+  </div>
+  <div class="section-container usage">
+    <div class="section-header usage">Phase 2 — Multi-tenant editors (if approved)</div>
+    <ol>
+      <li>Schema migration for editor ↔ tenant many-to-many.</li>
+      <li>Backend: active tenant context + middleware + lifecycle updates.</li>
+      <li>Admin UI: tenant switcher.</li>
+      <li>Migration: existing single assignments remain valid.</li>
+    </ol>
+  </div>
+
+  <h2 id="verification">8. Verification &amp; Test Plan</h2>
+  <table>
+    <thead>
+      <tr><th>Check</th><th>Method</th><th>Pass criteria</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Row counts match (per type)</td>
+        <td>Compare source vs target API counts with tenant filter</td>
+        <td>Equal counts (minus intentionally skipped single types)</td>
+      </tr>
+      <tr>
+        <td>Internal relations intact</td>
+        <td>Sample parishes → diocese, kalpana-documents → edition</td>
+        <td>All relations point to cloned target-tenant rows</td>
+      </tr>
+      <tr>
+        <td>Articles published + tenant</td>
+        <td><code class="script-name">debug-production-news.mjs</code> against target tenant</td>
+        <td>Tenant filter returns rows; category slugs lowercase</td>
+      </tr>
+      <tr>
+        <td>Media URLs load</td>
+        <td><code class="script-name">verify-cloud-image-urls.js</code></td>
+        <td>No 404 on sampled images</td>
+      </tr>
+      <tr>
+        <td>Editor isolation</td>
+        <td>Log in as editor assigned to target tenant only</td>
+        <td>Cannot see source tenant rows</td>
+      </tr>
+      <tr>
+        <td>Multi-tenant editor (Phase 2)</td>
+        <td>Switch tenant in admin; create article in each</td>
+        <td>Correct tenant on create; no cross-tenant edit</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="future-scripts">9. Planned Scripts (Future — Not Implemented)</h2>
+
+  <div class="section-container usage">
+    <div class="section-header usage">📋 Clone tenant (implemented)</div>
+    <p>Script: <code class="script-name">clone-tenant-records.js</code> · npm: <code class="code-highlight">npm run clone:tenant</code></p>
+  </div>
+
+  <div class="command-block advance"
+       data-command-type="advance"
+       data-command-base="node scripts/clone-tenant-records.js"
+       data-template-command="node scripts/clone-tenant-records.js --source-tenant-id=tenant_demo_002 --target-tenant-id=tenant_demo_003 --create-target --slug-suffix=-demo003 --dry-run">
+    <div class="command-header">
+      <span class="command-type">Clone Script (planned)</span>
+      <div class="command-header-buttons">
+        <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'clone-tenant')" title="Copy template command">📄 Template</button>
+        <button type="button" class="copy-button" onclick="copyCommand(this, 'clone-tenant')" title="Copy customized command">📋 Copy</button>
+      </div>
+    </div>
+    <div class="command-parameters">
+      <h5>🔧 Customize Parameters:</h5>
+      <div class="parameter-group">
+        <div class="parameter-input">
+          <label for="clone-tenant-source-tenant-id">Source tenant ID:</label>
+          <input type="text" id="clone-tenant-source-tenant-id" value="tenant_demo_002" oninput="updateCommand('clone-tenant', 'source-tenant-id', this.value)">
+        </div>
+        <div class="parameter-input">
+          <label for="clone-tenant-target-tenant-id">Target tenant ID:</label>
+          <input type="text" id="clone-tenant-target-tenant-id" value="tenant_demo_003" oninput="updateCommand('clone-tenant', 'target-tenant-id', this.value)">
+        </div>
+      </div>
+      <div class="parameter-group">
+        <div class="parameter-input">
+          <label for="clone-tenant-slug-suffix">Slug suffix:</label>
+          <input type="text" id="clone-tenant-slug-suffix" value="-demo003" oninput="updateCommand('clone-tenant', 'slug-suffix', this.value)">
+        </div>
+        <div class="parameter-input">
+          <label for="clone-tenant-extra-flags">Extra flags:</label>
+          <input type="text" id="clone-tenant-extra-flags" value="--create-target --dry-run" placeholder="--create-target --dry-run" oninput="updateCommand('clone-tenant', 'extra-flags', this.value)">
+        </div>
+      </div>
+    </div>
+    <div class="command-content" id="clone-tenant">node scripts/clone-tenant-records.js --source-tenant-id=tenant_demo_002 --target-tenant-id=tenant_demo_003 --create-target --slug-suffix=-demo003 --dry-run</div>
+    <div class="command-single-line" id="clone-tenant-single">
+      <div class="command-single-line-label">Windows Single-Line:</div>
+      <code id="clone-tenant-single-code">node scripts/clone-tenant-records.js --source-tenant-id=tenant_demo_002 --target-tenant-id=tenant_demo_003 --create-target --slug-suffix=-demo003 --dry-run</code>
+    </div>
+  </div>
+
+  <div class="section-container">
+    <div class="section-header">📋 Existing: assign editor to one tenant</div>
+    <p>Works today — assigning a <strong>second</strong> tenant to the same email <strong>replaces</strong> the first (not additive).</p>
+  </div>
+
+  <div class="command-block setup"
+       data-command-type="setup"
+       data-command-base="node scripts/assign-editor-to-directory-tenant.js"
+       data-template-command="node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_demo_002">
+    <div class="command-header">
+      <span class="command-type">Setup Script (existing)</span>
+      <div class="command-header-buttons">
+        <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'assign-editor')" title="Copy template command">📄 Template</button>
+        <button type="button" class="copy-button" onclick="copyCommand(this, 'assign-editor')" title="Copy customized command">📋 Copy</button>
+      </div>
+    </div>
+    <div class="command-parameters">
+      <h5>🔧 Customize Parameters:</h5>
+      <div class="parameter-group">
+        <div class="parameter-input">
+          <label for="assign-editor-editor-email">Editor email:</label>
+          <input type="email" id="assign-editor-editor-email" value="editor@example.com" oninput="updateCommand('assign-editor', 'editor-email', this.value)">
+        </div>
+        <div class="parameter-input">
+          <label for="assign-editor-tenant-id">Tenant ID:</label>
+          <input type="text" id="assign-editor-tenant-id" value="tenant_demo_002" oninput="updateCommand('assign-editor', 'tenant-id', this.value)">
+        </div>
+      </div>
+    </div>
+    <div class="command-content" id="assign-editor">node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_demo_002</div>
+    <div class="command-single-line" id="assign-editor-single">
+      <div class="command-single-line-label">Windows Single-Line:</div>
+      <code id="assign-editor-single-code">node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_demo_002</code>
+    </div>
+  </div>
+
+  <div class="command-block verify"
+       data-command-type="verify"
+       data-command-base="node scripts/verify-editor-tenant-liturgy.js"
+       data-template-command="node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002">
+    <div class="command-header">
+      <span class="command-type">Verify Script (existing)</span>
+      <div class="command-header-buttons">
+        <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'verify-tenant')" title="Copy template command">📄 Template</button>
+        <button type="button" class="copy-button" onclick="copyCommand(this, 'verify-tenant')" title="Copy customized command">📋 Copy</button>
+      </div>
+    </div>
+    <div class="command-parameters">
+      <h5>🔧 Customize Parameters:</h5>
+      <div class="parameter-group single">
+        <div class="parameter-input">
+          <label for="verify-tenant-tenant-id">Tenant ID:</label>
+          <input type="text" id="verify-tenant-tenant-id" value="tenant_demo_002" oninput="updateCommand('verify-tenant', 'tenant-id', this.value)">
+        </div>
+      </div>
+    </div>
+    <div class="command-content" id="verify-tenant">node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002</div>
+    <div class="command-single-line" id="verify-tenant-single">
+      <div class="command-single-line-label">Windows Single-Line:</div>
+      <code id="verify-tenant-single-code">node scripts/verify-editor-tenant-liturgy.js --tenant-id=tenant_demo_002</code>
+    </div>
+  </div>
+
+  <h3>9.1 Copy-paste implementation prompt (for future agent/session)</h3>
+  <div class="prompt-block">
+    <div class="prompt-header">
+      <strong>AI / developer implementation prompt</strong>
+      <button type="button" class="copy-button" onclick="copyPrompt(this)" title="Copy prompt">📋 Copy</button>
+    </div>
+    <pre class="prompt-body" id="impl-prompt">Implement tenant replication for strapi-editorial-template per documentation/multi_tenant/tenant-replication-and-multi-tenant-users-prd.html.
+
+Requirements:
+1. Create scripts/clone-tenant-records.js with --source-tenant-id, --target-tenant-id, --create-target, --slug-suffix, --dry-run, --types optional subset.
+2. Process ~30 tenant-scoped collection types in dependency order (dioceses before parishes/priests; kalpana-editions before kalpana-documents; articles last).
+3. Maintain oldDocumentId→newDocumentId map; remap internal relations; set tenant to target.
+4. Handle article draft/publish rows and tenant join tables (see src/bootstrap.js registerTenantPublishMiddleware).
+5. Reuse S3 media files where possible; use files_related_mph for media links per .cursor/rules/strapi-media-relation-image-upload-fix.mdc.
+6. Skip or document single types directory-home and kalpana-page (Strapi singleType limit).
+7. Add npm script clone:tenant and scripts/inventory-tenant-records.js for pre-clone counts.
+8. Do not implement multi-tenant editor schema until Phase 2 is approved.
+
+Test: dry-run on tenant_demo_002 locally; verify counts with --tenant-id filter.</pre>
+  </div>
+
+  <h2 id="references">10. References</h2>
+  <table>
+    <thead>
+      <tr><th>Topic</th><th>Location</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Tenant schema</td><td><code>src/api/tenant/content-types/tenant/schema.json</code></td></tr>
+      <tr><td>Editor assignment schema</td><td><code>src/api/editor-tenant/content-types/editor-tenant/schema.json</code></td></tr>
+      <tr><td>Tenant assignment logic</td><td><code>src/utils/tenant-assignment.js</code></td></tr>
+      <tr><td>Admin isolation middleware</td><td><code>src/bootstrap.js</code></td></tr>
+      <tr><td>Multi-tenant rules</td><td><code>.cursor/rules/multi-tenant-assignment.mdc</code></td></tr>
+      <tr><td>Assign editor script</td><td><code>scripts/assign-editor-to-directory-tenant.js</code></td></tr>
+      <tr><td>Partial tenant export</td><td><code>scripts/export_news_tenant_demo.js</code></td></tr>
+      <tr><td>Full push ordering</td><td><code>scripts/rest_api_push_to_cloud.js</code> (PUSH_FIRST)</td></tr>
+      <tr><td>Admin user guide</td><td><code>documentation/user_guide/admin_user_guide.html</code></td></tr>
+      <tr><td>Export/import guide</td><td><code>documentation/strapi5_export_import_transfer.html</code></td></tr>
+      <tr><td>Production tenant repair</td><td><code>.cursor/rules/strapi_production_news_tenant_categories.mdc</code></td></tr>
+    </tbody>
+  </table>
+
+  <p class="meta">Document version 1.0 — June 2026 · Status: Analysis PRD (no implementation) · Project: <code>strapi-editorial-template</code></p>
+
+  <script>
+    const commandParams = {};
+
+    function fallbackCopy(text, button) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        button.classList.add('copied');
+        const original = button.textContent;
+        button.textContent = '✓ Copied!';
+        setTimeout(function() {
+          button.classList.remove('copied');
+          button.textContent = original;
+        }, 2000);
+      } catch (e) {
+        console.error('Copy failed', e);
+      }
+      document.body.removeChild(ta);
+    }
+
+    function copyText(text, button, resetLabel) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+          button.classList.add('copied');
+          const original = button.textContent;
+          button.textContent = '✓ Copied!';
+          setTimeout(function() {
+            button.classList.remove('copied');
+            button.textContent = resetLabel || original;
+          }, 2000);
+        }).catch(function() {
+          fallbackCopy(text, button);
+        });
+      } else {
+        fallbackCopy(text, button);
+      }
+    }
+
+    function copyCommand(button, commandId) {
+      const el = document.getElementById(commandId);
+      if (!el) return;
+      copyText(el.textContent.trim(), button, '📋 Copy');
+    }
+
+    function copyTemplateCommand(button, commandId) {
+      const block = button.closest('.command-block');
+      if (!block) return;
+      let template = block.getAttribute('data-template-command') || '';
+      template = template.replace(/&quot;/g, '"');
+      copyText(template, button, '📄 Template');
+    }
+
+    function copyPrompt(button) {
+      const el = document.getElementById('impl-prompt');
+      if (!el) return;
+      copyText(el.textContent.trim(), button, '📋 Copy');
+    }
+
+    function updateCommandFromParams(commandId) {
+      const block = document.querySelector('.command-block .command-content#' + commandId);
+      if (!block) return;
+      const commandBlock = block.closest('.command-block');
+      if (!commandBlock) return;
+
+      let base = commandBlock.getAttribute('data-command-base') || '';
+      const params = commandParams[commandId] || {};
+      let command = base;
+
+      if (commandId === 'clone-tenant') {
+        if (params['source-tenant-id'] && params['source-tenant-id'].trim()) {
+          command += ' --source-tenant-id=' + params['source-tenant-id'].trim();
+        }
+        if (params['target-tenant-id'] && params['target-tenant-id'].trim()) {
+          command += ' --target-tenant-id=' + params['target-tenant-id'].trim();
+        }
+        if (params['slug-suffix'] && params['slug-suffix'].trim()) {
+          command += ' --slug-suffix=' + params['slug-suffix'].trim();
+        }
+        if (params['extra-flags'] && params['extra-flags'].trim()) {
+          command += ' ' + params['extra-flags'].trim();
+        }
+      } else if (commandId === 'assign-editor') {
+        const email = (params['editor-email'] || 'editor@example.com').trim();
+        const tenant = (params['tenant-id'] || 'tenant_demo_002').trim();
+        command = base + ' ' + email + ' ' + tenant;
+      } else if (commandId === 'verify-tenant') {
+        if (params['tenant-id'] && params['tenant-id'].trim()) {
+          command += ' --tenant-id=' + params['tenant-id'].trim();
+        }
+      }
+
+      block.textContent = command;
+      const single = document.getElementById(commandId + '-single-code');
+      if (single) single.textContent = command;
+    }
+
+    function updateCommand(commandId, paramName, paramValue) {
+      if (!commandParams[commandId]) commandParams[commandId] = {};
+      commandParams[commandId][paramName] = paramValue;
+      updateCommandFromParams(commandId);
+    }
+
+    function initializeCommands() {
+      document.querySelectorAll('.command-block[data-command-base]').forEach(function(block) {
+        const commandContent = block.querySelector('.command-content');
+        if (!commandContent || !commandContent.id) return;
+        const commandId = commandContent.id;
+
+        block.querySelectorAll('.parameter-input input').forEach(function(input) {
+          const inputId = input.id;
+          if (!inputId || inputId.indexOf(commandId + '-') !== 0) return;
+          const paramName = inputId.substring(commandId.length + 1);
+          if (!commandParams[commandId]) commandParams[commandId] = {};
+          commandParams[commandId][paramName] = input.value || '';
+        });
+
+        updateCommandFromParams(commandId);
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeCommands);
+  </script>
+</body>
+</html>

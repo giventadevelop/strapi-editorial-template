@@ -15,8 +15,13 @@
     "adminUserEmail": {
       "type": "string",
       "required": true,
+      "description": "Admin user's email (must match exactly the email they use to log in). Same email may have multiple rows (one per tenant)."
+    },
+    "assignmentKey": {
+      "type": "string",
+      "required": true,
       "unique": true,
-      "description": "Admin user's email (must match exactly the email they use to log in)"
+      "description": "Unique key: lowercase email + tenant tenantId (auto-set on save)."
     },
     "tenant": {
       "type": "relation",

@@ -1,16 +1,15 @@
 'use strict';
 
 /**
- * Assign an Editor (admin user) to a tenant so they can see that tenant's
- * content (Directory, Liturgical Calendar – Day, Articles, etc.) in the Content Manager.
- * Without this mapping, the list shows "0 entries" for tenant-scoped types.
+ * Assign an Editor (admin user) to a tenant.
  *
- * Usage (Windows and Unix):
+ * Default (--add): add assignment if email+tenant not already mapped (multi-tenant editors).
+ * --replace: replace all assignments for this email with the single tenant (legacy behavior).
+ *
+ * Usage:
  *   node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_demo_002
- *   node scripts/assign-editor-to-directory-tenant.js editor@example.com
- *
- * With env (Unix only): TENANT_ID=tenant_demo_002 node scripts/assign-editor-to-directory-tenant.js editor@example.com
- * Default tenant if omitted: directory_mosc_001 (from .env TENANT_ID or this default)
+ *   node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_demo_002 --add
+ *   node scripts/assign-editor-to-directory-tenant.js editor@example.com tenant_demo_002 --replace
  */
 
 try {
@@ -18,18 +17,25 @@ try {
 } catch (_) {}
 
 function getTenantId() {
-  if (process.argv[3] && String(process.argv[3]).trim()) return process.argv[3].trim();
+  const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+  if (args[1] && String(args[1]).trim()) return args[1].trim();
   if (process.env.TENANT_ID) return process.env.TENANT_ID.trim();
   return 'directory_mosc_001';
 }
 
+function buildAssignmentKey(email, tenantId) {
+  return `${String(email).trim().toLowerCase()}__${tenantId}`;
+}
+
+const replaceMode = process.argv.includes('--replace');
+const addMode = process.argv.includes('--add') || !replaceMode;
 const tenantId = getTenantId();
 
 async function main() {
-  const email = process.argv[2] || process.env.EDITOR_EMAIL;
+  const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+  const email = args[0] || process.env.EDITOR_EMAIL;
   if (!email || !String(email).trim()) {
-    console.error('Usage: node scripts/assign-editor-to-directory-tenant.js <editor-email> [tenant-id]');
-    console.error('Example (Windows): node scripts/assign-editor-to-directory-tenant.js mosc.regular.user@keleno.com tenant_demo_002');
+    console.error('Usage: node scripts/assign-editor-to-directory-tenant.js <editor-email> [tenant-id] [--add|--replace]');
     process.exit(1);
   }
   const editorEmail = String(email).trim().toLowerCase();
@@ -47,8 +53,6 @@ async function main() {
     });
     if (!tenant) {
       console.error('Tenant not found:', tenantId);
-      console.error('Run the directory import first (npm run seed:data_import_seed_directory_mosc_in) to create the tenant.');
-      await app.destroy();
       process.exit(1);
     }
 
@@ -56,32 +60,44 @@ async function main() {
       where: {},
       populate: { tenant: true },
     });
-    const mapping = mappings.find(
+    const forEmail = mappings.filter(
       (m) => (m.adminUserEmail || '').toLowerCase() === editorEmail
     );
 
-    if (mapping) {
-      const currentTenantId = mapping.tenant?.tenantId ?? mapping.tenant?.id;
-      if (currentTenantId === tenant.id || currentTenantId === tenant.tenantId) {
-        console.log('Editor', editorEmail, 'is already assigned to tenant', tenantId);
-        await app.destroy();
-        process.exit(0);
-      }
-      await strapi.db.query('api::editor-tenant.editor-tenant').update({
-        where: { id: mapping.id },
-        data: { tenant: tenant.id },
-      });
-      console.log('Updated Editor Tenant:', editorEmail, '-> tenant', tenantId);
-    } else {
-      await strapi.db.query('api::editor-tenant.editor-tenant').create({
-        data: {
-          adminUserEmail: editorEmail,
-          tenant: tenant.id,
-        },
-      });
-      console.log('Created Editor Tenant:', editorEmail, '-> tenant', tenantId);
+    const existingForPair = forEmail.find(
+      (m) => (m.tenant?.tenantId ?? m.tenant?.tenant_id) === tenant.tenantId
+    );
+
+    if (existingForPair) {
+      console.log('Editor', editorEmail, 'is already assigned to tenant', tenantId);
+      await app.destroy();
+      process.exit(0);
     }
-    console.log('Done. Have the editor log out and log back in; they should now see Directory – Bishops, Dioceses, Entries, etc.');
+
+    if (replaceMode && forEmail.length > 0) {
+      for (const row of forEmail) {
+        await strapi.db.query('api::editor-tenant.editor-tenant').delete({ where: { id: row.id } });
+      }
+      console.log('Removed', forEmail.length, 'previous assignment(s) for', editorEmail);
+    }
+
+    const assignmentKey = buildAssignmentKey(editorEmail, tenant.tenantId);
+    await strapi.db.query('api::editor-tenant.editor-tenant').create({
+      data: {
+        adminUserEmail: editorEmail,
+        assignmentKey,
+        tenant: tenant.id,
+      },
+    });
+
+    console.log(
+      addMode ? 'Added' : 'Created',
+      'Editor Tenant:',
+      editorEmail,
+      '-> tenant',
+      tenantId
+    );
+    console.log('Have the editor log out and log back in. Use the Active tenant switcher if multiple tenants are assigned.');
   } catch (err) {
     console.error('Error:', err.message);
     throw err;
