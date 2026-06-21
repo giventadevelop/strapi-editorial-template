@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Runbook: clone tenant_demo_002 to a new tenant locally, push all records to Strapi Cloud, link media — issues, workarounds, and commands (mosc_malankara_orthodox_2 case study).">
+  <title>Runbook: Tenant Clone &amp; Cloud Port</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; max-width: 1200px; margin: 0 auto; padding: 2rem; color: #333; }
+    h1 { font-size: 2.5em; color: #1a1a1a; border-bottom: 3px solid #0066cc; padding-bottom: 0.5rem; }
+    h2 { font-size: 1.8em; color: #2d2d2d; margin-top: 2rem; border-left: 4px solid #0066cc; padding-left: 15px; }
+    h3 { font-size: 1.4em; color: #333; margin-top: 1.5rem; }
+    a { color: #0066cc; }
+    code { background-color: #e8f4f8 !important; color: #0d3b66 !important; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9em; border: 1px solid #b8d4e3; }
+    pre { background-color: #e8f4f8 !important; color: #0d3b66 !important; padding: 1rem; overflow-x: auto; white-space: pre-wrap; border-radius: 4px; margin: 15px 0; border: 1px solid #b8d4e3; }
+    pre code { background: transparent !important; padding: 0; border: none; }
+    .note, .info { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .caution { background: #f8d7da; border-left: 4px solid #dc3545; padding: 0.75rem 1rem; margin: 1rem 0; }
+    .success { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; }
+    table { border-collapse: collapse; width: 100%; margin: 15px 0; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: bold; font-size: 0.9em; }
+    tr:nth-child(even) { background-color: #f8f9fa; }
+    tr:hover { background-color: #e3f2fd; }
+    td code { background-color: #e8f4f8; color: #0d3b66; padding: 3px 8px; border-radius: 3px; border: 1px solid #b8d4e3; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-container { background: linear-gradient(135deg, #f0f7ff 0%, #e6f2ff 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-container.parameters { background: linear-gradient(135deg, #fff5e6 0%, #ffe6cc 100%); border-left-color: #ff9800; }
+    .section-container.usage { background: linear-gradient(135deg, #f0e6ff 0%, #e6ccff 100%); border-left-color: #9c27b0; }
+    .section-container.output { background: linear-gradient(135deg, #e6ffe6 0%, #ccffcc 100%); border-left-color: #28a745; }
+    .section-header { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; padding: 12px 20px; margin: -20px -20px 20px -20px; border-radius: 8px 8px 0 0; font-size: 1.2em; font-weight: bold; }
+    .section-header.parameters { background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%); }
+    .section-header.usage { background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%); }
+    .section-header.output { background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; overflow: hidden; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: rgba(0,0,0,0.05); flex-wrap: wrap; gap: 8px; }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; word-break: break-word; color: #0d3b66; background: #e8f4f8; white-space: pre-wrap; }
+    .copy-button { background-color: #0066cc; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85em; font-weight: bold; }
+    .phase-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold; background: #0066cc; color: white; margin-right: 6px; }
+    .meta { color: #666; font-size: 0.9rem; margin-top: 2rem; border-top: 1px solid #b8d4e3; padding-top: 1rem; }
+  </style>
+</head>
+<body>
+  <p><a href="tenant-replication-and-multi-tenant-users-prd.html">← Tenant replication PRD</a> · <a href="../front_end_based_collection_types_import/production_cloud_data_push/index.html">Cloud push index</a> · <a href="../index.html">Documentation index</a></p>
+
+  <h1>Runbook: Tenant Clone &amp; Cloud Port</h1>
+
+  <div class="section-intro">
+    <p><strong>Purpose:</strong> Operational guide for copying all content from an existing tenant (e.g. <code>tenant_demo_002</code>) to a <strong>new tenant ID</strong> on the same local Strapi instance, then pushing that tenant’s data and media to <strong>Strapi Cloud</strong>.</p>
+    <p><strong>Case study (June 2026):</strong> <code>tenant_demo_002</code> → <code>mosc_malankara_orthodox_2</code> (slug suffix <code>-mo2</code>) · ~3,022 local records · 3,018 created on Cloud · 302 image/PDF links via REST fallback.</p>
+    <p><strong>Related PRD:</strong> <a href="tenant-replication-and-multi-tenant-users-prd.html">Tenant Replication &amp; Multi-Tenant Editor Access</a> · <strong>Image fix:</strong> <a href="../front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html">Cloud image upload migration fix</a></p>
+  </div>
+
+  <nav class="section-intro" aria-label="Table of contents">
+    <h3>Table of Contents</h3>
+    <ol>
+      <li><a href="#overview">End-to-end overview</a></li>
+      <li><a href="#prerequisites">Prerequisites &amp; environment</a></li>
+      <li><a href="#phase-local">Phase A — Local tenant clone</a></li>
+      <li><a href="#phase-cloud-content">Phase B — Cloud deploy &amp; content push</a></li>
+      <li><a href="#phase-cloud-media">Phase C — Cloud media (images &amp; Kalpana PDFs)</a></li>
+      <li><a href="#phase-editor">Phase D — Editor assignment &amp; permissions</a></li>
+      <li><a href="#issues">Issues &amp; workarounds (by phase)</a></li>
+      <li><a href="#kalpana">Kalpana-specific issues (editions + documents)</a></li>
+      <li><a href="#verification">Verification commands</a></li>
+      <li><a href="#scripts">Script reference</a></li>
+    </ol>
+  </nav>
+
+  <h2 id="overview">1. End-to-end overview</h2>
+  <table>
+    <thead><tr><th>Phase</th><th>Where</th><th>Goal</th><th>Primary script / npm</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="phase-badge">A</span> Local clone</td>
+        <td>Local SQLite Strapi</td>
+        <td>Copy all collection-type rows from source tenant → target tenant; suffix slugs globally</td>
+        <td><code class="script-name">clone-tenant-records.js</code> · <code>npm run clone:tenant</code></td>
+      </tr>
+      <tr>
+        <td><span class="phase-badge">B</span> Cloud content</td>
+        <td>Strapi Cloud REST API</td>
+        <td>Upsert all target-tenant records to Cloud (media stripped from payload)</td>
+        <td><code class="script-name">push-tenant-to-cloud.js</code> · <code>npm run push:tenant-to-cloud</code></td>
+      </tr>
+      <tr>
+        <td><span class="phase-badge">C</span> Cloud media</td>
+        <td>Cloud migration + REST</td>
+        <td>Upload binaries from <code>public/uploads/</code> and link to entries</td>
+        <td><code>finish:all-collection-images-on-cloud</code> + REST fallback (see §6–7)</td>
+      </tr>
+      <tr>
+        <td><span class="phase-badge">D</span> Editors</td>
+        <td>Local + Cloud</td>
+        <td>Assign editor to new tenant; grant CM permissions on Cloud</td>
+        <td><code>assign-editor-to-directory-tenant.js</code> · <code>grant:editor-directory-on-cloud</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warn">
+    <strong>Slugs are global per Strapi instance.</strong> A cloned tenant on the same instance (local or Cloud) <em>must</em> use a slug suffix (e.g. <code>-mo2</code>) so rows do not collide with the source tenant. The clone and push scripts support <code>--slug-suffix</code> (local) or inherit suffixed slugs from the local DB (cloud push).
+  </div>
+
+  <h2 id="prerequisites">2. Prerequisites &amp; environment</h2>
+  <div class="section-container parameters">
+    <div class="section-header parameters">Required .env (Cloud push)</div>
+    <ul>
+      <li><code>STRAPI_CLOUD_URL</code> — e.g. <code>https://awesome-birthday-82f0a4fa96.strapiapp.com</code></li>
+      <li><code>STRAPI_CLOUD_API_TOKEN</code> — Full Access API token</li>
+      <li><code>AWS_*</code> — optional for S3-backed media (see image fix doc)</li>
+    </ul>
+  </div>
+
+  <table>
+    <thead><tr><th>Constraint</th><th>Detail</th><th>Workaround</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Stop local Strapi before clone/push</td>
+        <td>SQLite file lock (<code>.tmp/data.db</code>)</td>
+        <td>Stop <code>npm run develop</code> before running embedded-Strapi scripts</td>
+      </tr>
+      <tr>
+        <td>Node version for scripts</td>
+        <td><code>better-sqlite3</code> ABI must match Node (local: Node 22 vs system Node 24)</td>
+        <td>Use Node 22 binary explicitly on Windows, e.g. <code>C:\Daily_Startup_Files\tools\node-v22.11.0-win-x64\node.exe</code></td>
+      </tr>
+      <tr>
+        <td>TLS on Windows</td>
+        <td>Node fetch to Cloud may fail certificate validation</td>
+        <td><code>$env:NODE_TLS_REJECT_UNAUTHORIZED='0'</code> before Cloud scripts (dev only)</td>
+      </tr>
+      <tr>
+        <td><code>TENANT_ID</code> in .env</td>
+        <td>Defaults to <code>tenant_demo_002</code>; overrides CLI <code>--tenant-id</code> in some image scripts</td>
+        <td>Set <code>$env:TENANT_ID='your_target_tenant'</code> before image commands; finish scripts use <code>dotenv override: false</code></td>
+      </tr>
+      <tr>
+        <td>Cloud deploy</td>
+        <td><code>npm run deploy</code> requires interactive login</td>
+        <td><code>npx strapi login</code> then <code>npm run deploy</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="phase-local">3. Phase A — Local tenant clone</h2>
+
+  <div class="section-container usage">
+    <div class="section-header usage">Step-by-step</div>
+    <ol>
+      <li>Inventory source tenant (optional): <code>npm run inventory:tenant -- --tenant-id=tenant_demo_002</code></li>
+      <li>Dry-run clone: see command block below</li>
+      <li>Execute clone (create target tenant if needed): add <code>--create-target</code></li>
+      <li>Inventory target tenant — expect same row counts minus known edge-case failures</li>
+    </ol>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Inventory target tenant</strong></div>
+    <div class="command-content">npm run inventory:tenant -- --tenant-id=mosc_malankara_orthodox_2</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Clone (dry-run)</strong></div>
+    <div class="command-content">node scripts/clone-tenant-records.js --source-tenant-id=tenant_demo_002 --target-tenant-id=mosc_malankara_orthodox_2 --create-target --slug-suffix=-mo2 --dry-run</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Clone (execute) — stop Strapi first</strong></div>
+    <div class="command-content">node scripts/clone-tenant-records.js --source-tenant-id=tenant_demo_002 --target-tenant-id=mosc_malankara_orthodox_2 --create-target --slug-suffix=-mo2</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Re-clone from scratch (destructive on target)</strong></div>
+    <div class="command-content">node scripts/clone-tenant-records.js --source-tenant-id=tenant_demo_002 --target-tenant-id=mosc_malankara_orthodox_2 --slug-suffix=-mo2 --clean-target --force</div>
+  </div>
+
+  <div class="note">
+    <strong>Skipped on clone:</strong> Single types <code>directory-home</code> and <code>kalpana-page</code> (max one per Strapi instance). Kalpana page content remains on the source tenant unless manually copied.
+  </div>
+
+  <h2 id="phase-cloud-content">4. Phase B — Cloud deploy &amp; content push</h2>
+
+  <div class="section-container usage">
+    <div class="section-header usage">Step-by-step</div>
+    <ol>
+      <li>Deploy schema/code to Cloud: <code>npx strapi login</code> → <code>npm run deploy</code></li>
+      <li>Create target tenant on Cloud (API or admin) if it does not exist</li>
+      <li>Dry-run push from local DB</li>
+      <li>Full push (~18 min for ~3k records)</li>
+      <li>Compare inventories (local vs Cloud) — see <a href="#verification">§9</a></li>
+    </ol>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Probe Cloud tenants</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; node scripts/probe-cloud-tenants.js --full --tenant-id=mosc_malankara_orthodox_2</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Push tenant to Cloud (dry-run)</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; node scripts/push-tenant-to-cloud.js --tenant-id=mosc_malankara_orthodox_2 --dry-run</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Push tenant to Cloud (full)</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; node scripts/push-tenant-to-cloud.js --tenant-id=mosc_malankara_orthodox_2 --delay-ms=80</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Re-push skipped articles only (force)</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run push:tenant-to-cloud -- --tenant-id=mosc_malankara_orthodox_2 --types=articles --force</div>
+  </div>
+
+  <div class="success">
+    <strong>Case study result:</strong> Created <strong>3,018</strong> · Skipped <strong>4</strong> (article slugs already on Cloud) · Failed <strong>0</strong>. Local total 3,022 = 3,018 + 4 skipped.
+  </div>
+
+  <h2 id="phase-cloud-media">5. Phase C — Cloud media (images &amp; PDFs)</h2>
+
+  <p>Content push <strong>does not</strong> upload media. After Phase B, run the image migration pipeline. See also <a href="../front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html">Cloud image upload migration fix</a>.</p>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Finish all collection images (set tenant env!)</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; $env:TENANT_ID='mosc_malankara_orthodox_2'; npm run finish:all-collection-images-on-cloud -- --tenant-id=mosc_malankara_orthodox_2</div>
+  </div>
+
+  <div class="caution">
+    <strong>Known failure mode:</strong> <code>finish:all-collection-images-on-cloud</code> may exit <code>1</code> with “Created: N | Linked: N” but verification shows <strong>all MISSING</strong>. The migration endpoint’s DB morph link does not surface via Strapi 5 REST. Use the <strong>REST fallback</strong> in §7.2.
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>REST link fallback (all registered collections)</strong></div>
+    <div class="command-content">Uses scripts/lib/link-cloud-images-rest.js with correct mediaField per collection (see cloud-image-migration-config.js). After fix (June 2026), linkImagesViaRest accepts mediaField: image | cardImage | pdf.</div>
+  </div>
+
+  <h2 id="phase-editor">6. Phase D — Editor assignment &amp; permissions</h2>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Assign editor locally (multi-tenant — add mode)</strong></div>
+    <div class="command-content">node scripts/assign-editor-to-directory-tenant.js giventauser@gmail.com mosc_malankara_orthodox_2 --add</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Grant directory CM permissions on Cloud</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run grant:editor-directory-on-cloud</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Assign editor on Cloud (REST)</strong></div>
+    <div class="command-content">POST /api/editor-tenants with { adminUserEmail, assignmentKey: "email__tenantId", tenant: tenantDocumentId }</div>
+  </div>
+
+  <p>Editor must <strong>log out and back in</strong> to see the tenant switcher and new content types.</p>
+
+  <h2 id="issues">7. Issues &amp; workarounds (by phase)</h2>
+
+  <h3>7.1 Phase A — Local clone</h3>
+  <table>
+    <thead><tr><th>Issue</th><th>Symptom</th><th>Root cause</th><th>Fix / workaround</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Slug suffix not applied</td>
+        <td>Clone fails with unique slug constraint errors</td>
+        <td><code>buildClonePayload</code> read <code>ctx.slugSuffix</code> instead of <code>ctx.args.slugSuffix</code></td>
+        <td>Fixed in <code>scripts/lib/tenant-clone-helpers.js</code> — always pass suffix via clone args</td>
+      </tr>
+      <tr>
+        <td>Diocese tenant overwritten</td>
+        <td>Cloned dioceses get wrong tenant</td>
+        <td>Diocese lifecycle reset tenant on create</td>
+        <td>Fixed in <code>src/api/diocese/content-types/diocese/lifecycles.js</code> (preserve explicit tenant, same as parish)</td>
+      </tr>
+      <tr>
+        <td>Partial clone failures</td>
+        <td>5 records failed (3,017/3,022)</td>
+        <td>1 flash-news null title; 4 duplicate article slugs in source data</td>
+        <td>Optional: fix source data or retry individual types with <code>--force</code></td>
+      </tr>
+      <tr>
+        <td>SQLite locked</td>
+        <td>Script hangs or throws database locked</td>
+        <td>Strapi dev server holding <code>.tmp/data.db</code></td>
+        <td>Stop <code>npm run develop</code> before clone</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>7.2 Phase B — Cloud content push</h3>
+  <table>
+    <thead><tr><th>Issue</th><th>Symptom</th><th>Root cause</th><th>Fix / workaround</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Wrong REST plural names</td>
+        <td>HTTP 404 on push</td>
+        <td>Inferred plurals wrong (e.g. <code>catholicoses</code> vs <code>catholicos-entries</code>)</td>
+        <td><code>PLURAL_BY_UID</code> map in <code>tenant-clone-config.js</code>; prefers schema <code>pluralName</code></td>
+      </tr>
+      <tr>
+        <td>Author global map failed</td>
+        <td>HTTP 400 on <code>/api/authors?fields[0]=slug</code></td>
+        <td>Authors have no <code>slug</code> field</td>
+        <td>Map Cloud authors by <code>name</code> in push helpers</td>
+      </tr>
+      <tr>
+        <td>4 articles skipped</td>
+        <td>Local 79 vs Cloud 75 articles</td>
+        <td>Slug already exists on Cloud (global uniqueness vs <code>tenant_demo_002</code>)</td>
+        <td>Accept skip or <code>--force</code> on articles subset; verify slugs in admin</td>
+      </tr>
+      <tr>
+        <td>Inventory shows 0 articles on Cloud</td>
+        <td>Probe counts wrong for articles/flash-news</td>
+        <td>Draft-and-publish types default to published filter in REST</td>
+        <td><code>probe-cloud-tenants.js --full</code> uses <code>&amp;status=draft</code> for D&amp;P types</td>
+      </tr>
+      <tr>
+        <td>Cloud tenant missing</td>
+        <td>Push exits: tenant not found</td>
+        <td>Tenant row not created on Cloud</td>
+        <td>Create via admin or POST <code>/api/tenants</code> before push</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>7.3 Phase C — Cloud media</h3>
+  <table>
+    <thead><tr><th>Issue</th><th>Symptom</th><th>Root cause</th><th>Fix / workaround</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Morph link “success” but API null</td>
+        <td><code>Created: 9 | Linked: 9</code> then verify <code>0 distinct images | N missing</code></td>
+        <td>Migration <code>files_related_mph</code> insert does not bind for Strapi 5 document API / REST populate</td>
+        <td><strong>REST PUT fallback:</strong> <code>linkImagesViaRest</code> in <code>scripts/lib/link-cloud-images-rest.js</code></td>
+      </tr>
+      <tr>
+        <td>Wrong tenant during image migration</td>
+        <td>Log shows <code>Tenant: tenant_demo_002</code> despite <code>--tenant-id=mosc_...</code></td>
+        <td><code>TENANT_ID</code> in <code>.env</code> + <code>dotenv override: true</code> in finish scripts</td>
+        <td>Set <code>$env:TENANT_ID</code> explicitly; finish scripts now use <code>override: false</code></td>
+      </tr>
+      <tr>
+        <td>finish script exit 1</td>
+        <td>All 11 collections FAIL in summary</td>
+        <td>Verification step requires <code>missing === 0</code>; morph link ineffective</td>
+        <td>Run REST fallback after migration upload; treat upload as success if REST links OK</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>7.4 Admin / deploy (cross-cutting)</h3>
+  <table>
+    <thead><tr><th>Issue</th><th>Symptom</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Blank Cloud/local admin after upgrade</td>
+        <td>Empty <code>/admin</code> page</td>
+        <td>Strapi 5 removed <code>injectContentManagerComponent</code>; use <code>app.getPlugin('content-manager').injectComponent(...)</code> in <code>src/admin/app.js</code></td>
+      </tr>
+      <tr>
+        <td>Deploy requires login</td>
+        <td><code>We couldn't find a valid token</code></td>
+        <td><code>npx strapi login</code> then <code>npm run deploy</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="kalpana">8. Kalpana-specific issues (editions + documents)</h2>
+
+  <div class="section-container">
+    <div class="section-header">Why Kalpana is different</div>
+    <p>Kalpana uses <strong>non-standard media field names</strong> and <strong>PDF binaries</strong>, not the usual <code>image</code> field used by directory card types.</p>
+    <table>
+      <thead><tr><th>Content type</th><th>Media field</th><th>Registry key</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>kalpana-edition</code></td>
+          <td><code>cardImage</code> (thumbnail)</td>
+          <td><code>kalpana-editions</code></td>
+          <td>12 edition rows per tenant; linked via migration + REST</td>
+        </tr>
+        <tr>
+          <td><code>kalpana-document</code></td>
+          <td><code>pdf</code> (not image)</td>
+          <td><code>kalpana-documents</code></td>
+          <td>~350 PDFs per tenant; larger payloads; dedicated push script available</td>
+        </tr>
+        <tr>
+          <td><code>kalpana-page</code></td>
+          <td>single type</td>
+          <td>—</td>
+          <td><strong>Not cloned</strong> per tenant on same instance — manual or separate instance</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>8.1 Kalpana issue: REST link used wrong field name</h3>
+  <div class="caution">
+    <strong>Symptom:</strong> <code>HTTP 400 ValidationError: Invalid key image</code> when linking kalpana-editions or kalpana-documents.<br>
+    <strong>Cause:</strong> <code>linkImagesViaRest</code> hardcoded <code>{ image: fileId }</code> in PUT body.<br>
+    <strong>Fix (June 2026):</strong> Pass <code>mediaField</code> from <code>cloud-image-migration-config.js</code> — <code>cardImage</code> for editions, <code>pdf</code> for documents. Updated in <code>scripts/lib/link-cloud-images-rest.js</code> and <code>push-collection-images-migration.js</code>.
+  </div>
+
+  <h3>8.2 Kalpana results (mosc_malankara_orthodox_2)</h3>
+  <table>
+    <thead><tr><th>Step</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Migration upload (finish-all)</td><td>Uploaded binaries; morph link reported linked; verify failed (0 visible via REST)</td></tr>
+      <tr><td>REST fallback — editions</td><td><strong>12/12</strong> linked via <code>cardImage</code></td></tr>
+      <tr><td>REST fallback — documents</td><td><strong>348/348</strong> PDFs linked via <code>pdf</code> field</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.3 Kalpana commands</h3>
+  <div class="command-block">
+    <div class="command-header"><strong>Per-type image finish (editions)</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; $env:TENANT_ID='mosc_malankara_orthodox_2'; npm run finish:collection-images-on-cloud -- --collection=kalpana-editions --tenant-id=mosc_malankara_orthodox_2</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Per-type PDF finish (documents)</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; $env:TENANT_ID='mosc_malankara_orthodox_2'; npm run finish:kalpana-documents-on-cloud -- --tenant-id=mosc_malankara_orthodox_2</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>Full Kalpana push (legacy per-type — content + PDF upload)</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; npm run push:kalpana-documents-to-cloud -- --tenant-id=mosc_malankara_orthodox_2</div>
+  </div>
+
+  <div class="command-block">
+    <div class="command-header"><strong>PDFs only retry (after content exists on Cloud)</strong></div>
+    <div class="command-content">$env:NODE_TLS_REJECT_UNAUTHORIZED='0'; node scripts/push-kalpana-documents-to-cloud.js --tenant-id=mosc_malankara_orthodox_2 --pdfs-only</div>
+  </div>
+
+  <div class="note">
+    <strong>When to use bulk vs per-type Kalpana scripts:</strong> After <code>push:tenant-to-cloud</code>, kalpana <em>records</em> are already on Cloud. You only need media linking (Phase C). Use <code>finish:kalpana-documents-on-cloud</code> or REST fallback — not a full re-import — unless PDF files were never uploaded.<br>
+    <strong>Full Kalpana guide:</strong> <a href="../kalpana/kalpana-import-and-cloud-push.html">kalpana-import-and-cloud-push.html</a>
+  </div>
+
+  <h2 id="verification">9. Verification commands</h2>
+  <table>
+    <thead><tr><th>Check</th><th>Command</th><th>Expected (case study)</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Local row counts</td>
+        <td><code>npm run inventory:tenant -- --tenant-id=mosc_malankara_orthodox_2</code></td>
+        <td>3,022 collection rows</td>
+      </tr>
+      <tr>
+        <td>Cloud row counts</td>
+        <td><code>node scripts/probe-cloud-tenants.js --full --tenant-id=mosc_malankara_orthodox_2</code></td>
+        <td>3,018 (4 articles skipped); D&amp;P types use draft count</td>
+      </tr>
+      <tr>
+        <td>Sample image on Cloud</td>
+        <td>GET <code>/api/catholicate-entries?filters[slug][$eq]=catholicate-intro-mo2&amp;populate=image</code></td>
+        <td><code>image.url</code> non-null after REST link</td>
+      </tr>
+      <tr>
+        <td>Sample Kalpana PDF</td>
+        <td>GET <code>/api/kalpana-documents?filters[tenant][tenantId][$eq]=mosc_malankara_orthodox_2&amp;populate=pdf&amp;pagination[pageSize]=1</code></td>
+        <td><code>pdf.url</code> non-null</td>
+      </tr>
+      <tr>
+        <td>Editor tenant list</td>
+        <td><code>node scripts/list-editor-tenant-assignments.js giventauser@gmail.com</code></td>
+        <td>Both <code>tenant_demo_002</code> and <code>mosc_malankara_orthodox_2</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="scripts">10. Script reference</h2>
+  <table>
+    <thead><tr><th>Script</th><th>npm</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td><code>inventory-tenant-records.js</code></td><td><code>inventory:tenant</code></td><td>Per-type counts for a tenant (local)</td></tr>
+      <tr><td><code>clone-tenant-records.js</code></td><td><code>clone:tenant</code></td><td>Clone source → target tenant locally</td></tr>
+      <tr><td><code>push-tenant-to-cloud.js</code></td><td><code>push:tenant-to-cloud</code></td><td>Bulk REST upsert of all collection types to Cloud</td></tr>
+      <tr><td><code>probe-cloud-tenants.js</code></td><td>—</td><td>Cloud tenant list + per-type counts (<code>--full</code>)</td></tr>
+      <tr><td><code>finish-all-collection-images-on-cloud.js</code></td><td><code>finish:all-collection-images-on-cloud</code></td><td>Migration upload + verify (may need REST fallback)</td></tr>
+      <tr><td><code>link-cloud-images-rest.js</code></td><td>—</td><td>REST PUT media link library (supports mediaField)</td></tr>
+      <tr><td><code>push-kalpana-documents-to-cloud.js</code></td><td><code>push:kalpana-documents-to-cloud</code></td><td>Full Kalpana document + PDF push (legacy path)</td></tr>
+      <tr><td><code>assign-editor-to-directory-tenant.js</code></td><td><code>assign:editor-directory-tenant</code></td><td>Editor ↔ tenant assignment (local DB)</td></tr>
+      <tr><td><code>grant-editor-directory-on-cloud.js</code></td><td><code>grant:editor-directory-on-cloud</code></td><td>CM permissions on Cloud via migration route</td></tr>
+    </tbody>
+  </table>
+
+  <p class="meta">Document version 1.0 — June 2026 · Case study: <code>mosc_malankara_orthodox_2</code> · Project: <code>strapi-editorial-template</code></p>
+</body>
+</html>

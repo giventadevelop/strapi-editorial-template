@@ -17,7 +17,7 @@ const { spawnSync } = require('child_process');
 
 require('dotenv').config({
   path: path.join(__dirname, '..', '.env'),
-  override: true,
+  override: false,
 });
 
 const { listCollectionKeys } = require('./lib/cloud-image-migration-config');

@@ -44,6 +44,7 @@
       <p><strong>Strapi project root:</strong> <code class="code-highlight">C:\project_workspace\strapi-editorial-template</code></p>
       <p><strong>Production (Cloud):</strong> <code class="code-highlight">STRAPI_CLOUD_URL</code> in <code>.env</code> (e.g. <code>https://awesome-birthday-82f0a4fa96.strapiapp.com</code>)</p>
       <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code> (always filter and link by tenant on push)</p>
+      <p><strong>Bulk tenant port:</strong> <a href="../../multi_tenant/tenant-clone-and-cloud-port-runbook.html">Tenant Clone &amp; Cloud Port Runbook</a> — clone to new tenant ID, then <code>npm run push:tenant-to-cloud</code></p>
       <p><strong>Canonical example script:</strong> <code class="script-name">scripts/push-catholicate-to-cloud.js</code> · npm: <code>push:catholicate-to-cloud</code></p>
     </div>
 
@@ -79,6 +80,11 @@
           <td><code class="script-name">push-liturgy-days-to-cloud.js</code></td>
           <td>Same cloud helpers; upsert key is <code>date + tenant</code> (not slug).</td>
           <td>Liturgy calendar only.</td>
+        </tr>
+        <tr>
+          <td><code class="script-name">push-tenant-to-cloud.js</code></td>
+          <td>Push <strong>all</strong> collection types for one tenant from local DB to Cloud REST (28 types, ~3k rows). Media stripped; run image finish after.</td>
+          <td><strong>Yes — bulk tenant port</strong> after local clone. See <a href="../../multi_tenant/tenant-clone-and-cloud-port-runbook.html">runbook</a>.</td>
         </tr>
         <tr>
           <td><code class="script-name">rest_api_push_to_cloud.js</code></td>

@@ -188,8 +188,13 @@ function buildClonePayload(strapi, uid, sourceDoc, ctx) {
       }
       const target = attr.target;
       if (GLOBAL_RELATION_TARGETS.has(target)) {
-        const relId = extractRelationDocumentId(value);
-        if (relId) data[field] = relId;
+        if (ctx.resolveGlobalRelation) {
+          const resolved = ctx.resolveGlobalRelation(target, value);
+          if (resolved) data[field] = resolved;
+        } else {
+          const relId = extractRelationDocumentId(value);
+          if (relId) data[field] = relId;
+        }
         continue;
       }
       const oldRelDocId = extractRelationDocumentId(value);
@@ -476,7 +481,13 @@ module.exports = {
   cleanTargetTenantRecords,
   cloneCollectionType,
   printStatsReport,
+  buildClonePayload,
+  getSchemaAttributes,
+  extractRelationDocumentId,
+  extractMediaDocumentId,
+  applySlugSuffix,
   pluralFromUid,
   SINGLE_TYPE_UIDS,
   CLONE_ORDER,
+  GLOBAL_RELATION_TARGETS,
 };

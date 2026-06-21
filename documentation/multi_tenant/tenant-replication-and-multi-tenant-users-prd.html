@@ -100,7 +100,8 @@
       <li><a href="#effort">Effort Estimates &amp; Options</a></li>
       <li><a href="#phases">Recommended Implementation Phases</a></li>
       <li><a href="#verification">Verification &amp; Test Plan</a></li>
-      <li><a href="#future-scripts">Planned Scripts (Future)</a></li>
+      <li><a href="#future-scripts">Implemented Scripts &amp; Commands</a></li>
+      <li><a href="#runbook">Operational Runbook (clone + Cloud port)</a></li>
       <li><a href="#references">References</a></li>
     </ol>
   </nav>
@@ -113,11 +114,11 @@
     <tbody>
       <tr>
         <td>Can we replicate all <code>tenant_demo_002</code> records to another tenant in one shot <em>today</em>?</td>
-        <td><strong>No.</strong> There is no existing clone script. Per-type import/push scripts and partial export exist, but nothing performs a full tenant-to-tenant copy within the same Strapi instance.</td>
+        <td><strong>Yes.</strong> Use <code class="script-name">clone-tenant-records.js</code> locally, then <code class="script-name">push-tenant-to-cloud.js</code> for Cloud. See <a href="tenant-clone-and-cloud-port-runbook.html">operational runbook</a>.</td>
       </tr>
       <tr>
         <td>Can one editor be linked to multiple tenant IDs <em>today</em>?</td>
-        <td><strong>No.</strong> <code>Editor Tenant Assignment</code> enforces one email → one tenant (<code>adminUserEmail</code> is unique).</td>
+        <td><strong>Yes (Phase 2).</strong> Multiple <code>Editor Tenant Assignment</code> rows per email; tenant switcher in admin.</td>
       </tr>
       <tr>
         <td>Fastest workaround for multi-tenant editing?</td>
@@ -499,11 +500,25 @@
     </tbody>
   </table>
 
-  <h2 id="future-scripts">9. Planned Scripts (Future — Not Implemented)</h2>
+  <h2 id="future-scripts">9. Implemented Scripts &amp; Commands</h2>
+
+  <div class="success">
+    <strong>Operational runbook:</strong> Full phased workflow, issues, Kalpana workarounds, and Windows commands — <a href="tenant-clone-and-cloud-port-runbook.html"><strong>Tenant Clone &amp; Cloud Port Runbook</strong></a> (case study: <code>mosc_malankara_orthodox_2</code>).
+  </div>
 
   <div class="section-container usage">
-    <div class="section-header usage">📋 Clone tenant (implemented)</div>
+    <div class="section-header usage">📋 Inventory tenant (local)</div>
+    <p>Script: <code class="script-name">inventory-tenant-records.js</code> · npm: <code class="code-highlight">npm run inventory:tenant</code></p>
+  </div>
+
+  <div class="section-container usage">
+    <div class="section-header usage">📋 Clone tenant (local)</div>
     <p>Script: <code class="script-name">clone-tenant-records.js</code> · npm: <code class="code-highlight">npm run clone:tenant</code></p>
+  </div>
+
+  <div class="section-container usage">
+    <div class="section-header usage">📋 Push entire tenant to Cloud</div>
+    <p>Script: <code class="script-name">push-tenant-to-cloud.js</code> · npm: <code class="code-highlight">npm run push:tenant-to-cloud</code> · Requires Cloud deploy + target tenant on Cloud first.</p>
   </div>
 
   <div class="command-block advance"
@@ -511,7 +526,7 @@
        data-command-base="node scripts/clone-tenant-records.js"
        data-template-command="node scripts/clone-tenant-records.js --source-tenant-id=tenant_demo_002 --target-tenant-id=tenant_demo_003 --create-target --slug-suffix=-demo003 --dry-run">
     <div class="command-header">
-      <span class="command-type">Clone Script (planned)</span>
+      <span class="command-type">Clone Script</span>
       <div class="command-header-buttons">
         <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'clone-tenant')" title="Copy template command">📄 Template</button>
         <button type="button" class="copy-button" onclick="copyCommand(this, 'clone-tenant')" title="Copy customized command">📋 Copy</button>
@@ -548,8 +563,8 @@
   </div>
 
   <div class="section-container">
-    <div class="section-header">📋 Existing: assign editor to one tenant</div>
-    <p>Works today — assigning a <strong>second</strong> tenant to the same email <strong>replaces</strong> the first (not additive).</p>
+    <div class="section-header">📋 Assign editor to tenant (multi-tenant — add mode)</div>
+    <p>Use <code>--add</code> (default) to assign a second tenant without replacing the first. See runbook Phase D.</p>
   </div>
 
   <div class="command-block setup"
@@ -631,7 +646,14 @@ Requirements:
 Test: dry-run on tenant_demo_002 locally; verify counts with --tenant-id filter.</pre>
   </div>
 
-  <h2 id="references">10. References</h2>
+  <h2 id="runbook">10. Operational Runbook (clone + Cloud port)</h2>
+  <div class="section-container output">
+    <div class="section-header output">Tenant Clone &amp; Cloud Port Runbook</div>
+    <p>Step-by-step procedures for copying <code>tenant_demo_002</code> → new tenant ID locally, pushing ~3k records to Strapi Cloud, linking images/PDFs (including Kalpana), editor setup, and a phased <strong>issues &amp; workarounds</strong> table.</p>
+    <p><a href="tenant-clone-and-cloud-port-runbook.html"><strong>Open runbook →</strong></a></p>
+  </div>
+
+  <h2 id="references">11. References</h2>
   <table>
     <thead>
       <tr><th>Topic</th><th>Location</th></tr>
@@ -642,8 +664,13 @@ Test: dry-run on tenant_demo_002 locally; verify counts with --tenant-id filter.
       <tr><td>Tenant assignment logic</td><td><code>src/utils/tenant-assignment.js</code></td></tr>
       <tr><td>Admin isolation middleware</td><td><code>src/bootstrap.js</code></td></tr>
       <tr><td>Multi-tenant rules</td><td><code>.cursor/rules/multi-tenant-assignment.mdc</code></td></tr>
+      <tr><td>Clone + Cloud port runbook</td><td><code>documentation/multi_tenant/tenant-clone-and-cloud-port-runbook.html</code></td></tr>
+      <tr><td>Kalpana import &amp; Cloud push PRD</td><td><code>documentation/kalpana/kalpana-import-and-cloud-push.html</code></td></tr>
+      <tr><td>Cloud image / REST link fix</td><td><code>documentation/front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html</code></td></tr>
+      <tr><td>Push tenant to Cloud script</td><td><code>scripts/push-tenant-to-cloud.js</code></td></tr>
+      <tr><td>Clone helpers</td><td><code>scripts/lib/tenant-clone-helpers.js</code></td></tr>
+      <tr><td>REST media link library</td><td><code>scripts/lib/link-cloud-images-rest.js</code></td></tr>
       <tr><td>Assign editor script</td><td><code>scripts/assign-editor-to-directory-tenant.js</code></td></tr>
-      <tr><td>Partial tenant export</td><td><code>scripts/export_news_tenant_demo.js</code></td></tr>
       <tr><td>Full push ordering</td><td><code>scripts/rest_api_push_to_cloud.js</code> (PUSH_FIRST)</td></tr>
       <tr><td>Admin user guide</td><td><code>documentation/user_guide/admin_user_guide.html</code></td></tr>
       <tr><td>Export/import guide</td><td><code>documentation/strapi5_export_import_transfer.html</code></td></tr>
@@ -651,7 +678,7 @@ Test: dry-run on tenant_demo_002 locally; verify counts with --tenant-id filter.
     </tbody>
   </table>
 
-  <p class="meta">Document version 1.0 — June 2026 · Status: Analysis PRD (no implementation) · Project: <code>strapi-editorial-template</code></p>
+  <p class="meta">Document version 1.1 — June 2026 · Status: Implemented (Phase 1 + 2) · Runbook: <a href="tenant-clone-and-cloud-port-runbook.html">tenant-clone-and-cloud-port-runbook.html</a> · Project: <code>strapi-editorial-template</code></p>
 
   <script>
     const commandParams = {};

@@ -180,6 +180,7 @@ async function main() {
       apiToken: API_TOKEN,
       restPlural: config.restPlural,
       links,
+      mediaField: config.mediaField || 'image',
     });
     console.log('REST linked:', restResults.linked, '| errors:', restResults.errors.length);
     if (restResults.errors.length) console.warn('REST link errors:', restResults.errors);
