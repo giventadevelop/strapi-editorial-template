@@ -4,8 +4,8 @@
   "info": {
     "singularName": "saint-entry",
     "pluralName": "saint-entries",
-    "displayName": "Directory – Saints",
-    "description": "Saint or holy figure: summary, biography, and image"
+    "displayName": "Directory – Saints & Blesseds",
+    "description": "Saint or blessed: summary, biography, image, and display order"
   },
   "options": {
     "draftAndPublish": false
