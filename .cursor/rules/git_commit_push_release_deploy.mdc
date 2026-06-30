@@ -1,0 +1,202 @@
+---
+description: One-shot workflow — commit all safe unstaged/untracked files, push, merge to release/deploy branch, secret filter (Windows PowerShell)
+globs: **/*
+alwaysApply: false
+---
+
+# Git Commit → Push → Release Deploy (Consolidated One-Shot)
+
+Use this rule when the user asks to **commit and push** named project(s), **include unstaged/untracked files** (after secret filtering), **sync cursor git rules**, and **merge into release/deploy branches** for production builds.
+
+**Detail rules (read when needed):**
+- [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc) — secret blocklist, SSL workaround, unstaged/untracked staging
+- [git_commit_push_core_repos.mdc](mdc:.cursor/rules/git_commit_push_core_repos.mdc) — batch workflow for mosc-temp + batch-jobs + service
+
+---
+
+## **Copy-paste user prompt (one shot)**
+
+```
+Commit and push these projects:
+- F:\project_workspace\<repo-1>
+- F:\project_workspace\<repo-2>
+
+Include all unstaged and untracked files if they pass the secret filter (no .env, keys, auth.json, credentials).
+Sync .cursor/rules/git_local_push.mdc and git_commit_push_core_repos.mdc from common_project_work.
+Then merge each repo into its release/deploy branch and push for production deployments.
+
+Follow git_commit_push_release_deploy.mdc.
+```
+
+---
+
+## **Production deploy branches (canonical)**
+
+| Repo | Path | Work branch (typical) | **Deploy branch** | Deploy target |
+|------|------|----------------------|-------------------|---------------|
+| **mosc-temp** | `F:\project_workspace\mosc-temp` | `MOSC-redesign-sub-poc-2` | **`release/v1.0.0`** | AWS Amplify (satellite prod) |
+| **event-site-front-end-test-site** | `F:\project_workspace\event-site-front-end-test-site` | `main` | **`release/v1.0.0`** | AWS Amplify (test satellite prod) |
+| **event-site-front-end-template** | `F:\project_workspace\event-site-front-end-template` | `main` | **`main`** | AWS Amplify (no release branch) |
+| **strapi-editorial-template** | `F:\project_workspace\strapi-editorial-template` | `main` | **`release/v1.0.0`** (if used) or **`main`** | Strapi Cloud / CI — verify console |
+| **event-site-manager-batch-jobs** | `F:\project_workspace\event-site-manager-batch-jobs` | `main` | **`release/v1.0.0`** | ECS prod (GitHub Actions) |
+| **event-site-manager-service** | `F:\project_workspace\event-site-manager-service` | `feature_Freelance_Work` | **`release/v1.0.0`** | ECS prod (GitHub Actions) |
+| **common_project_work** | `F:\project_workspace\common_project_work` | `main` | **`main`** | Docs/rules only |
+| **application-deployments** | `F:\project_workspace\application-deployments` | `main` | **`main`** | Docs/scripts only |
+
+- **DO** run `git branch --show-current` and `git branch -a` — do not assume branch names.
+- **DO** after commit on work branch: update **deploy branch** so CI/Amplify/Strapi builds run.
+
+---
+
+## **Agent checklist (every request)**
+
+### **Phase 1 — Inspect (parallel per repo)**
+
+```powershell
+cd F:\project_workspace\<repo>
+git status -sb
+git status --porcelain
+git branch --show-current
+git diff --stat
+```
+
+### **Phase 2 — Sync cursor git rules (from canonical source)**
+
+Canonical copies live in `F:\project_workspace\common_project_work\.cursor\rules\`:
+
+```powershell
+$canonical = 'F:\project_workspace\common_project_work\.cursor\rules'
+$dest = 'F:\project_workspace\<repo>\.cursor\rules'
+Copy-Item "$canonical\git_local_push.mdc" "$dest\git_local_push.mdc" -Force
+Copy-Item "$canonical\git_commit_push_core_repos.mdc" "$dest\git_commit_push_core_repos.mdc" -Force
+Copy-Item "$canonical\git_commit_push_release_deploy.mdc" "$dest\git_commit_push_release_deploy.mdc" -Force
+```
+
+Also commit rule updates back to **common_project_work** and **application-deployments** when this consolidated rule changes.
+
+### **Phase 3 — Stage ALL safe changes (unstaged + untracked)**
+
+When `git status --porcelain` is non-empty:
+
+```powershell
+git add -A
+git restore --staged tsconfig.tsbuildinfo 2>$null
+git restore --staged code_html_template/SQLS/corrected_event_media_inserts.ordered_PROD.sql 2>$null
+git diff --cached --name-only | Select-String -Pattern `
+  'prod\.env$|\.env\.local|\.env\.production|auth\.json|\.auth-state|secrets|\.pem$|\.key$|credentials|ordered_PROD\.sql' `
+  -CaseSensitive:$false | ForEach-Object { git restore --staged $_.Line }
+```
+
+**Secret scan (required — empty output before commit):**
+
+```powershell
+git diff --cached --name-only | Select-String -Pattern `
+  'prod\.env$|\.env\.local|\.env\.production|auth\.json|\.auth-state|secrets|\.pem$|\.key$|credentials' `
+  -CaseSensitive:$false
+```
+
+- **DO** commit app code, docs, SQL artifacts, and `.cursor/rules/*.mdc` together when safe.
+- **DON'T** commit only rules while other unstaged app files remain — unless user scoped to rules only.
+
+If nothing to commit after scan, skip to Phase 5 (release merge may still be needed).
+
+### **Phase 4 — Commit and push work branch**
+
+```powershell
+git commit -m "<type(scope): message from diff>"
+$env:GIT_SSL_NO_VERIFY = 'true'
+git push origin <current-branch>
+Remove-Item Env:GIT_SSL_NO_VERIFY
+git status --porcelain
+```
+
+Repeat until working tree is clean (except gitignored/blocklisted paths).
+
+### **Phase 5 — Merge to deploy branch and push**
+
+**Fast-forward (preferred)** when deploy branch has no unique commits:
+
+```powershell
+git fetch origin
+git checkout release/v1.0.0
+git pull origin release/v1.0.0
+git reset --hard <work-branch>
+$env:GIT_SSL_NO_VERIFY = 'true'
+git push origin release/v1.0.0
+Remove-Item Env:GIT_SSL_NO_VERIFY
+git checkout <work-branch>
+```
+
+**Merge (when release has prod-only commits ahead):**
+
+```powershell
+git checkout release/v1.0.0
+git pull origin release/v1.0.0
+git merge <work-branch> -m "merge: <work-branch> into release/v1.0.0 for deployment"
+$env:GIT_SSL_NO_VERIFY = 'true'
+git push origin release/v1.0.0
+Remove-Item Env:GIT_SSL_NO_VERIFY
+```
+
+**Repos with deploy branch = `main`:** push `main` only (no release step).
+
+### **Phase 6 — Verify**
+
+```powershell
+git fetch origin
+git rev-parse --short origin/<work-branch>
+git rev-parse --short origin/<deploy-branch>   # should include work-branch changes
+git status -sb
+git status --porcelain
+```
+
+Report: commit hashes, branches pushed, deploy branch updated, any paths skipped (secrets/build artifacts).
+
+---
+
+## **Repo-specific quick commands**
+
+### **mosc-temp (Amplify satellite prod)**
+
+```powershell
+cd F:\project_workspace\mosc-temp
+# Phases 3–4 on MOSC-redesign-sub-poc-2
+# Phase 5:
+git checkout release/v1.0.0
+git reset --hard MOSC-redesign-sub-poc-2
+git push origin release/v1.0.0
+git checkout MOSC-redesign-sub-poc-2
+```
+
+### **strapi-editorial-template**
+
+```powershell
+cd F:\project_workspace\strapi-editorial-template
+# Phases 3–4 on main
+# Phase 5 — if remote has release/v1.0.0 and prod uses it:
+git checkout release/v1.0.0
+git reset --hard main
+git push origin release/v1.0.0
+git checkout main
+# Else: main is deploy branch — push main only
+```
+
+**Strapi secret extras:** never commit `.env`, Strapi admin JWT secrets, AWS keys in `config/plugins.ts` overrides, or `database/*.env`.
+
+---
+
+## **Anti-patterns**
+
+- ❌ Commit only `.cursor/rules/*` while `git status` shows other modified files
+- ❌ Skip secret filename scan after `git add -A`
+- ❌ Push feature branch only and assume Amplify/ECS prod deployed
+- ❌ `git config http.sslVerify false` globally (use one-time `$env:GIT_SSL_NO_VERIFY`)
+- ❌ Force-push `release/v1.0.0` without user approval
+
+---
+
+## **References**
+
+- [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc)
+- [git_commit_push_core_repos.mdc](mdc:.cursor/rules/git_commit_push_core_repos.mdc)
+- Amplify / satellite: `application-deployments/documentation/aws-infrastructure/satellite-frontend-deployment-guide.html`

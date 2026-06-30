@@ -15,6 +15,7 @@
  *   DRY_RUN=1         Preview only
  *   --replace         Update existing rows for same slug+tenant
  *   --images-only     Replace image media only (no text/content changes)
+ *   --slug-suffix=-mo2  Append to slug when tenant shares instance (e.g. mosc_malankara_orthodox_2)
  *
  * Image priority (matches mosc-redesign saints hub cards):
  *   1. Hub card image from saints/page.tsx
@@ -40,12 +41,20 @@ const TENANT_ID = (() => {
   if (m) return m.split('=')[1].trim();
   return process.env.TENANT_ID || 'tenant_demo_002';
 })();
+const SLUG_SUFFIX = (() => {
+  const m = process.argv.find((a) => a.startsWith('--slug-suffix='));
+  if (m) return m.split('=').slice(1).join('=');
+  if (TENANT_ID === 'mosc_malankara_orthodox_2') return '-mo2';
+  return '';
+})();
 
 const MOSC_ROOT = path.resolve(
   process.env.MOSC_TEMP_DIR || process.env.STRAPI_DATA_IMPORT_MOSC_TEMP_DIR || 'C:\\project_workspace\\mosc-temp'
 );
 const SAINTS_PAGES = path.join(MOSC_ROOT, 'src', 'app', 'mosc-redesign', '(syro)', 'saints');
+const HOMEPAGE_PATH = path.join(MOSC_ROOT, 'src', 'app', 'mosc-redesign', 'page.tsx');
 const PUBLIC_SAINTS_IMAGES = path.join(MOSC_ROOT, 'public', 'images', 'saints');
+const PUBLIC_MOSC_IMAGES = path.join(MOSC_ROOT, 'public', 'mosc', 'assets', 'images', 'mosc_images');
 
 const UID = 'api::saint-entry.saint-entry';
 
@@ -63,6 +72,10 @@ function findFileCaseInsensitive(dir, baseName) {
   return null;
 }
 
+function effectiveSlug(baseSlug) {
+  return `${baseSlug}${SLUG_SUFFIX}`;
+}
+
 function loadHubMeta() {
   const hubPath = path.join(SAINTS_PAGES, 'page.tsx');
   if (!fs.existsSync(hubPath)) return new Map();
@@ -70,17 +83,46 @@ function loadHubMeta() {
   const map = new Map();
   let order = 0;
 
-  const cardRe =
-    /\{\s*title:\s*'((?:\\'|[^'])*)',\s*excerpt:\s*'((?:\\'|[^'])*)',\s*href:\s*'([^']*)',\s*image:\s*'([^']*)',?\s*\}/g;
+  const cardPatterns = [
+    /\{\s*title:\s*'((?:\\'|[^'])*)',\s*excerpt:\s*'((?:\\'|[^'])*)',\s*href:\s*'([^']*)',\s*image:\s*'([^']*)',?\s*\}/g,
+    /\{\s*title:\s*'((?:\\'|[^'])*)',\s*excerpt:\s*"((?:\\"|[^"])*)",\s*href:\s*'([^']*)',\s*image:\s*'([^']*)',?\s*\}/g,
+  ];
+  for (const cardRe of cardPatterns) {
+    let m;
+    while ((m = cardRe.exec(raw)) !== null) {
+      const slug = m[3].split('/').filter(Boolean).pop();
+      if (!slug || map.has(slug)) continue;
+      map.set(slug, {
+        title: m[1].replace(/\\'/g, "'").trim(),
+        excerpt: m[2].replace(/\\'/g, "'").replace(/\\"/g, '"').trim(),
+        cardImage: m[4],
+        order: order++,
+      });
+    }
+  }
+  return map;
+}
+
+/** Homepage carousel (Our Saints & Blesseds) from mosc-redesign/page.tsx */
+function loadCarouselMeta() {
+  if (!fs.existsSync(HOMEPAGE_PATH)) return new Map();
+  const raw = fs.readFileSync(HOMEPAGE_PATH, 'utf8');
+  const saintsBlock = raw.match(/const saints:\s*Saint\[\]\s*=\s*\[([\s\S]*?)\];/);
+  if (!saintsBlock) return new Map();
+  const map = new Map();
+  let order = 0;
+  const entryRe =
+    /\{\s*name:\s*"((?:\\"|[^"])*)",\s*href:\s*"([^"]+)",\s*image:\s*"([^"]+)"(?:,\s*alt:\s*"((?:\\"|[^"])*)")?/g;
   let m;
-  while ((m = cardRe.exec(raw)) !== null) {
-    const slug = m[3].split('/').filter(Boolean).pop();
+  while ((m = entryRe.exec(saintsBlock[1])) !== null) {
+    const slug = m[2].split('/').filter(Boolean).pop();
     if (!slug) continue;
     map.set(slug, {
-      title: m[1].replace(/\\'/g, "'").trim(),
-      excerpt: m[2].replace(/\\'/g, "'").trim(),
-      cardImage: m[4],
-      order: order++,
+      name: m[1].replace(/\\"/g, '"').trim(),
+      href: m[2],
+      image: m[3],
+      alt: m[4] ? m[4].replace(/\\"/g, '"').trim() : null,
+      carouselOrder: order++,
     });
   }
   return map;
@@ -173,6 +215,11 @@ function resolveImageFile(imageRef) {
     const base = path.basename(ref);
     candidates.push(path.join(PUBLIC_SAINTS_IMAGES, base));
     candidates.push(findFileCaseInsensitive(PUBLIC_SAINTS_IMAGES, base));
+  }
+  if (ref.startsWith('/mosc/assets/images/mosc_images/')) {
+    const rel = ref.replace(/^\/mosc\/assets\/images\/mosc_images\//, '').replace(/\//g, path.sep);
+    candidates.push(path.join(PUBLIC_MOSC_IMAGES, rel));
+    candidates.push(findFileCaseInsensitive(PUBLIC_MOSC_IMAGES, path.basename(rel)));
   }
   if (ref.startsWith('/images/')) {
     candidates.push(path.join(MOSC_ROOT, 'public', ref.replace(/^\//, '').replace(/\//g, path.sep)));
@@ -288,6 +335,7 @@ async function main() {
   console.log('Saints import from mosc-temp');
   console.log('  MOSC_ROOT:', MOSC_ROOT);
   console.log('  TENANT_ID:', TENANT_ID);
+  if (SLUG_SUFFIX) console.log('  SLUG_SUFFIX:', SLUG_SUFFIX);
   if (DRY_RUN) console.log('  DRY_RUN=1');
   if (REPLACE) console.log('  --replace: update existing slugs');
   if (IMAGES_ONLY) console.log('  --images-only: replace images only (no content changes)');
@@ -299,8 +347,10 @@ async function main() {
   }
 
   const hubMeta = loadHubMeta();
+  const carouselMeta = loadCarouselMeta();
   const slugs = discoverDetailSlugs();
   console.log('Hub cards (page.tsx):', hubMeta.size);
+  console.log('Homepage carousel entries:', carouselMeta.size);
   console.log('Detail pages:', slugs.length);
   console.log('');
 
@@ -334,6 +384,7 @@ async function main() {
 
   for (const slug of slugs) {
     const hub = hubMeta.get(slug) || {};
+    const carousel = carouselMeta.get(slug) || {};
     const detail = parseDetailPage(slug);
     if (!detail) {
       console.warn('Skip (no detail page):', slug);
@@ -341,11 +392,17 @@ async function main() {
       continue;
     }
 
-    const name = hub.title || detail.bannerTitle || slug;
+    const storageSlug = effectiveSlug(slug);
+    const name = carousel.name || hub.title || detail.bannerTitle || slug;
     const excerpt = hub.excerpt || (detail.firstParagraph ? detail.firstParagraph.slice(0, 280) : null);
-    const order = hub.order != null ? hub.order : orphanOrder++;
+    const order =
+      carousel.carouselOrder != null
+        ? carousel.carouselOrder
+        : hub.order != null
+          ? hub.order
+          : orphanOrder++;
 
-    const imageCandidates = [hub.cardImage, detail.detailImage];
+    const imageCandidates = [carousel.image, hub.cardImage, detail.detailImage];
     let imageFile = null;
     let imageRefUsed = null;
     for (const ref of imageCandidates) {
@@ -357,10 +414,10 @@ async function main() {
       }
     }
 
-    const prev = bySlug.get(slug);
+    const prev = bySlug.get(storageSlug);
     if (IMAGES_ONLY) {
       if (!prev) {
-        console.warn('Skip (no row for images-only):', slug);
+        console.warn('Skip (no row for images-only):', storageSlug);
         skipped++;
         continue;
       }
@@ -401,7 +458,7 @@ async function main() {
 
     const data = {
       name,
-      slug,
+      slug: storageSlug,
       excerpt,
       body: detail.bodyHtml || null,
       order,
@@ -409,7 +466,7 @@ async function main() {
     };
 
     if (prev && !REPLACE) {
-      console.log('Skip (exists):', slug);
+      console.log('Skip (exists):', storageSlug);
       skipped++;
       continue;
     }

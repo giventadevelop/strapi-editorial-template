@@ -1,0 +1,180 @@
+---
+description: Standard commit-and-push workflow for the three core backend/frontend repos (mosc-temp, event-site-manager-batch-jobs, event-site-manager-service) on Windows
+globs: **/*
+alwaysApply: false
+---
+
+# Git Commit & Push — Core Three Repos (HP Omen / F:\project_workspace)
+
+## **Overview**
+
+When the user asks to **commit and push** (or "commit push these projects") for the **backend core trio** below, run the **same workflow** for all three repositories unless they name a subset. Only commit when the user **explicitly** requests it.
+
+**Related rules:**
+- [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc) — PowerShell syntax, **secret filtering**, SSL workaround, unstaged/untracked staging
+- [git_commit_push_release_deploy.mdc](mdc:.cursor/rules/git_commit_push_release_deploy.mdc) — **one-shot** commit + push + merge to release/deploy branch (copy-paste prompt)
+
+This rule covers only the **three-repo batch** workflow for batch-jobs and service (and mosc-temp when named in the trio).
+
+## **Repositories (canonical paths & branches)**
+
+| Repo | Path | Default branch | Remote |
+|------|------|----------------|--------|
+| **mosc-temp** | `F:\project_workspace\mosc-temp` | `MOSC-redesign-sub-poc-2` | `origin` |
+| **event-site-manager-batch-jobs** | `F:\project_workspace\event-site-manager-batch-jobs` | `main` | `origin` |
+| **event-site-manager-service** | `F:\project_workspace\event-site-manager-service` | `feature_Freelance_Work` | `origin` |
+
+- **DO** verify `git branch --show-current` before push; branch names above are defaults, not assumptions.
+- **DO NOT** change `git config` (no global credential or SSL config edits).
+- **DO NOT** commit `.env`, credentials, or secrets — run the staged-path secret check in [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc) before every `git commit`.
+
+## **Agent workflow (every commit-and-push request)**
+
+### **Step 1 — Inspect all three repos in parallel**
+
+For each repo, run:
+
+```powershell
+cd "F:\project_workspace\<repo-name>"
+git status -sb
+git diff --stat
+git log -3 --oneline
+```
+
+Also check unpushed commits:
+
+```powershell
+git log origin/<branch>..HEAD --oneline
+```
+
+### **Step 2 — Stage ALL safe changes (unstaged + untracked), then commit**
+
+Only repos with changes get a commit. Use focused messages from the diff (not generic "update files").
+
+When `git status --porcelain` shows **` M` (unstaged modified)** or **`??` (untracked)**, use **`git add -A`** — not only paths the user named. Follow the unstaged/untracked workflow in [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc): unstage `tsconfig.tsbuildinfo`, `ordered_PROD.sql`, and blocklisted paths; run secret scan; then commit **all** remaining staged files.
+
+```powershell
+cd "F:\project_workspace\<repo-name>"
+git status --porcelain
+git add -A
+git restore --staged tsconfig.tsbuildinfo 2>$null
+git restore --staged code_html_template/SQLS/corrected_event_media_inserts.ordered_PROD.sql 2>$null
+git diff --cached --name-only | Select-String -Pattern `
+  'prod\.env$|\.env\.local|\.env\.production|auth\.json|\.auth-state|secrets|\.pem$|\.key$|credentials|ordered_PROD\.sql' `
+  -CaseSensitive:$false | ForEach-Object { git restore --staged $_.Line }
+git diff --cached --name-only | Select-String -Pattern 'prod\.env|\.env\.local|auth\.json|secrets' -CaseSensitive:$false
+git commit -m "<short summary sentence>" -m "<optional body with scope>"
+```
+
+**Commit message guidance:**
+
+| Change type | Message pattern |
+|-------------|-----------------|
+| JPA `allocationSize = 1` on entities | `Set JPA sequence allocationSize=1 on domain entities.` |
+| DB sequence / SQL export / import docs | `Update database sequence sync, export/import SQL, and documentation.` |
+| Merge conflict resolution | `Fix merge conflict markers in <File>.` |
+| Single feature/fix | `fix(scope): …` or `feat(scope): …` (conventional commits OK) |
+
+- **DO** use multiple `-m` flags for title + body on Windows (no heredoc required).
+- **DO** run pre-commit hooks; if commit fails due to hooks, fix and create a **new** commit (do not amend unless user asked and HEAD was yours unpushed).
+- **DO** unstage any path matched by the secret filename check (see [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc)).
+
+### **Step 3 — Push all repos that were committed (or have unpushed commits)**
+
+```powershell
+cd "F:\project_workspace\mosc-temp"
+git push origin MOSC-redesign-sub-poc-2
+
+cd "F:\project_workspace\event-site-manager-batch-jobs"
+git push origin main
+
+cd "F:\project_workspace\event-site-manager-service"
+git push origin feature_Freelance_Work
+```
+
+Replace branch names if `git branch --show-current` differs.
+
+**Amplify production deploy for `mosc-temp`:** After pushing the feature branch, also merge/push `release/v1.0.0` per [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc) if the user wants a prod build — the trio push alone may not trigger Amplify.
+
+### **Step 4 — Verify clean and synced**
+
+```powershell
+git status -sb
+git status --porcelain
+```
+
+Each repo should show `## <branch>...origin/<branch>` with **no** ahead/behind and **no** unstaged/untracked commit-eligible changes. If dirty paths remain (excluding `tsconfig.tsbuildinfo` and gitignored secrets), re-run Steps 2–3 for that repo before reporting done.
+
+## **SSL certificate errors on push (Windows)**
+
+If push fails with:
+
+`SSL certificate problem: unable to get local issuer certificate`
+
+Retry **only that repo** with a **one-time** env var (do not persist in git config):
+
+```powershell
+$env:GIT_SSL_NO_VERIFY='true'
+cd "F:\project_workspace\<repo-name>"
+git push origin <branch-name>
+Remove-Item Env:GIT_SSL_NO_VERIFY
+```
+
+- **event-site-manager-service** often pushes without this; **mosc-temp** and **batch-jobs** may need it on this machine.
+- Full SSL troubleshooting: [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc).
+- Inform the user if SSL bypass was used; suggest fixing CA bundle separately if pushes fail repeatedly.
+
+## **PowerShell notes**
+
+- **DO** run `cd` and `git` as **separate** commands or use `;` — avoid `&&` if the shell rejects it.
+- CRLF warnings on commit are informational unless the user configured otherwise.
+
+## **Multi-machine pull (other machine should match this push)**
+
+After push from HP Omen, on the other machine:
+
+```powershell
+cd "F:\project_workspace\mosc-temp"
+git pull origin MOSC-redesign-sub-poc-2
+
+cd "F:\project_workspace\event-site-manager-batch-jobs"
+git pull origin main
+
+cd "F:\project_workspace\event-site-manager-service"
+git pull origin feature_Freelance_Work
+```
+
+**Force remote to win** (discard local changes on target machine):
+
+```powershell
+git fetch origin
+git reset --hard origin/<branch-name>
+```
+
+## **Anti-patterns**
+
+```powershell
+# ❌ DON'T: Commit without user explicitly asking
+# ❌ DON'T: Push --force to main without user approval
+# ❌ DON'T: Bundle unrelated repos into one commit message without checking each diff
+# ❌ DON'T: git config http.sslVerify false (use one-time $env:GIT_SSL_NO_VERIFY instead)
+# ❌ DON'T: Skip secret filename check before commit (see git_local_push.mdc)
+```
+
+## **Quick reference — full trio commit + push**
+
+When user says *"commit and push these three projects"* (mosc-temp, batch-jobs, service):
+
+1. Parallel `git status` / `git diff --stat` / `git log` on all three paths
+2. Secret scan + `git add -A` + `git commit` per repo with changes ([git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc))
+3. `git push origin <branch>` per repo
+4. Retry failed pushes with `$env:GIT_SSL_NO_VERIFY='true'` if SSL error
+5. If mosc-temp prod deploy needed: merge/push `release/v1.0.0` per [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc)
+6. Report commit hashes, branches, and push status in the response
+
+## **References**
+
+- **One-shot commit + push + release deploy:** [git_commit_push_release_deploy.mdc](mdc:.cursor/rules/git_commit_push_release_deploy.mdc)
+- **General Git CLI, secrets, Amplify release pushes:** [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc)
+- Remote: `https://github.com/giventadeveloporg/<repo-name>.git`
+- Last verified push: 2026-06-23 — `mosc-temp` @ `5763c9db`, `batch-jobs` @ `22a62f6`, `service` @ `8884c37`

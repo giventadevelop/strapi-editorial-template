@@ -1749,8 +1749,8 @@ export interface ApiRetiredBishopRetiredBishop
 export interface ApiSaintEntrySaintEntry extends Struct.CollectionTypeSchema {
   collectionName: 'saint_entries';
   info: {
-    description: 'Saint or holy figure: summary, biography, and image';
-    displayName: 'Directory \u2013 Saints';
+    description: 'Saint or blessed: summary, biography, image, and display order';
+    displayName: 'Directory \u2013 Saints & Blesseds';
     pluralName: 'saint-entries';
     singularName: 'saint-entry';
   };
