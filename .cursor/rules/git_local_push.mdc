@@ -1,5 +1,5 @@
 ---
-description: Standard procedure for using local Git (CLI) to stage, commit, and push changes from Cursor on Windows PowerShell
+description: Local Git commit/push on Windows — release-branch merges for Amplify, untracked files, and secret filtering before stage
 globs: **/*
 alwaysApply: false
 ---
@@ -7,61 +7,318 @@ alwaysApply: false
 - **Scope**
   - Applies when committing code changes from the local workspace using Git CLI on Windows PowerShell.
   - Use for routine commits and pushes to existing or new branches.
+  - **Also use** when pushing frontend repos so **AWS Amplify production builds** trigger on the correct branch.
+  - When the user asks to commit/push the **core trio** (mosc-temp + batch-jobs + service together), also follow [git_commit_push_core_repos.mdc](mdc:.cursor/rules/git_commit_push_core_repos.mdc).
+  - **One-shot prompt** (commit + unstaged files + release deploy): [git_commit_push_release_deploy.mdc](mdc:.cursor/rules/git_commit_push_release_deploy.mdc).
 
 - **Pre-checks**
   - **Verify current branch**:
     ```powershell
-git status -sb
+    git status -sb
+    git branch -a | Select-String "release"
     ```
   - If you need a new branch:
     ```powershell
-git checkout -b <new-branch-name>
+    git checkout -b <new-branch-name>
     ```
 
-- **Stage → Commit → Push (Windows PowerShell)**
-  - PowerShell does not support `&&` as a command separator by default. Run each command on its own line.
-  - **Stage files**:
-    ```powershell
-git add <path1> <path2> <pathN>
-    ```
-  - **Commit with message**:
-    ```powershell
-git commit -m "<type(scope): short, imperative message>"
-    ```
-  - **Push to upstream (existing tracking branch)**:
-    ```powershell
-git push
-    ```
-  - **First push for a new branch (set upstream tracking)**:
-    ```powershell
-git push -u origin <branch-name>
-    ```
+---
 
-- **Examples**
-  - Commit a feature on the current branch:
-    ```powershell
-git add src/app/api/stripe/payment-intent/route.ts src/components/StripePaymentRequestButton.tsx
-git commit -m "feat(payments): add Payment Request Button and PI endpoint"
-git push
-    ```
-  - Create and push a new branch:
-    ```powershell
-git checkout -b payment-options
-git push -u origin payment-options
-    ```
+## **Amplify deploy: merge to release branch before push**
 
-- **Authentication prompts**
-  - If Git asks to authenticate, a browser window may open. Complete auth and re-run `git push` if needed.
+When the goal is to **trigger AWS Amplify** (production / satellite frontends), the push must land on the branch Amplify watches — not only the feature branch.
 
-- **Troubleshooting**
-  - If you see `The token '&&' is not a valid statement separator`, split combined commands into separate lines.
-  - Normalize line endings warning (LF→CRLF) is informational. Commit proceeds unless you configured otherwise.
+| Repo | Typical path | Amplify production branch | Action if not on that branch |
+|------|--------------|----------------------------|------------------------------|
+| `mosc-temp` | `F:\project_workspace\mosc-temp` | `release/v1.0.0` | Commit → merge/fast-forward into `release/v1.0.0` → push `release/v1.0.0` |
+| `event-site-front-end-test-site` | `F:\project_workspace\event-site-front-end-test-site` | `release/v1.0.0` | Commit on `release/v1.0.0` → push |
+| `event-site-front-end-template` | `F:\project_workspace\event-site-front-end-template` | `main` (no `release/*` on remote) | Commit on `main` → push `main` |
+| `strapi-editorial-template` | `F:\project_workspace\strapi-editorial-template` | `release/v1.0.0` or `main` | Commit on `main` → FF/merge `release/v1.0.0` if prod uses it |
+| `event-site-manager-batch-jobs` | `F:\project_workspace\event-site-manager-batch-jobs` | `release/v1.0.0` | Commit on `main` → merge into `release/v1.0.0` → push |
+| `event-site-manager-service` | `F:\project_workspace\event-site-manager-service` | `release/v1.0.0` | Commit on feature branch → merge into `release/v1.0.0` → push |
+| `event-site-manager` (primary) | `F:\project_workspace\event-site-manager` | Check Amplify console / docs | Usually `release/v1.0.0` or `main` per app |
 
-- **Best practices**
-  - Use conventional commit messages when possible (e.g., `feat`, `fix`, `chore`).
-  - Keep commits focused and scoped; avoid bundling unrelated changes.
-  - Push to a feature branch, then open a PR on GitHub.
+**Workflow (feature branch → release):**
 
-- **References**
-  - After adding or updating rules, verify consistency with [cursor_rules.mdc](mdc:.cursor/rules/cursor_rules.mdc).
+```powershell
+cd F:\project_workspace\<repo>
 
+# 1) Commit on current branch (after secret scan below)
+git add -A
+git commit -m "feat(scope): short imperative message"
+
+# 2) Update release branch
+git checkout release/v1.0.0
+git merge <feature-branch> -m "merge: <feature-branch> into release/v1.0.0 for Amplify deploy"
+
+# If merge aborts due to CRLF-only local drift on release (common on Windows):
+git reset --hard <feature-branch>
+
+# 3) Push release (and optionally feature branch)
+$env:GIT_SSL_NO_VERIFY = "true"
+git push origin release/v1.0.0
+git push origin <feature-branch>
+Remove-Item Env:GIT_SSL_NO_VERIFY
+```
+
+- **DO:** Push **`release/v1.0.0`** (or the repo’s documented prod branch) so Amplify starts a build.
+- **DON'T:** Push only the feature branch and assume prod deployed — Amplify may not watch that branch.
+- Protected branches may require a PR; if direct push is blocked, open a PR into `release/v1.0.0` instead.
+
+---
+
+## **Unstaged (` M`) and untracked (`??`) files — include in every commit**
+
+When the user asks to **commit and push** a project and `git status` shows **any** unstaged or untracked paths, stage **all safe changes** — not only the paths they named (e.g. not only `.cursor/rules/*` while app code stays dirty).
+
+```powershell
+git status -sb
+git status --porcelain
+git add -A
+git diff --cached --name-only
+```
+
+**Required workflow:**
+
+1. **List pending work** with `git status --porcelain` before staging.
+2. **`git add -A`** — includes modified tracked files **and** new untracked files.
+3. **Unstage excluded paths** (build artifacts + secret blocklist):
+   ```powershell
+   git restore --staged tsconfig.tsbuildinfo 2>$null
+   git restore --staged code_html_template/SQLS/corrected_event_media_inserts.ordered_PROD.sql 2>$null
+   git diff --cached --name-only | Select-String -Pattern `
+     'prod\.env$|\.env\.local|\.env\.production|auth\.json|\.auth-state|secrets|\.pem$|\.key$|credentials|ordered_PROD\.sql' `
+     -CaseSensitive:$false | ForEach-Object { git restore --staged $_.Line }
+   ```
+4. **Secret filename check** (below) — empty output required before commit.
+5. **Content spot-check** on new untracked env-like or credential-shaped files (below).
+6. **`git commit`** with a message reflecting the **full** staged diff.
+7. **Verify clean tree** after push:
+   ```powershell
+   git status -sb
+   ```
+   If commit-eligible paths remain dirty, repeat from step 1. Only `tsconfig.tsbuildinfo`, gitignored env files, and other blocklisted paths may stay unstaged.
+
+**DO:** Include new feature folders (`?? src/**`), docs, SQL refresh artifacts, tenant settings, and modified tracked files in the same commit when they pass the secret filter.
+
+**DON'T:** Commit only `.cursor/rules/*` while leaving other unstaged/untracked app changes behind — unless the user **explicitly** scoped the request to rules only.
+
+---
+
+## **Include untracked (unversioned) files — with categorization**
+
+When the user asks to **add unversioned files**, stage everything **after** secret filtering — not only modified tracked files (same as the unstaged/untracked workflow above).
+
+```powershell
+git status -sb
+git add -A
+git diff --cached --name-only
+```
+
+**Categorize staged paths before commit:**
+
+| Category | Examples | Usually commit? |
+|----------|----------|-----------------|
+| App / feature code | `src/**`, `components/**` | ✅ Yes |
+| Cursor rules | `.cursor/rules/*.mdc` | ✅ Yes |
+| Docs / runbooks | `documentation/**`, `*.html` PRDs | ✅ Yes |
+| Migration scripts | `scripts/mosc-in-migration/**` | ✅ Yes (env vars for DB, not hardcoded prod secrets) |
+| Manifest / map JSON | `url-list.*.json`, `*-category-map.json` | ✅ Yes (metadata/URLs) |
+| SQL refresh artifacts | `export.sql`, `*.ordered.sql`, `sequence_fix_inserts/**` | ✅ Yes (unless gitignored) |
+| Env **templates** | `*.env.example`, `database_target.*.env.example` | ✅ Yes (placeholders only) |
+| Local caches | `.mosc-downloads/`, `**/screenshots/` | ❌ No — should be gitignored |
+| Build artifacts | `tsconfig.tsbuildinfo`, `.next/` | ❌ No — gitignore or skip |
+| **Secrets / credentials** | See blocklist below | ❌ **Never** |
+
+---
+
+## **Secret and key filtering (required before `git commit`)**
+
+**Always run a staged-path check** after `git add -A` and **before** `git commit`:
+
+```powershell
+git diff --cached --name-only | Select-String -Pattern `
+  'prod\.env$|\.env\.local|\.env\.production|auth\.json|\.auth-state|secrets|\.pem$|\.key$|credentials' `
+  -CaseSensitive:$false
+```
+
+- **Empty output** = no blocked filenames in the index (good).
+- **Any match** = unstage and gitignore before committing:
+  ```powershell
+  git reset HEAD -- <path>
+  ```
+
+**Filename blocklist (never commit):**
+
+| Pattern / file | Why |
+|----------------|-----|
+| `code_html_template/batch_files/database_target.prod.env` | Production RDS password |
+| `code_html_template/batch_files/database_target.local.env` | Local/dev RDS credentials |
+| `.env`, `.env.local`, `.env.production`, `.env.*` (except `.env.example`) | App secrets, Clerk, Stripe, JWT |
+| `TestSprite/**/auth.json`, `**/.auth-state.json` | Session tokens |
+| `**/secrets-snapshot.json`, `**/*credentials*` | AWS / API secrets |
+| `*.pem`, `*.key`, `*.p12` | Private keys |
+| `code_html_template/SQLS/corrected_event_media_inserts.ordered_PROD.sql` | May contain encrypted payment/Twilio blobs (gitignored in mosc-temp) |
+
+**Ensure `.gitignore` includes (add if missing):**
+
+```gitignore
+.env*
+!.env.example
+code_html_template/batch_files/database_target.local.env
+code_html_template/batch_files/database_target.prod.env
+code_html_template/SQLS/corrected_event_media_inserts.ordered_PROD.sql
+```
+
+**Content spot-check** for new untracked env-like files:
+
+```powershell
+Get-Content path\to\suspect-file | Select-Object -First 20
+```
+
+Reject if you see real `DB_PASSWORD=`, `sk_live_`, `sk_test_`, `AKIA…`, `Bearer …`, or `BEGIN RSA PRIVATE KEY`.
+
+**Migration scripts:** OK to commit when they use `process.env.MOSC_DB_PASSWORD` / `process.env.DB_PASSWORD` — not hardcoded production passwords.
+
+---
+
+## **Stage → Commit → Push (Windows PowerShell)**
+
+- PowerShell does not support `&&` as a command separator by default. Run each command on its own line.
+
+**Recommended sequence (with untracked + secret filter):**
+
+```powershell
+cd F:\project_workspace\<repo>
+git status -sb
+
+# Optional: update .gitignore for prod/local env files first
+git add .gitignore
+
+git add -A
+git diff --cached --name-only | Select-String -Pattern 'prod\.env|\.env\.local|auth\.json|secrets' -CaseSensitive:$false
+# Fix any matches, then:
+git commit -m "feat(scope): short imperative message"
+
+$env:GIT_SSL_NO_VERIFY = "true"
+git push origin <branch>
+Remove-Item Env:GIT_SSL_NO_VERIFY
+```
+
+- **Stage specific paths** (when not using `-A`):
+  ```powershell
+  git add <path1> <path2> <pathN>
+  ```
+- **Commit with message**:
+  ```powershell
+  git commit -m "<type(scope): short, imperative message>"
+  ```
+- **Push to upstream (existing tracking branch)**:
+  ```powershell
+  git push
+  ```
+- **First push for a new branch (set upstream tracking)**:
+  ```powershell
+  git push -u origin <branch-name>
+  ```
+
+---
+
+## **Examples**
+
+- **Satellite frontend (mosc-temp): commit feature + deploy via release:**
+  ```powershell
+  cd F:\project_workspace\mosc-temp
+  git add -A
+  git diff --cached --name-only | Select-String 'prod\.env|auth\.json'
+  git commit -m "feat(mosc-redesign): downloads migration and SQL refresh"
+  git checkout release/v1.0.0
+  git reset --hard MOSC-redesign-sub-poc-2
+  $env:GIT_SSL_NO_VERIFY = "true"
+  git push origin release/v1.0.0
+  Remove-Item Env:GIT_SSL_NO_VERIFY
+  ```
+
+- **Test-site (already on release):**
+  ```powershell
+  cd F:\project_workspace\event-site-front-end-test-site
+  git add -A
+  git diff --cached --name-only | Select-String 'prod\.env|auth\.json'
+  git commit -m "feat(mosc-redesign): sync with mosc-temp baseline"
+  $env:GIT_SSL_NO_VERIFY = "true"
+  git push origin release/v1.0.0
+  Remove-Item Env:GIT_SSL_NO_VERIFY
+  ```
+
+- **Template (main only):**
+  ```powershell
+  cd F:\project_workspace\event-site-front-end-template
+  git add -A
+  git commit -m "feat: sync cursor rules and migration tooling"
+  git push origin main
+  ```
+
+- **Create and push a new branch:**
+  ```powershell
+  git checkout -b payment-options
+  git push -u origin payment-options
+  ```
+
+---
+
+## **Authentication prompts**
+
+- If Git asks to authenticate, a browser window may open. Complete auth and re-run `git push` if needed.
+
+---
+
+## **Troubleshooting**
+
+- If you see `The token '&&' is not a valid statement separator`, split combined commands into separate lines.
+- Normalize line endings warning (LF→CRLF) is informational. Commit proceeds unless you configured otherwise.
+- **Merge blocked on release with “local changes would be overwritten”** (CRLF drift): on `release/v1.0.0`, run `git reset --hard <feature-branch>` then push — release tip matches feature; no merge commit needed.
+- **`database_target.prod.env` shows as untracked (`??`)**: add to `.gitignore`; never `git add` it.
+
+---
+
+## **SSL certificate errors on `git push` / `git fetch` (Windows)**
+
+- **Symptom** (seen repeatedly on `mosc-temp` and other HTTPS remotes):
+  ```
+  fatal: unable to access 'https://github.com/...': SSL certificate problem: unable to get local issuer certificate
+  ```
+- **Cause:** Git for Windows cannot validate the HTTPS server certificate chain (missing/intermediate CA, corporate SSL inspection, or outdated CA bundle).
+- **Temporary workaround (current session only — use only to unblock a push):**
+  ```powershell
+  cd F:\project_workspace\<repo>
+  $env:GIT_SSL_NO_VERIFY = "true"
+  git push
+  Remove-Item Env:GIT_SSL_NO_VERIFY
+  ```
+  - **Do not** set `git config http.sslVerify false` globally.
+  - **Do not** leave `GIT_SSL_NO_VERIFY` set in your user or system environment.
+- **Proper fix (preferred — pick one):**
+  1. **Update Git for Windows** — [https://git-scm.com/download/win](https://git-scm.com/download/win)
+  2. **Corporate proxy / SSL inspection** — `git config --global http.sslCAInfo "C:/path/to/corporate-ca-bundle.pem"`
+  3. **Switch the remote to SSH** — `git remote set-url origin git@github.com:org/repo.git`
+- **Verify after fix:** `git ls-remote origin HEAD`
+
+---
+
+## **Best practices**
+
+- Use conventional commit messages when possible (e.g., `feat`, `fix`, `chore`).
+- Keep commits focused and scoped; avoid bundling unrelated changes.
+- **Always** run the staged secret filename check before commit when using `git add -A`.
+- For Amplify prod deploys, push the **documented production branch** (`release/v1.0.0` or `main`).
+- Push to a feature branch first when using PR-based release protection; merge via PR if direct push to release is blocked.
+
+---
+
+## **References**
+
+- **One-shot commit + push + release deploy:** [git_commit_push_release_deploy.mdc](mdc:.cursor/rules/git_commit_push_release_deploy.mdc)
+- **Core trio batch commit/push** (mosc-temp, batch-jobs, service): [git_commit_push_core_repos.mdc](mdc:.cursor/rules/git_commit_push_core_repos.mdc)
+- Amplify / satellite branches: [satellite-frontend-deployment-guide.html](mdc:documentation/aws-infrastructure/satellite-frontend-deployment-guide.html) (see `application-deployments` repo for this doc)
+- Database import (separate from git): [database_export_import_vpc_local.mdc](mdc:.cursor/rules/database_export_import_vpc_local.mdc) (see `application-deployments` repo)
+- Rule format: [cursor_rules.mdc](mdc:.cursor/rules/cursor_rules.mdc)
