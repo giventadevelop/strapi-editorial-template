@@ -17,6 +17,7 @@ const EDITOR_DIRECTORY_SUBJECTS = [
   'api::directory-home.directory-home',
   'api::bishop.bishop',
   'api::catholicos.catholicos',
+  'api::current-catholicos.current-catholicos',
   'api::diocesan-bishop.diocesan-bishop',
   'api::holy-synod-member.holy-synod-member',
   'api::ecumenical-article.ecumenical-article',

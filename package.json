@@ -15,6 +15,7 @@
     "import:holy-synod": "node ./scripts/import-holy-synod-from-mosc-temp.js",
     "import:ecumenical": "node ./scripts/import-ecumenical-from-mosc-temp.js",
     "import:saints": "node ./scripts/import-saints-from-mosc-temp.js",
+    "import:current-catholicos": "node ./scripts/import-current-catholicos-from-mosc-temp.js",
     "import:catholicate": "node ./scripts/import-catholicate-from-mosc-temp.js",
     "import:theological-seminaries": "node ./scripts/import-theological-seminaries-from-mosc-temp.js",
     "import:publications": "node ./scripts/import-publications-from-mosc-temp.js",

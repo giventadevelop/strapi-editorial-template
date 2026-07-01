@@ -1,0 +1,83 @@
+{
+  "kind": "collectionType",
+  "collectionName": "current_catholicos_entries",
+  "info": {
+    "singularName": "current-catholicos",
+    "pluralName": "current-catholicos-entries",
+    "displayName": "Directory – Current Catholicos",
+    "description": "Homepage Current Catholicos profile: badge, role, summary, biography, image, and profile link"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Full display name (e.g. His Holiness Baselios Marthoma Mathews III)"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "badge": {
+      "type": "string",
+      "description": "Badge label above the name (e.g. Malankara Metropolitan)"
+    },
+    "roleTitle": {
+      "type": "string",
+      "description": "Role line (e.g. Catholicos of the East and Malankara Metropolitan)"
+    },
+    "excerpt": {
+      "type": "text",
+      "description": "Short summary for homepage / card views"
+    },
+    "body": {
+      "type": "richtext",
+      "description": "Full biography (HTML)"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Portrait / featured image"
+    },
+    "imageAlt": {
+      "type": "string",
+      "description": "Alt text for the portrait image"
+    },
+    "profilePath": {
+      "type": "string",
+      "description": "Internal path to full profile page (e.g. /mosc-redesign/holy-synod/...)"
+    },
+    "address": {
+      "type": "text"
+    },
+    "email": {
+      "type": "string"
+    },
+    "phones": {
+      "type": "text",
+      "description": "Phone number(s), comma-separated if multiple"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order when multiple rows exist"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}
