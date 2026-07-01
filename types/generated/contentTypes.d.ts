@@ -829,6 +829,54 @@ export interface ApiChurchDignitaryChurchDignitary
   };
 }
 
+export interface ApiCurrentCatholicosCurrentCatholicos
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'current_catholicos_entries';
+  info: {
+    description: 'Homepage Current Catholicos profile: badge, role, summary, biography, image, and profile link';
+    displayName: 'Directory \u2013 Current Catholicos';
+    pluralName: 'current-catholicos-entries';
+    singularName: 'current-catholicos';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    address: Schema.Attribute.Text;
+    badge: Schema.Attribute.String;
+    body: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    email: Schema.Attribute.String;
+    excerpt: Schema.Attribute.Text;
+    image: Schema.Attribute.Media<'images'>;
+    imageAlt: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::current-catholicos.current-catholicos'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    phones: Schema.Attribute.Text;
+    profilePath: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    roleTitle: Schema.Attribute.String;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiDiocesanBishopDiocesanBishop
   extends Struct.CollectionTypeSchema {
   collectionName: 'diocesan_bishops';
@@ -2609,6 +2657,7 @@ declare module '@strapi/strapi' {
       'api::catholicate-entry.catholicate-entry': ApiCatholicateEntryCatholicateEntry;
       'api::catholicos.catholicos': ApiCatholicosCatholicos;
       'api::church-dignitary.church-dignitary': ApiChurchDignitaryChurchDignitary;
+      'api::current-catholicos.current-catholicos': ApiCurrentCatholicosCurrentCatholicos;
       'api::diocesan-bishop.diocesan-bishop': ApiDiocesanBishopDiocesanBishop;
       'api::diocese.diocese': ApiDioceseDiocese;
       'api::directory-entry.directory-entry': ApiDirectoryEntryDirectoryEntry;
