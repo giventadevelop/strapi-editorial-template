@@ -24,6 +24,56 @@ alwaysApply: false
 
 ---
 
+## **Phase 0 — Pull remote FIRST (before commit or release merge)**
+
+**Always `fetch` + `pull` the current work branch** before staging, committing, or merging to release. Do **not** commit on a branch that is behind `origin` without pulling first.
+
+```powershell
+cd F:\project_workspace\<repo>
+$branch = git branch --show-current
+$env:GIT_SSL_NO_VERIFY = 'true'
+git fetch origin
+git status -sb
+git log HEAD..origin/$branch --oneline
+git pull origin $branch
+Remove-Item Env:GIT_SSL_NO_VERIFY -ErrorAction SilentlyContinue
+```
+
+| `git pull` result | Action |
+|-------------------|--------|
+| **Already up to date** | Proceed to Phase 1 (stage/commit) |
+| **Fast-forward** | Remote changes applied — proceed |
+| **Merge commit created** | Pull succeeded — proceed |
+| **CONFLICT** | **STOP** — resolve conflicts (below) before commit/push |
+| **error: Your local changes would be overwritten** | Stash or commit WIP first, then pull again |
+
+**Detect unresolved conflicts:**
+
+```powershell
+git diff --name-only --diff-filter=U
+git diff --check
+Select-String -Path <file> -Pattern '^(<<<<<<<|=======|>>>>>>>)' 
+```
+
+**Resolve conflicts (agent must attempt before reporting blocker):**
+
+1. Open each file listed by `--diff-filter=U`.
+2. Choose correct hunks (or combine); **remove all** `<<<<<<<`, `=======`, `>>>>>>>` markers.
+3. Run `git add <file>` for each resolved file.
+4. Complete the merge:
+   ```powershell
+   git commit -m "merge: resolve conflicts after pull from origin/<branch>"
+   ```
+   (Or `git merge --continue` / `git rebase --continue` if a rebase was in progress.)
+
+**If conflicts cannot be resolved safely** (ambiguous business logic, same file edited unrelated ways, binary conflicts):
+
+- **DO NOT** commit or push that repo.
+- **Report as BLOCKER** in the response (see **Blocker report format** below).
+- Continue with other requested repos that have no blockers.
+
+---
+
 ## **Amplify deploy: merge to release branch before push**
 
 When the goal is to **trigger AWS Amplify** (production / satellite frontends), the push must land on the branch Amplify watches — not only the feature branch.
@@ -38,32 +88,55 @@ When the goal is to **trigger AWS Amplify** (production / satellite frontends), 
 | `event-site-manager-service` | `F:\project_workspace\event-site-manager-service` | `release/v1.0.0` | Commit on feature branch → merge into `release/v1.0.0` → push |
 | `event-site-manager` (primary) | `F:\project_workspace\event-site-manager` | Check Amplify console / docs | Usually `release/v1.0.0` or `main` per app |
 
-**Workflow (feature branch → release):**
+**Workflow (feature branch → release) — pull, merge, resolve, then push or PR:**
 
 ```powershell
 cd F:\project_workspace\<repo>
+$work = git branch --show-current   # or explicit: MOSC-redesign-sub-poc-2, main, etc.
 
-# 1) Commit on current branch (after secret scan below)
+# 0) Pull work branch first (Phase 0)
+git fetch origin
+git pull origin $work
+
+# 1) Commit on work branch (after secret scan below)
 git add -A
+# ... secret filter ...
 git commit -m "feat(scope): short imperative message"
+git push origin $work
 
-# 2) Update release branch
+# 2) Preview release merge LOCALLY — resolve conflicts before push
+git fetch origin
 git checkout release/v1.0.0
-git merge <feature-branch> -m "merge: <feature-branch> into release/v1.0.0 for Amplify deploy"
+git pull origin release/v1.0.0
+git merge $work -m "merge: $work into release/v1.0.0 for deploy"
 
-# If merge aborts due to CRLF-only local drift on release (common on Windows):
-git reset --hard <feature-branch>
+# If conflicts: resolve files, git add, git commit (merge --continue)
+# If CRLF-only drift and no real conflicts: git reset --hard $work
 
-# 3) Push release (and optionally feature branch)
+# 3) Push release OR open PR if protected
 $env:GIT_SSL_NO_VERIFY = "true"
 git push origin release/v1.0.0
-git push origin <feature-branch>
 Remove-Item Env:GIT_SSL_NO_VERIFY
+git checkout $work
 ```
 
-- **DO:** Push **`release/v1.0.0`** (or the repo’s documented prod branch) so Amplify starts a build.
-- **DON'T:** Push only the feature branch and assume prod deployed — Amplify may not watch that branch.
-- Protected branches may require a PR; if direct push is blocked, open a PR into `release/v1.0.0` instead.
+**If `git push origin release/v1.0.0` is rejected** (protected branch / PR required):
+
+```powershell
+# Work branch must already be pushed
+gh pr create --base release/v1.0.0 --head $work `
+  --title "merge: $work into release/v1.0.0 for deploy" `
+  --body "Automated release sync. Local merge conflicts resolved: <yes/no>."
+
+# Check PR mergeability; merge if clean
+gh pr view --json mergeable,mergeStateStatus,url
+gh pr merge <number> --merge --delete-branch=false
+```
+
+- **DO:** Resolve merge conflicts **locally** on `release/v1.0.0` (or on work branch during pull) **before** push or PR.
+- **DO:** Open a **pull request** when direct push to `release/v1.0.0` is blocked; attempt `gh pr merge` after conflicts are resolved.
+- **DON'T:** Push only the work branch and assume prod deployed.
+- **DON'T:** Force-push `release/v1.0.0` without explicit user approval.
 
 ---
 
@@ -71,9 +144,12 @@ Remove-Item Env:GIT_SSL_NO_VERIFY
 
 When the user asks to **commit and push** a project and `git status` shows **any** unstaged or untracked paths, stage **all safe changes** — not only the paths they named (e.g. not only `.cursor/rules/*` while app code stays dirty).
 
+**Mandatory condition:** If `git status --porcelain` shows **` M` (modified, unstaged)**, **`MM` (staged + unstaged)**, or **`??` (untracked)**, run **`git add -A`** and commit every path that passes the secret filter below. Unstaged tracked files **must not** be left behind when the user requests commit/push — they are first-class commit candidates, same as untracked files.
+
 ```powershell
 git status -sb
 git status --porcelain
+# If any line starts with " M", "MM", "??", " D", " A", etc. — stage all safe paths:
 git add -A
 git diff --cached --name-only
 ```
@@ -97,9 +173,11 @@ git diff --cached --name-only
    ```powershell
    git status -sb
    ```
-   If commit-eligible paths remain dirty, repeat from step 1. Only `tsconfig.tsbuildinfo`, gitignored env files, and other blocklisted paths may stay unstaged.
+   If commit-eligible paths remain dirty (including **` M` unstaged** lines in porcelain), repeat from step 1. Only `tsconfig.tsbuildinfo`, gitignored env files, runtime logs (e.g. `*.log` with OAuth output), and other blocklisted paths may stay unstaged.
 
-**DO:** Include new feature folders (`?? src/**`), docs, SQL refresh artifacts, tenant settings, and modified tracked files in the same commit when they pass the secret filter.
+**DO:** Include **unstaged modified** tracked files (` M`), new feature folders (`?? src/**`), docs, SQL refresh artifacts, tenant settings, and modified tracked files in the same commit when they pass the secret filter.
+
+**DON'T:** Leave unstaged app/docs/script changes uncommitted after a commit/push request — if porcelain still shows ` M` or `??` on safe paths, the workflow is incomplete.
 
 **DON'T:** Commit only `.cursor/rules/*` while leaving other unstaged/untracked app changes behind — unless the user **explicitly** scoped the request to rules only.
 
@@ -186,11 +264,21 @@ Reject if you see real `DB_PASSWORD=`, `sk_live_`, `sk_test_`, `AKIA…`, `Beare
 
 - PowerShell does not support `&&` as a command separator by default. Run each command on its own line.
 
-**Recommended sequence (with untracked + secret filter):**
+**Recommended sequence (pull first, then stage, commit, push):**
 
 ```powershell
 cd F:\project_workspace\<repo>
+$branch = git branch --show-current
 git status -sb
+
+# Phase 0: pull remote first
+$env:GIT_SSL_NO_VERIFY = "true"
+git fetch origin
+git pull origin $branch
+Remove-Item Env:GIT_SSL_NO_VERIFY -ErrorAction SilentlyContinue
+
+# Stop if conflicts — resolve before continuing
+git diff --name-only --diff-filter=U
 
 # Optional: update .gitignore for prod/local env files first
 git add .gitignore
@@ -201,7 +289,7 @@ git diff --cached --name-only | Select-String -Pattern 'prod\.env|\.env\.local|a
 git commit -m "feat(scope): short imperative message"
 
 $env:GIT_SSL_NO_VERIFY = "true"
-git push origin <branch>
+git push origin $branch
 Remove-Item Env:GIT_SSL_NO_VERIFY
 ```
 
@@ -276,8 +364,33 @@ Remove-Item Env:GIT_SSL_NO_VERIFY
 
 - If you see `The token '&&' is not a valid statement separator`, split combined commands into separate lines.
 - Normalize line endings warning (LF→CRLF) is informational. Commit proceeds unless you configured otherwise.
-- **Merge blocked on release with “local changes would be overwritten”** (CRLF drift): on `release/v1.0.0`, run `git reset --hard <feature-branch>` then push — release tip matches feature; no merge commit needed.
+- **`git pull` conflicts:** resolve markers, `git add`, `git commit`; if unresolvable → **BLOCKER** (do not push).
+- **Merge blocked on release with “local changes would be overwritten”** (CRLF drift): stash or commit WIP, then `git checkout release/v1.0.0`, `git pull`, `git merge <work-branch>`; if only CRLF drift, `git reset --hard <work-branch>` then push.
+- **Protected `release/v1.0.0` push rejected:** create PR with `gh pr create`, resolve merge conflicts on PR or locally first, then `gh pr merge`.
 - **`database_target.prod.env` shows as untracked (`??`)**: add to `.gitignore`; never `git add` it.
+
+---
+
+## **Blocker report format (required in agent response)**
+
+When any requested repo cannot complete pull, merge, commit, or push, report a **BLOCKERS** section:
+
+```markdown
+### BLOCKERS
+| Repo | Step | Issue | Conflicted files | Action needed |
+|------|------|-------|------------------|---------------|
+| mosc-temp | pull / release merge | Unresolved conflicts | `src/foo.tsx`, `package.json` | Manual merge decision |
+| batch-jobs | push release | PR required, merge conflicts on PR | — | Resolve PR #N |
+
+### COMPLETED (no blockers)
+| Repo | Work branch | Commit | Release/PR | Status |
+|------|-------------|--------|------------|--------|
+| test-site | main | abc1234 | release/v1.0.0 @ abc1234 | pushed |
+```
+
+- **DO:** List every conflicted file path for unresolved merges.
+- **DO:** Continue commit/push for repos with **no** blockers in the same request.
+- **DON'T:** Skip reporting a failed repo silently.
 
 ---
 
@@ -307,10 +420,12 @@ Remove-Item Env:GIT_SSL_NO_VERIFY
 
 ## **Best practices**
 
+- **Always `git pull` before `git commit`** on the work branch (Phase 0).
+- **Resolve merge conflicts locally** before push or PR; report unresolvable conflicts as blockers.
 - Use conventional commit messages when possible (e.g., `feat`, `fix`, `chore`).
 - Keep commits focused and scoped; avoid bundling unrelated changes.
 - **Always** run the staged secret filename check before commit when using `git add -A`.
-- For Amplify prod deploys, push the **documented production branch** (`release/v1.0.0` or `main`).
+- For Amplify prod deploys, push the **documented production branch** (`release/v1.0.0` or `main`) — use **PR** when direct push is blocked.
 - Push to a feature branch first when using PR-based release protection; merge via PR if direct push to release is blocked.
 
 ---

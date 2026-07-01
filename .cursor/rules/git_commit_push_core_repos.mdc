@@ -30,6 +30,24 @@ This rule covers only the **three-repo batch** workflow for batch-jobs and servi
 
 ## **Agent workflow (every commit-and-push request)**
 
+**Order of operations:** Phase 0 pull → commit/push work branch → release merge (resolve conflicts) → PR if protected → report blockers → only proceed on clean repos.
+
+### **Step 0 — Pull remote FIRST (every repo, before commit)**
+
+```powershell
+cd "F:\project_workspace\<repo-name>"
+$branch = git branch --show-current
+$env:GIT_SSL_NO_VERIFY = 'true'
+git fetch origin
+git status -sb
+git pull origin $branch
+Remove-Item Env:GIT_SSL_NO_VERIFY -ErrorAction SilentlyContinue
+```
+
+- If **`git diff --name-only --diff-filter=U`** returns files → **attempt conflict resolution** (see [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc) Phase 0).
+- If conflicts **cannot** be resolved → mark repo **BLOCKER**; skip commit/push for that repo; continue others.
+- If pull says **local changes would be overwritten** → stash (`git stash push -m "wip"`) or commit WIP, pull again, then continue.
+
 ### **Step 1 — Inspect all three repos in parallel**
 
 For each repo, run:
@@ -51,7 +69,9 @@ git log origin/<branch>..HEAD --oneline
 
 Only repos with changes get a commit. Use focused messages from the diff (not generic "update files").
 
-When `git status --porcelain` shows **` M` (unstaged modified)** or **`??` (untracked)**, use **`git add -A`** — not only paths the user named. Follow the unstaged/untracked workflow in [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc): unstage `tsconfig.tsbuildinfo`, `ordered_PROD.sql`, and blocklisted paths; run secret scan; then commit **all** remaining staged files.
+When `git status --porcelain` shows **` M` (unstaged modified)**, **`MM`**, or **`??` (untracked)**, use **`git add -A`** — not only paths the user named. **Unstaged tracked files count:** if a file shows ` M`, it must be staged and committed when it passes the secret filter; do not push with leftover unstaged app/docs/script changes.
+
+Follow the unstaged/untracked workflow in [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc): unstage `tsconfig.tsbuildinfo`, `ordered_PROD.sql`, runtime logs, and blocklisted paths; run secret scan; then commit **all** remaining staged files.
 
 ```powershell
 cd "F:\project_workspace\<repo-name>"
@@ -79,7 +99,7 @@ git commit -m "<short summary sentence>" -m "<optional body with scope>"
 - **DO** run pre-commit hooks; if commit fails due to hooks, fix and create a **new** commit (do not amend unless user asked and HEAD was yours unpushed).
 - **DO** unstage any path matched by the secret filename check (see [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc)).
 
-### **Step 3 — Push all repos that were committed (or have unpushed commits)**
+### **Step 3 — Push work branch (repos that committed or have unpushed commits)**
 
 ```powershell
 cd "F:\project_workspace\mosc-temp"
@@ -92,18 +112,73 @@ cd "F:\project_workspace\event-site-manager-service"
 git push origin feature_Freelance_Work
 ```
 
-Replace branch names if `git branch --show-current` differs.
+Replace branch names if `git branch --show-current` differs. Retry with `$env:GIT_SSL_NO_VERIFY='true'` on SSL errors.
 
-**Amplify production deploy for `mosc-temp`:** After pushing the feature branch, also merge/push `release/v1.0.0` per [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc) if the user wants a prod build — the trio push alone may not trigger Amplify.
+### **Step 3b — Release merge: pull, merge, resolve conflicts, push or PR**
 
-### **Step 4 — Verify clean and synced**
+For each repo that needs **`release/v1.0.0`** deploy (mosc-temp, batch-jobs, service):
+
+```powershell
+cd "F:\project_workspace\<repo-name>"
+$work = "<work-branch>"   # MOSC-redesign-sub-poc-2 | main | feature_Freelance_Work
+git fetch origin
+git checkout release/v1.0.0
+git pull origin release/v1.0.0
+git merge $work -m "merge: $work into release/v1.0.0 for deploy"
+```
+
+**On merge conflict:**
+
+```powershell
+git diff --name-only --diff-filter=U
+# Resolve each file; remove <<<<<<< ======= >>>>>>> markers
+git add <resolved-files>
+git commit -m "merge: resolve conflicts merging $work into release/v1.0.0"
+```
+
+**If merge cannot be resolved** → `git merge --abort`, report **BLOCKER** with file list; do not push release.
+
+**Push release (or PR if protected):**
+
+```powershell
+$env:GIT_SSL_NO_VERIFY = 'true'
+git push origin release/v1.0.0
+Remove-Item Env:GIT_SSL_NO_VERIFY
+git checkout $work
+```
+
+**If push rejected (protected branch):**
+
+```powershell
+gh pr create --base release/v1.0.0 --head $work --title "merge: $work into release/v1.0.0" --body "Deploy sync."
+gh pr view --json mergeable,mergeStateStatus,url
+# If mergeable: CONFLICTING → report BLOCKER with PR URL
+# If mergeable: MERGEABLE → gh pr merge <n> --merge
+```
+
+- **mosc-temp:** work = `MOSC-redesign-sub-poc-2`; if no conflicts and release only has CRLF drift → `git reset --hard $work` instead of merge commit.
+- **batch-jobs / service:** release may have prod-only commits — use **merge** (not hard reset) unless user approves reset.
+
+**Amplify production deploy for `mosc-temp`:** requires `release/v1.0.0` pushed or PR merged — work-branch push alone does not trigger Amplify prod.
+
+### **Step 4 — Verify clean and synced; report blockers**
 
 ```powershell
 git status -sb
 git status --porcelain
 ```
 
-Each repo should show `## <branch>...origin/<branch>` with **no** ahead/behind and **no** unstaged/untracked commit-eligible changes. If dirty paths remain (excluding `tsconfig.tsbuildinfo` and gitignored secrets), re-run Steps 2–3 for that repo before reporting done.
+Each **completed** repo should show `## <branch>...origin/<branch>` with no ahead/behind and no unstaged commit-eligible changes.
+
+**Response must include:**
+
+1. **COMPLETED** table — repo, work commit, release/PR status
+2. **BLOCKERS** table — any repo that failed pull, merge, conflict resolution, push, or PR (with conflicted file paths and PR URLs)
+
+See **Blocker report format** in [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc).
+
+- If dirty paths remain (excluding `tsconfig.tsbuildinfo` and gitignored secrets), re-run Steps 0–3 for that repo.
+- **DO** commit/push repos with no blockers even when another repo in the same request is blocked.
 
 ## **SSL certificate errors on push (Windows)**
 
@@ -154,9 +229,13 @@ git reset --hard origin/<branch-name>
 ## **Anti-patterns**
 
 ```powershell
+# ❌ DON'T: Commit/push while porcelain still has unstaged safe files ( M / ??)
+# ❌ DON'T: Stage only .cursor/rules when src/, scripts/, or docs/ also show M or ??
 # ❌ DON'T: Commit without user explicitly asking
-# ❌ DON'T: Push --force to main without user approval
-# ❌ DON'T: Bundle unrelated repos into one commit message without checking each diff
+# ❌ DON'T: Commit before git pull when branch is behind origin
+# ❌ DON'T: Push release/v1.0.0 with unresolved merge conflict markers
+# ❌ DON'T: Push --force to main/release without user approval
+# ❌ DON'T: Skip BLOCKER report when a repo fails pull/merge/push
 # ❌ DON'T: git config http.sslVerify false (use one-time $env:GIT_SSL_NO_VERIFY instead)
 # ❌ DON'T: Skip secret filename check before commit (see git_local_push.mdc)
 ```
@@ -165,12 +244,12 @@ git reset --hard origin/<branch-name>
 
 When user says *"commit and push these three projects"* (mosc-temp, batch-jobs, service):
 
-1. Parallel `git status` / `git diff --stat` / `git log` on all three paths
-2. Secret scan + `git add -A` + `git commit` per repo with changes ([git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc))
-3. `git push origin <branch>` per repo
-4. Retry failed pushes with `$env:GIT_SSL_NO_VERIFY='true'` if SSL error
-5. If mosc-temp prod deploy needed: merge/push `release/v1.0.0` per [git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc)
-6. Report commit hashes, branches, and push status in the response
+1. **Phase 0:** `git fetch` + `git pull` on each work branch; resolve conflicts or report **BLOCKER**
+2. Parallel `git status` / `git diff --stat` / `git log` on all three paths
+3. Secret scan + `git add -A` + `git commit` per repo with changes ([git_local_push.mdc](mdc:.cursor/rules/git_local_push.mdc))
+4. `git push origin <work-branch>` per repo (SSL retry if needed)
+5. **Release:** checkout `release/v1.0.0`, pull, merge work branch, **resolve conflicts**, push or **open PR** (`gh pr create` / `gh pr merge`)
+6. Report **BLOCKERS** + **COMPLETED** tables; skip only blocked repos
 
 ## **References**
 
