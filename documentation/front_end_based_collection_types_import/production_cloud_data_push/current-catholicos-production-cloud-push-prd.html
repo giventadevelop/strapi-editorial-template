@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Current Catholicos – Production Cloud Push PRD</title>
+  <style>
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-header { display: flex; justify-content: space-between; padding: 10px 15px; }
+    .command-content { padding: 12px 15px; font-family: monospace; font-size: 0.9em; color: #0d3b66; word-break: break-all; }
+    .copy-button { padding: 6px 12px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; color: #856404; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Cloud push index</a></p>
+    <h1>Current Catholicos – Production / Cloud data push PRD</h1>
+    <p>Push <strong>Directory – Current Catholicos</strong> (homepage Catholicos profile) to Strapi Cloud. Status: <strong>Script ready</strong> — deploy schema to Cloud before first push.</p>
+
+    <div class="section-intro">
+      <p><strong>UID:</strong> <code class="code-highlight">api::current-catholicos.current-catholicos</code></p>
+      <p><strong>REST plural:</strong> <code class="code-highlight">current-catholicos-entries</code></p>
+      <p><strong>Local CM:</strong> <code>http://localhost:1337/admin/content-manager/collection-types/api::current-catholicos.current-catholicos</code></p>
+      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code> (or <code>mosc_malankara_orthodox_2</code>) · <strong>Upsert:</strong> slug + tenantId</p>
+      <p><strong>Source:</strong> mosc-redesign homepage section[2] via <code class="script-name">import-current-catholicos-from-mosc-temp.js</code></p>
+    </div>
+
+    <div class="warn">
+      <strong>Prerequisite:</strong> Deploy Strapi code with the <code>current-catholicos</code> content type to Cloud (<code>git push</code> or <code>npx strapi deploy</code>) before running the push script. Cloud must expose <code>/api/current-catholicos-entries</code>.
+    </div>
+
+    <h2>1. Script strategy</h2>
+    <table>
+      <thead><tr><th>Item</th><th>Detail</th></tr></thead>
+      <tbody>
+        <tr><td>Base template</td><td><code class="script-name">push-saints-to-cloud.js</code> (tenant + image + upsert flow)</td></tr>
+        <tr><td>New script</td><td><code class="script-name">scripts/push-current-catholicos-to-cloud.js</code></td></tr>
+        <tr><td>npm</td><td><code>push:current-catholicos-to-cloud</code></td></tr>
+        <tr><td>Local import first</td><td><code>npm run import:current-catholicos -- --tenant-id=tenant_demo_002 --replace</code></td></tr>
+        <tr><td>Expected count</td><td>1 entry per tenant (His Holiness Baselios Marthoma Mathews III)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. Cloud payload fields</h2>
+    <table>
+      <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>name, slug, excerpt, body, order, tenant</td><td>Standard directory fields</td></tr>
+        <tr><td>badge</td><td>Homepage badge (e.g. <code>Malankara Metropolitan</code>)</td></tr>
+        <tr><td>roleTitle</td><td>Role line (e.g. <code>Catholicos of the East and Malankara Metropolitan</code>)</td></tr>
+        <tr><td>imageAlt</td><td>Portrait alt text from homepage</td></tr>
+        <tr><td>profilePath</td><td>Internal link to full Holy Synod profile (e.g. <code>/mosc-redesign/holy-synod/his-holiness-baselios-marthoma-mathews-iii</code>)</td></tr>
+        <tr><td>address, email, phones</td><td>Contact block from detail page</td></tr>
+        <tr><td>image</td><td>Portrait; upload + link like Saints / Holy Synod</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. Commands</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Phase A — local import</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c0')">📋 Copy</button></div>
+      <div class="command-content" id="c0">npm run import:current-catholicos -- --tenant-id=tenant_demo_002 --replace</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Phase B — push content (stop local Strapi first)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c1')">📋 Copy</button></div>
+      <div class="command-content" id="c1">npm run push:current-catholicos-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Dry run</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c2')">📋 Copy</button></div>
+      <div class="command-content" id="c2">set DRY_RUN=1&amp;&amp; npm run push:current-catholicos-to-cloud -- --tenant-id=tenant_demo_002</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Images only (retry upload/link)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c3')">📋 Copy</button></div>
+      <div class="command-content" id="c3">npm run push:current-catholicos-to-cloud -- --tenant-id=tenant_demo_002 --images-only</div>
+    </div>
+
+    <h2>4. REST verification</h2>
+    <p><code>GET /api/current-catholicos-entries?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
+    <p>Expect <strong>1</strong> entry for <code>tenant_demo_002</code> with slug <code>his-holiness-baselios-marthoma-mathews-iii</code>; portrait <code>image.url</code> populated.</p>
+
+    <h2>5. Cloud image upload fix</h2>
+    <p>After content push, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a> when Cloud <code>/api/upload</code> fails (S3 credential issues).</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish Current Catholicos images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button></div>
+      <div class="command-content" id="cmd-img">npm run finish:collection-images-on-cloud -- --collection=current-catholicos --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>6. AI prompt — Cloud image upload fix (Current Catholicos)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p-img')">📋 Copy</button></div>
+      <div class="command-content" id="p-img" style="white-space:pre-wrap;">Upload the Cloud images for Current Catholicos using the Cloud image migration fix. Read cloud-image-upload-migration-fix.html and current-catholicos-production-cloud-push-prd.html § Cloud image upload fix. Run: npm run finish:collection-images-on-cloud -- --collection=current-catholicos --tenant-id=tenant_demo_002</div>
+    </div>
+
+    <h2>7. AI prompt (content push)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
+      <div class="command-content" id="p" style="white-space:pre-wrap;">Push Current Catholicos from local Strapi to Cloud. Script push-current-catholicos-to-cloud.js. UID api::current-catholicos.current-catholicos, plural current-catholicos-entries. Payload: name, slug, badge, roleTitle, excerpt, body, imageAlt, profilePath, address, email, phones, order, tenant, image. tenant tenant_demo_002. Run import:current-catholicos first. Deploy schema to Cloud before push. Follow holy-synod-production-cloud-push-prd.html pattern.</div>
+    </div>
+  </div>
+  <script>
+    function copyCommand(btn, id) { navigator.clipboard.writeText(document.getElementById(id).textContent.trim()).then(() => { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = '📋 Copy', 2000); }); }
+  </script>
+</body>
+</html>

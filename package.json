@@ -68,6 +68,7 @@
     "push:publications-to-cloud": "node ./scripts/push-publications-to-cloud.js",
     "push:theological-seminaries-to-cloud": "node ./scripts/push-theological-seminaries-to-cloud.js",
     "push:holy-synod-to-cloud": "node ./scripts/push-holy-synod-to-cloud.js",
+    "push:current-catholicos-to-cloud": "node ./scripts/push-current-catholicos-to-cloud.js",
     "push:kalpana-editions-to-cloud": "node ./scripts/push-kalpana-editions-to-cloud.js",
     "push:kalpana-documents-to-cloud": "node ./scripts/push-kalpana-documents-to-cloud.js",
     "finish:kalpana-documents-on-cloud": "node ./scripts/finish-collection-images-on-cloud.js --collection=kalpana-documents",

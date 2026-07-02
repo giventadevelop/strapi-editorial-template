@@ -80,6 +80,22 @@ const COLLECTIONS = {
     pushContentScript: 'push:holy-synod-to-cloud',
     prd: 'holy-synod-production-cloud-push-prd.html',
   },
+  'current-catholicos': {
+    label: 'Current Catholicos',
+    uid: 'api::current-catholicos.current-catholicos',
+    table: 'current_catholicos_entries',
+    tenantLinkTable: 'current_catholicos_entries_tenant_lnk',
+    entryIdCol: 'current_catholicos_entry_id',
+    restPlural: 'current-catholicos-entries',
+    mediaField: 'image',
+    scoreImage: (name = '') => {
+      if (/Baselios.*Mathews/i.test(name)) return 100;
+      if (/H\.?H/i.test(name)) return 90;
+      return 0;
+    },
+    pushContentScript: 'push:current-catholicos-to-cloud',
+    prd: 'current-catholicos-production-cloud-push-prd.html',
+  },
   institutions: {
     label: 'Institutions',
     uid: 'api::institution.institution',
