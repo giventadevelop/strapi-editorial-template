@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Saints – Production Cloud Push PRD</title>
+  <title>Saints &amp; Blesseds – Production Cloud Push PRD</title>
   <style>
     :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
@@ -24,66 +24,87 @@
     .command-content { padding: 12px 15px; font-family: monospace; font-size: 0.9em; color: #0d3b66; word-break: break-all; }
     .copy-button { padding: 6px 12px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; }
     .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
-    .ok { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; color: #155724; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; color: #856404; }
   </style>
 </head>
 <body>
   <div class="doc">
-    <p><a href="index.html">← Cloud push index</a> · <a href="../saints-import-prd.html">Local import PRD</a></p>
-    <h1>Saints – Production / Cloud data push PRD</h1>
-    <p>Push <strong>Directory – Saints</strong> to Strapi Cloud. Status: <strong>Complete</strong> (7 entries + 7 distinct images on Cloud, June 2026).</p>
+    <p><a href="index.html">← Cloud push index</a></p>
+    <h1>Saints &amp; Blesseds – Production / Cloud data push PRD</h1>
+    <p>Push <strong>Directory – Saints &amp; Blesseds</strong> (mosc-redesign homepage carousel + saints hub) to Strapi Cloud. Status: <strong>Script ready</strong>.</p>
 
     <div class="section-intro">
       <p><strong>UID:</strong> <code class="code-highlight">api::saint-entry.saint-entry</code></p>
       <p><strong>REST plural:</strong> <code class="code-highlight">saint-entries</code></p>
       <p><strong>Local CM:</strong> <code>http://localhost:1337/admin/content-manager/collection-types/api::saint-entry.saint-entry</code></p>
-      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code> · <strong>Upsert:</strong> slug + tenantId</p>
+      <p><strong>Tenant:</strong> <code class="code-highlight">tenant_demo_002</code> (or <code>mosc_malankara_orthodox_2</code> with <code>-mo2</code> slug suffix) · <strong>Upsert:</strong> slug + tenantId</p>
+      <p><strong>Source:</strong> mosc-redesign homepage section[1] + saints hub via <code class="script-name">import-saints-from-mosc-temp.js</code></p>
+    </div>
+
+    <div class="warn">
+      <strong>Shared-instance slug rule:</strong> On a shared Strapi instance, import for <code>mosc_malankara_orthodox_2</code> auto-appends <code>-mo2</code> to slugs (global slug uniqueness). Use plain slugs for <code>tenant_demo_002</code>.
     </div>
 
     <h2>1. Script strategy</h2>
     <table>
       <thead><tr><th>Item</th><th>Detail</th></tr></thead>
       <tbody>
-        <tr><td>Reuse Catholicate script?</td><td><strong>Yes</strong> — same fields: name, slug, excerpt, body, image, order, tenant</td></tr>
-        <tr><td>New script</td><td><code class="script-name">scripts/push-saints-to-cloud.js</code></td></tr>
-        <tr><td>Change</td><td><code>UID</code>, <code>PLURAL = 'saint-entries'</code>, log title</td></tr>
+        <tr><td>Base template</td><td><code class="script-name">push-catholicate-to-cloud.js</code> (tenant + image + upsert flow)</td></tr>
+        <tr><td>Script</td><td><code class="script-name">scripts/push-saints-to-cloud.js</code></td></tr>
         <tr><td>npm</td><td><code>push:saints-to-cloud</code></td></tr>
+        <tr><td>Local import first</td><td><code>npm run import:saints -- --tenant-id=tenant_demo_002 --replace</code></td></tr>
+        <tr><td>Expected count</td><td>~9 carousel entries from mosc-redesign (varies if hub/detail pages differ)</td></tr>
       </tbody>
     </table>
 
-    <h2>2. Commands (after script created)</h2>
+    <h2>2. Cloud payload fields</h2>
+    <table>
+      <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>name, slug, excerpt, body, order, tenant</td><td>Standard directory fields</td></tr>
+        <tr><td>image</td><td>Portrait from carousel card, hub card, or detail page; upload + link like Catholicate</td></tr>
+      </tbody>
+    </table>
+
+    <h2>3. Commands</h2>
     <div class="command-block">
-      <div class="command-header"><strong>Push</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c1')">📋 Copy</button></div>
+      <div class="command-header"><strong>Phase A — local import</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c0')">📋 Copy</button></div>
+      <div class="command-content" id="c0">npm run import:saints -- --tenant-id=tenant_demo_002 --replace</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Phase B — push content (stop local Strapi first)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c1')">📋 Copy</button></div>
       <div class="command-content" id="c1">npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002</div>
     </div>
     <div class="command-block">
       <div class="command-header"><strong>Dry run</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c2')">📋 Copy</button></div>
       <div class="command-content" id="c2">set DRY_RUN=1&amp;&amp; npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002</div>
     </div>
-
-    <h2>3. REST verification</h2>
-    <p><code>GET /api/saint-entries?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
-    <p>Expect 7 entries for <code>tenant_demo_002</code>; each with a distinct <code>image.url</code>.</p>
-
-    <div class="ok"><strong>June 2026 — images fixed:</strong> 7 distinct images on Cloud via migration base64 upload + REST PUT fallback.</div>
-
-    <h2>4. Cloud image upload fix</h2>
-    <p>After content push, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a> when Cloud <code>/api/upload</code> fails.</p>
     <div class="command-block">
-      <div class="command-header"><strong>Finish Saints images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button></div>
+      <div class="command-header"><strong>Images only (retry upload/link)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c3')">📋 Copy</button></div>
+      <div class="command-content" id="c3">npm run push:saints-to-cloud -- --tenant-id=tenant_demo_002 --images-only</div>
+    </div>
+
+    <h2>4. REST verification</h2>
+    <p><code>GET /api/saint-entries?filters[tenant][tenantId][$eq]=tenant_demo_002&amp;sort=order:asc&amp;populate[0]=tenant&amp;populate[1]=image</code></p>
+    <p>Expect all carousel saints for <code>tenant_demo_002</code>; each entry should have a distinct <code>image.url</code>.</p>
+
+    <h2>5. Cloud image upload fix</h2>
+    <p>After content push, use the <a href="cloud-image-upload-migration-fix.html">migration image fix</a> when Cloud <code>/api/upload</code> fails (S3 credential issues) or portraits are missing on Cloud.</p>
+    <div class="command-block">
+      <div class="command-header"><strong>Finish Saints &amp; Blesseds images on Cloud</strong><button type="button" class="copy-button" onclick="copyCommand(this,'cmd-img')">📋 Copy</button></div>
       <div class="command-content" id="cmd-img">npm run finish:collection-images-on-cloud -- --collection=saints --tenant-id=tenant_demo_002</div>
     </div>
 
-    <h2>5. AI prompt — Cloud image upload fix (Saints)</h2>
+    <h2>6. AI prompt — Cloud image upload fix (Saints &amp; Blesseds)</h2>
     <div class="command-block">
       <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p-img')">📋 Copy</button></div>
-      <div class="command-content" id="p-img" style="white-space:pre-wrap;">Upload the Cloud images for Saints using the Cloud image migration fix. Read cloud-image-upload-migration-fix.html and saints-production-cloud-push-prd.html § Cloud image upload fix. Run: npm run finish:collection-images-on-cloud -- --collection=saints --tenant-id=tenant_demo_002</div>
+      <div class="command-content" id="p-img" style="white-space:pre-wrap;">Upload the Cloud images for Saints &amp; Blesseds using the Cloud image migration fix. Read cloud-image-upload-migration-fix.html and saints-production-cloud-push-prd.html § Cloud image upload fix. Run: npm run finish:collection-images-on-cloud -- --collection=saints --tenant-id=tenant_demo_002</div>
     </div>
 
-    <h2>6. AI prompt (content push)</h2>
+    <h2>7. AI prompt (content push)</h2>
     <div class="command-block">
       <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
-      <div class="command-content" id="p" style="white-space:pre-wrap;">Push Saints from local Strapi to Cloud. Clone push-catholicate-to-cloud.js → push-saints-to-cloud.js. UID api::saint-entry.saint-entry, plural saint-entries, tenant tenant_demo_002. Run import:saints first. Add npm push:saints-to-cloud. Follow catholicate-production-cloud-push-prd.html pattern.</div>
+      <div class="command-content" id="p" style="white-space:pre-wrap;">Push Saints &amp; Blesseds from local Strapi to Cloud. Script push-saints-to-cloud.js. UID api::saint-entry.saint-entry, plural saint-entries. Payload: name, slug, excerpt, body, order, tenant, image. tenant tenant_demo_002. Run import:saints first (import-saints-from-mosc-temp.js). Follow holy-synod-production-cloud-push-prd.html pattern. If images missing on Cloud, run finish:collection-images-on-cloud --collection=saints.</div>
     </div>
   </div>
   <script>
