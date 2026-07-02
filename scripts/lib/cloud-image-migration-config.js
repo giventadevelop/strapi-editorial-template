@@ -36,7 +36,7 @@ const COLLECTIONS = {
     prd: 'ecumenical-production-cloud-push-prd.html',
   },
   saints: {
-    label: 'Saints',
+    label: 'Saints & Blesseds',
     uid: 'api::saint-entry.saint-entry',
     table: 'saint_entries',
     tenantLinkTable: 'saint_entries_tenant_lnk',
@@ -85,7 +85,7 @@ const COLLECTIONS = {
     uid: 'api::current-catholicos.current-catholicos',
     table: 'current_catholicos_entries',
     tenantLinkTable: 'current_catholicos_entries_tenant_lnk',
-    entryIdCol: 'current_catholicos_entry_id',
+    entryIdCol: 'current_catholicos_id',
     restPlural: 'current-catholicos-entries',
     mediaField: 'image',
     scoreImage: (name = '') => {
