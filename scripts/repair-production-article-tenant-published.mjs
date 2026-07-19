@@ -72,11 +72,14 @@ async function tenantDocumentId(tenantId) {
   return field(t, 'documentId');
 }
 
-async function allArticleDocumentIds() {
+/** Only draft articles already linked to this tenant (avoids reassigning other tenants). */
+async function articleDocumentIdsForTenant(tenantId) {
   const out = new Set();
   let page = 1;
   while (true) {
-    const r = await api(`/api/articles?status=draft&pagination[page]=${page}&pagination[pageSize]=100`);
+    const r = await api(
+      `/api/articles?status=draft&filters[tenant][tenantId][$eq]=${encodeURIComponent(tenantId)}&pagination[page]=${page}&pagination[pageSize]=100&fields[0]=documentId`
+    );
     if (!r.ok) throw new Error(`Article list failed page=${page} HTTP ${r.status}`);
     const list = rows(r.json);
     for (const a of list) {
@@ -100,8 +103,8 @@ async function main() {
   if (!tenantDoc) throw new Error(`Tenant not found for ${TENANT_ID}`);
   console.log(`tenantDocumentId=${tenantDoc}`);
 
-  const docs = await allArticleDocumentIds();
-  console.log(`article documentIds=${docs.length}`);
+  const docs = await articleDocumentIdsForTenant(TENANT_ID);
+  console.log(`article documentIds for tenant=${docs.length}`);
 
   const articles = docs.map((documentId) => ({ documentId, uid: 'api::article.article' }));
   if (DRY_RUN) {
