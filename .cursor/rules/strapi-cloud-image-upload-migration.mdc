@@ -1,57 +1,90 @@
 ---
-description: Fix Strapi Cloud image uploads when /api/upload returns 500 — use migration base64 upload for directory collection types
-globs: scripts/push-*-to-cloud.js, scripts/push-collection-images-migration.js, scripts/finish-collection-images-on-cloud.js, scripts/lib/cloud-image-migration-config.js, src/index.js, documentation/front_end_based_collection_types_import/production_cloud_data_push/**/*
+description: Fix missing Strapi Cloud images — migration base64 upload (post-deploy) and durable S3 register path; production tenant commands and script map
+globs: scripts/push-*-to-cloud.js, scripts/push-collection-images-migration.js, scripts/push-collection-images-s3-to-cloud.js, scripts/push-all-collection-images-s3-to-cloud.js, scripts/finish-collection-images-on-cloud.js, scripts/finish-all-collection-images-on-cloud.js, scripts/lib/cloud-image-migration-config.js, scripts/lib/push-collection-images-s3.js, scripts/lib/liturgy-cli.js, src/index.js, config/env/**/plugins.js, documentation/front_end_based_collection_types_import/production_cloud_data_push/**/*, documentation/STRAPI_MEDIA_STORAGE_S3_CLOUD_PRD.html
 alwaysApply: false
 ---
 
-- **When to use this fix**
-  - Content is already on Strapi Cloud (text + tenant links OK) but **images are missing** or all cards show the same placeholder.
-  - `POST /api/upload` on Cloud returns **HTTP 500** (broken S3 / `InvalidAccessKeyId`) or migration endpoints are required.
-  - Local images exist under `public/uploads/` from phase-A import.
+# Strapi Cloud image upload (production)
 
-- **Canonical solution (June 2026 — proven on Catholicate)**
-  - **Do not rely on** Cloud `POST /api/upload` when S3 credentials are invalid.
-  - Use **`POST /api/migration/fix-published`** with `uploadMedia` (base64) + `linkCollectionImages` — implemented in [src/index.js](mdc:src/index.js).
-  - Generic scripts:
-    - [scripts/push-collection-images-migration.js](mdc:scripts/push-collection-images-migration.js)
-    - [scripts/finish-collection-images-on-cloud.js](mdc:scripts/finish-collection-images-on-cloud.js)
-    - Registry: [scripts/lib/cloud-image-migration-config.js](mdc:scripts/lib/cloud-image-migration-config.js)
+## When images are missing on production
 
-- **Standard command (any registered collection)**
-  ```bash
-  npm run finish:collection-images-on-cloud -- --collection=catholicate --tenant-id=tenant_demo_002
-  ```
-  - Replace `catholicate` with: `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `institutions`, `training`, `kalpana-editions`, `kalpana-documents`.
-  - **After every Strapi Cloud deploy**, re-run images for affected types (batch): `npm run finish:all-collection-images-on-cloud -- --tenant-id=tenant_demo_002`
-  - **Stop local Strapi dev server** before running (embedded Strapi reads local DB).
-  - Requires migration code **deployed on Cloud** (`git push` or `npx strapi deploy --force`).
+- Content/tenant links exist on Cloud, but cards show placeholders or broken images.
+- `HEAD https://<cloud>/uploads/<file>` returns **404** while local `public/uploads/` works.
+- Common cause: Cloud disk is **ephemeral** — DB still has `image.url` like `/uploads/...`, files wiped after deploy.
+- Frontend (`mosc-temp`) resolves relative URLs via `NEXT_PUBLIC_STRAPI_URL` + `getMediaUrl` — fix Cloud files, not the Next app.
 
-- **Prerequisites**
-  - `.env`: `STRAPI_CLOUD_URL`, `STRAPI_CLOUD_API_TOKEN` (Full Access). Use `dotenv` with `override: true` if shell env sets `STRAPI_CLOUD_URL` to localhost.
-  - Phase A local import complete; content already pushed to Cloud via `push:*-to-cloud`.
-  - `STRAPI_IMPORT_NODE_ENV=staging` or scripts default to `staging` for local DB.
+## Production vs demo tenant (critical)
 
-- **Workflow order**
-  1. Push **content + tenant** first: `npm run push:<section>-to-cloud -- --tenant-id=tenant_demo_002`
-  2. Deploy code if migration endpoint not live (probe returns `"articles array is required."` without `uploadMedia` hint).
-  3. Push **images**: `npm run finish:collection-images-on-cloud -- --collection=<key> --tenant-id=tenant_demo_002`
-  4. Verify REST: `populate[image]=*` + `filters[tenant][tenantId][$eq]=tenant_demo_002` — each entry should have a **distinct** `image.url`.
+| Audience | Tenant ID |
+|---|---|
+| Live site (`www.mosc-temp.com`, Amplify) | **`mosc_malankara_orthodox_2`** |
+| Editor / demo CMS | `tenant_demo_002` |
 
-- **Adding a new collection type**
-  1. Add entry to [cloud-image-migration-config.js](mdc:scripts/lib/cloud-image-migration-config.js) (`uid`, `table`, `tenantLinkTable`, `entryIdCol`, `restPlural`).
-  2. Document in `production_cloud_data_push/<section>-production-cloud-push-prd.html` § **Cloud image upload fix**.
-  3. Add AI prompt block: *"Upload the Cloud images for [Section] using the Cloud image migration fix."*
+Always pass `--tenant-id=` explicitly. In [scripts/lib/liturgy-cli.js](mdc:scripts/lib/liturgy-cli.js), **CLI flags override `.env` `TENANT_ID`** — confirm the log line `Tenant: mosc_malankara_orthodox_2` before trusting the run.
 
-- **AI invocation phrase (user → agent)**
-  - *"Upload the Cloud images for [collection] using the Cloud image migration fix."*
-  - Agent reads: [cloud-image-upload-migration-fix.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html) + per-type PRD § Cloud image upload fix.
-  - Agent runs `finish:collection-images-on-cloud` with the matching `--collection` key; does not ask user to run scripts.
+## Two upload strategies
 
-- **Alternative (when S3 is fixed on Cloud)**
-  - Set valid `AWS_*` in Strapi Cloud → Settings → Variables.
-  - Re-run: `npm run push:<section>-to-cloud -- --tenant-id=tenant_demo_002 --images-only`
+### A — Quick fix (migration base64 → Cloud local disk)
 
-- **References**
-  - Master doc: [cloud-image-upload-migration-fix.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html)
-  - Catholicate example (complete): [catholicate-production-cloud-push-prd.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/catholicate-production-cloud-push-prd.html)
-  - Production upload config: [config/env/production/plugins.js](mdc:config/env/production/plugins.js) (`UPLOAD_PROVIDER=local` fallback)
+Use when images 404 after deploy and you need production fixed now.
+
+```bash
+# Stop local Strapi first. Requires .env: STRAPI_CLOUD_URL, STRAPI_CLOUD_API_TOKEN
+npm run finish:collection-images-on-cloud -- --collection=institutions --tenant-id=mosc_malankara_orthodox_2
+```
+
+- Success log looks like: `Created: 9 | Linked: 219`
+- Windows may exit non-zero with `UV_HANDLE_CLOSING` after success — treat **Created/Linked** as the result.
+- **Re-run after every Cloud deploy** (files land on ephemeral disk again).
+- Batch: `npm run finish:all-collection-images-on-cloud -- --tenant-id=mosc_malankara_orthodox_2`
+
+### B — Durable fix (S3 + register-s3-media)
+
+Prefer when Cloud has valid AWS vars and `UPLOAD_PROVIDER=aws-s3` (see [STRAPI_MEDIA_STORAGE_S3_CLOUD_PRD.html](mdc:documentation/STRAPI_MEDIA_STORAGE_S3_CLOUD_PRD.html)). Survives redeploys.
+
+```bash
+npm run push:collection-images-s3-to-cloud -- --collection=institutions --tenant-id=mosc_malankara_orthodox_2
+# optional: --skip-api  |  --skip-s3  |  --link-existing
+npm run push:all-collection-images-s3-to-cloud -- --tenant-id=mosc_malankara_orthodox_2
+```
+
+Needs local `.env` AWS creds (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET_NAME`) writing to the shared prod prefix. ACL: omit when bucket is “Bucket owner enforced” — [strapi-s3-upload-acl-fix.mdc](mdc:.cursor/rules/strapi-s3-upload-acl-fix.mdc).
+
+## Script map
+
+| Role | Path / npm script |
+|---|---|
+| Finish one collection (probe + push + verify) | [scripts/finish-collection-images-on-cloud.js](mdc:scripts/finish-collection-images-on-cloud.js) → `finish:collection-images-on-cloud` |
+| Finish all registered collections | [scripts/finish-all-collection-images-on-cloud.js](mdc:scripts/finish-all-collection-images-on-cloud.js) → `finish:all-collection-images-on-cloud` |
+| Base64 migration push | [scripts/push-collection-images-migration.js](mdc:scripts/push-collection-images-migration.js) (dedupes by file hash) |
+| S3 push / register | [scripts/push-collection-images-s3-to-cloud.js](mdc:scripts/push-collection-images-s3-to-cloud.js) → `push:collection-images-s3-to-cloud` |
+| Collection registry | [scripts/lib/cloud-image-migration-config.js](mdc:scripts/lib/cloud-image-migration-config.js) |
+| Cloud endpoint (`uploadMedia`, `linkCollectionImages`, `register-s3-media`) | [src/index.js](mdc:src/index.js) |
+| Upload provider config | [config/env/production/plugins.js](mdc:config/env/production/plugins.js) |
+
+**`--collection` keys:** `catholicate`, `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `current-catholicos`, `institutions`, `training`, `spiritual-organisations`, `kalpana-editions`, `kalpana-documents`.
+
+Content-first (if entries missing): `npm run push:<section>-to-cloud -- --tenant-id=mosc_malankara_orthodox_2` (e.g. `push:institutions-to-cloud`), then images via A or B.
+
+## Workflow (institutions example — Jul 2026)
+
+1. Confirm local has files under `public/uploads/` and Cloud entries exist for the **production** tenant.
+2. Stop local Strapi.
+3. Run strategy A (or B if S3 is ready):
+   ```bash
+   npm run finish:collection-images-on-cloud -- --collection=institutions --tenant-id=mosc_malankara_orthodox_2
+   ```
+4. Verify Cloud: with API token, `GET /api/institutions?populate=image` — every `image.url` should `HEAD` **200** (absolute Cloud URL for `/uploads/...`, or `https://...amazonaws.com/...` for S3).
+5. Spot-check live page: `https://www.mosc-temp.com/mosc-redesign/institutions-cms` — card `<img>` src should point at Cloud/S3 and load.
+
+## Agent invocation
+
+- User: *“Upload / fix Cloud images for Institutions on production”* or *“re-run finish collection images for institutions”*
+- Agent: run the command with **`mosc_malankara_orthodox_2`** unless user names another tenant; do not ask the user to run it.
+- Read master doc: [cloud-image-upload-migration-fix.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/cloud-image-upload-migration-fix.html) + per-type PRD under `documentation/front_end_based_collection_types_import/production_cloud_data_push/`.
+
+## Adding a new collection
+
+1. Register in [cloud-image-migration-config.js](mdc:scripts/lib/cloud-image-migration-config.js) (`uid`, `table`, `tenantLinkTable`, `entryIdCol`, `restPlural`, `mediaField`).
+2. Document § Cloud image upload fix in the type’s `*-production-cloud-push-prd.html`.
+3. Deploy Cloud if migration endpoints changed, then run finish/S3 for both tenants as needed.

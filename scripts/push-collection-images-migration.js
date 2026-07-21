@@ -114,23 +114,28 @@ async function main() {
 
   const uploadMedia = [];
   const links = [];
+  const uploadedHashes = new Set();
   for (const row of rows) {
     const diskPath = resolveDiskPath(row);
     if (!diskPath) {
       console.warn('Missing disk file for', row.slug, row.hash);
       continue;
     }
-    const buf = fs.readFileSync(diskPath);
-    uploadMedia.push({
-      name: row.name,
-      hash: row.hash,
-      ext: row.ext,
-      mime: row.mime,
-      size: row.size || buf.length,
-      width: row.width,
-      height: row.height,
-      base64: buf.toString('base64'),
-    });
+    // Dedupe binary payload by hash (institutions share category images across many rows).
+    if (!uploadedHashes.has(row.hash)) {
+      const buf = fs.readFileSync(diskPath);
+      uploadMedia.push({
+        name: row.name,
+        hash: row.hash,
+        ext: row.ext,
+        mime: row.mime,
+        size: row.size || buf.length,
+        width: row.width,
+        height: row.height,
+        base64: buf.toString('base64'),
+      });
+      uploadedHashes.add(row.hash);
+    }
     links.push({ slug: row.slug, hash: row.hash });
   }
 
@@ -139,7 +144,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`Uploading ${uploadMedia.length} ${config.label} images via migration endpoint...`);
+  console.log(
+    `Uploading ${uploadMedia.length} unique ${config.label} file(s) → link ${links.length} entr(y/ies) via migration endpoint...`
+  );
   const res = await fetch(`${CLOUD_URL}/api/migration/fix-published`, {
     method: 'POST',
     headers: {

@@ -35,12 +35,7 @@ const ENV_BY_ARG = {
 
 function getArg(name, defaultValue) {
   const names = Array.isArray(name) ? name : [name];
-  for (const n of names) {
-    for (const envKey of ENV_BY_ARG[n] || []) {
-      const v = process.env[envKey];
-      if (v != null && String(v).trim() !== '') return String(v).trim();
-    }
-  }
+  // Prefer CLI flags over env so --tenant-id=... always wins over TENANT_ID in .env
   for (let i = 2; i < process.argv.length; i++) {
     const arg = process.argv[i];
     for (const n of names) {
@@ -48,6 +43,12 @@ function getArg(name, defaultValue) {
       const escaped = n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const match = arg.match(new RegExp(`^--${escaped}=(.+)$`));
       if (match) return match[1].trim();
+    }
+  }
+  for (const n of names) {
+    for (const envKey of ENV_BY_ARG[n] || []) {
+      const v = process.env[envKey];
+      if (v != null && String(v).trim() !== '') return String(v).trim();
     }
   }
   return defaultValue;
