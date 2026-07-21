@@ -18,6 +18,7 @@
     "import:current-catholicos": "node ./scripts/import-current-catholicos-from-mosc-temp.js",
     "update:working-committee": "node ./scripts/update-working-committee-from-mosc-directory.js",
     "update:seminaries": "node ./scripts/update-seminaries-from-mosc-directory.js",
+    "update:dioceses-from-frontend": "node ./scripts/update-dioceses-from-frontend-pages.js",
     "import:catholicate": "node ./scripts/import-catholicate-from-mosc-temp.js",
     "import:theological-seminaries": "node ./scripts/import-theological-seminaries-from-mosc-temp.js",
     "import:publications": "node ./scripts/import-publications-from-mosc-temp.js",
