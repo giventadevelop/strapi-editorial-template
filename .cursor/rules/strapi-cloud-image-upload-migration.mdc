@@ -39,6 +39,19 @@ npm run finish:collection-images-on-cloud -- --collection=institutions --tenant-
 
 Always pass `--tenant-id=` explicitly. In [scripts/lib/liturgy-cli.js](mdc:scripts/lib/liturgy-cli.js), **CLI flags override `.env` `TENANT_ID`** — confirm the log line `Tenant: mosc_malankara_orthodox_2` before trusting the run.
 
+## News push gotchas (articles + ads)
+
+- **`push:tenant-to-cloud` publish resets `publishedAt` to “now”.** After pushing articles, restore historical dates from local:
+  ```bash
+  node scripts/sync-article-published-dates-to-cloud.js --tenant-id=mosc_malankara_orthodox_2
+  ```
+  Uses `POST /api/migration/fix-published` (knex) so Document Service publish does not overwrite dates again.
+- **S3 register with `prod/` prefix while local media lives under `dev/`** creates Cloud URLs that **403** (object missing under prod). `push-collection-images-s3` now copies remote `dev/` bytes into the prod key before register. Emergency repair:
+  ```bash
+  node scripts/repair-cloud-ad-s3-from-dev.js
+  ```
+- Bucket has **ACLs disabled** — do not pass `ACL: public-read` on PutObject; rely on bucket policy for the prefix.
+
 ## Two upload strategies
 
 ### A — Durable (S3 + register-s3-media) — **default for production**

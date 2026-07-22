@@ -36,6 +36,42 @@ function resolveLocalUploadPath(image) {
   return null;
 }
 
+/** When media already lives on S3, derive register payload without a local file. */
+function s3RegisterFromRemoteMedia(image) {
+  const url = image?.url ?? image?.attributes?.url;
+  if (!url || typeof url !== 'string') return null;
+  if (!/amazonaws\.com|\.s3[.-]/i.test(url)) return null;
+  const hash = image.hash;
+  const ext = image.ext?.startsWith('.') ? image.ext : image.ext ? `.${image.ext}` : path.extname(url);
+  if (!hash || !ext) return null;
+  const relativePath = `${hash}${ext}`;
+  return {
+    name: image.name || relativePath,
+    hash,
+    ext,
+    mime: image.mime || 'application/octet-stream',
+    size: image.size || 0,
+    width: image.width ?? null,
+    height: image.height ?? null,
+    relativePath,
+  };
+}
+
+function entryMatchKey(row) {
+  const slug = row.slug ?? row.attributes?.slug;
+  if (slug) return `slug:${slug}`;
+  const position = row.position ?? row.attributes?.position;
+  if (position) {
+    const priority = row.priority ?? row.attributes?.priority;
+    const startDate = row.startDate ?? row.attributes?.startDate ?? '';
+    const endDate = row.endDate ?? row.attributes?.endDate ?? '';
+    const pri = priority != null ? priority : 'np';
+    return `ad:${position}:${pri}:${startDate}:${endDate}`;
+  }
+  const documentId = row.documentId ?? row.document_id ?? row.id;
+  return documentId ? `id:${documentId}` : null;
+}
+
 async function cloudFetch(pathname, options = {}) {
   const url = pathname.startsWith('http') ? pathname : `${CLOUD_URL}${pathname}`;
   const res = await fetch(url, {
@@ -126,8 +162,53 @@ async function uploadToS3(localPath, imageMeta) {
   const key = `${S3_PREFIX}/${relativePath}`;
   const body = fs.readFileSync(localPath);
   const mime = imageMeta.mime || 'application/octet-stream';
+  // Bucket has ACLs disabled; public GET relies on bucket policy for this prefix.
   await client.send(new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: mime }));
   return { relativePath, key };
+}
+
+/**
+ * When local media already points at S3 (often under .../dev/), ensure the same
+ * bytes exist under the production register prefix before register-s3-media.
+ * Prevents Cloud URLs like .../prod/<hash>.jpg that 403 because only /dev/ exists.
+ */
+async function ensureRemoteMediaOnProdPrefix(imageMeta, remoteS3) {
+  const sourceUrl = imageMeta?.url ?? imageMeta?.attributes?.url;
+  if (!sourceUrl || !remoteS3?.relativePath) return remoteS3;
+  const region = process.env.AWS_REGION || 'us-east-2';
+  const bucket = process.env.AWS_S3_BUCKET_NAME || 'eventapp-media-bucket';
+  const prodKey = `${S3_PREFIX}/${remoteS3.relativePath}`;
+  const prodUrl = `https://${bucket}.s3.${region}.amazonaws.com/${prodKey}`;
+  try {
+    const probe = await fetch(prodUrl, { method: 'GET', headers: { Range: 'bytes=0-8' } });
+    if (probe.status === 200 || probe.status === 206) return remoteS3;
+  } catch (_) {}
+
+  let downloadUrl = sourceUrl;
+  if (!/^https?:\/\//i.test(downloadUrl)) {
+    throw new Error(`Remote media URL is not absolute: ${downloadUrl}`);
+  }
+  // Prefer public source URL; if it already is prod and missing, try swapping prod→dev.
+  if (/\/strapi-editorial-media\/prod\//i.test(downloadUrl)) {
+    downloadUrl = downloadUrl.replace(/\/strapi-editorial-media\/prod\//i, '/strapi-editorial-media/dev/');
+  }
+  const srcRes = await fetch(downloadUrl);
+  if (!srcRes.ok) {
+    throw new Error(`Could not download source media (${srcRes.status}): ${downloadUrl}`);
+  }
+  const body = Buffer.from(await srcRes.arrayBuffer());
+  const client = getS3Client();
+  if (!client) throw new Error('AWS credentials missing in .env');
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: prodKey,
+      Body: body,
+      ContentType: imageMeta.mime || srcRes.headers.get('content-type') || 'application/octet-stream',
+    })
+  );
+  console.log('  Copied remote S3 object into prod prefix:', prodKey);
+  return remoteS3;
 }
 
 async function registerS3OnCloud(filePayloads) {
@@ -146,9 +227,9 @@ async function getCloudEntryMap(restPlural, tenantIdFilter) {
     const list = Array.isArray(data?.data) ? data.data : data?.results ?? [];
     if (list.length === 0) break;
     for (const row of list) {
-      const slug = row.slug ?? row.attributes?.slug;
       const docId = row.documentId ?? row.document_id ?? row.id;
-      if (slug && docId) map.set(slug, docId);
+      const key = entryMatchKey(row);
+      if (key && docId) map.set(key, docId);
     }
     if (list.length < 100) break;
     page++;
@@ -181,9 +262,9 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
       : { tenant: tenant.id };
   const result = await app.documents(UID).findMany({
     filters,
-    limit: 500,
+    limit: 2000,
     populate: { [mediaField]: true },
-    sort: 'order:asc',
+    ...(UID === 'api::article.article' ? { status: 'draft' } : {}),
   });
   const list = result?.results ?? result?.data ?? (Array.isArray(result) ? result : []);
   await app.destroy();
@@ -192,36 +273,50 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
     return { linked: 0, failed: 0, skipped: 0, entries: 0, mode: 'empty' };
   }
 
-  const cloudBySlug = await getCloudEntryMap(restPlural, tenantIdFilter);
+  const cloudByKey = await getCloudEntryMap(restPlural, tenantIdFilter);
   let linked = 0;
   let failed = 0;
   let skipped = 0;
   const registerBatch = [];
 
-  async function linkMediaOnCloud(cloudDocId, fileId) {
+  async function linkMediaOnCloud(cloudDocId, fileId, extraData = {}) {
     await cloudFetch(`/api/${restPlural}/${cloudDocId}`, {
       method: 'PUT',
-      body: JSON.stringify({ data: { [mediaField]: fileId } }),
+      body: JSON.stringify({ data: { [mediaField]: fileId, ...extraData } }),
     });
   }
 
+  // Resolve Cloud tenant documentId so PUTs do not wipe the tenant relation.
+  let cloudTenantDocId = null;
+  try {
+    const tenants = await cloudFetch(
+      `/api/tenants?filters[tenantId][$eq]=${encodeURIComponent(tenantIdFilter)}&pagination[pageSize]=1`
+    );
+    const trow = (tenants?.data || [])[0];
+    cloudTenantDocId = trow?.documentId ?? trow?.document_id ?? null;
+  } catch (_) {}
+  const linkExtra = cloudTenantDocId ? { tenant: cloudTenantDocId } : {};
+
   for (const doc of list) {
-    const cloudDocId = cloudBySlug.get(doc.slug);
+    const matchKey = entryMatchKey(doc);
+    const cloudDocId = matchKey ? cloudByKey.get(matchKey) : null;
+    const label = doc.slug || matchKey || doc.documentId;
     if (!cloudDocId) {
-      console.warn('Skip (no cloud entry):', doc.slug);
+      console.warn('Skip (no cloud entry):', label);
       failed++;
       continue;
     }
     const media = doc[mediaField];
     if (!media) {
-      console.warn('Skip (no local media):', doc.slug);
+      console.warn('Skip (no local media):', label);
       skipped++;
       continue;
     }
 
     const mediaPath = resolveLocalUploadPath(media);
-    if (!mediaPath) {
-      console.warn('Skip (file missing):', doc.slug, media?.url);
+    const remoteS3 = !mediaPath ? s3RegisterFromRemoteMedia(media) : null;
+    if (!mediaPath && !remoteS3) {
+      console.warn('Skip (file missing):', label, media?.url);
       failed++;
       continue;
     }
@@ -232,49 +327,59 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
       const existing = await findCloudFile(media);
       if (existing?.id) {
         fileId = existing.id;
-        console.log('Found existing media:', doc.slug, '←', existing.name);
+        console.log('Found existing media:', label, '←', existing.name);
       }
     }
 
-    if (!fileId && tryApiFirst) {
+    if (!fileId && tryApiFirst && mediaPath) {
       try {
         const uploaded = await uploadViaApi(mediaPath, media);
         fileId = uploaded?.id;
-        if (fileId) console.log('Uploaded via API:', doc.slug);
+        if (fileId) console.log('Uploaded via API:', label);
       } catch (e) {
-        console.warn('  API upload failed:', doc.slug, e.message);
+        console.warn('  API upload failed:', label, e.message);
       }
     }
 
     if (!fileId && !skipS3 && !linkExisting) {
       try {
-        const { relativePath } = await uploadToS3(mediaPath, media);
-        registerBatch.push({
-          name: media.name,
-          hash: media.hash,
-          ext: media.ext,
-          mime: media.mime,
-          size: media.size,
-          width: media.width ?? null,
-          height: media.height ?? null,
-          relativePath,
-          slug: doc.slug,
-          cloudDocId,
-        });
-        console.log('  Staged for S3 register:', doc.slug, relativePath);
+        if (mediaPath) {
+          const { relativePath } = await uploadToS3(mediaPath, media);
+          registerBatch.push({
+            name: media.name,
+            hash: media.hash,
+            ext: media.ext,
+            mime: media.mime,
+            size: media.size,
+            width: media.width ?? null,
+            height: media.height ?? null,
+            relativePath,
+            slug: label,
+            cloudDocId,
+          });
+          console.log('  Staged for S3 register:', label, relativePath);
+        } else if (remoteS3) {
+          const ensured = await ensureRemoteMediaOnProdPrefix(media, remoteS3);
+          registerBatch.push({
+            ...ensured,
+            slug: label,
+            cloudDocId,
+          });
+          console.log('  Staged existing S3 URL for register:', label, ensured.relativePath);
+        }
       } catch (e) {
-        console.warn('  S3 upload failed:', doc.slug, e.message);
+        console.warn('  S3 upload failed:', label, e.message);
         failed++;
       }
     }
 
     if (fileId) {
       try {
-        await linkMediaOnCloud(cloudDocId, fileId);
-        console.log('  Linked:', doc.slug);
+        await linkMediaOnCloud(cloudDocId, fileId, linkExtra);
+        console.log('  Linked:', label);
         linked++;
       } catch (e) {
-        console.warn('  Link failed:', doc.slug, e.message);
+        console.warn('  Link failed:', label, e.message);
         failed++;
       }
     }
@@ -291,13 +396,15 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
       for (let i = 0; i < registerBatch.length; i++) {
         const item = registerBatch[i];
         const match =
-          created.find((c) => c.name === item.name && (c.hash === item.hash || c.reused)) || created[i];
+          created.find((c) => c.name === item.name && (c.hash === item.hash || c.reused)) ||
+          created[i];
         if (!match?.id) {
           failed++;
           continue;
         }
         try {
-          await linkMediaOnCloud(item.cloudDocId, match.id);
+          // Always include tenant in PUT so cover/media link does not wipe tenant relation.
+          await linkMediaOnCloud(item.cloudDocId, match.id, linkExtra);
           console.log('  Linked (S3 register):', item.slug, match.reused ? '(reused)' : '');
           linked++;
         } catch (e) {
@@ -311,7 +418,8 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
           'Migration endpoint not on Cloud. Deploy first: npx strapi login && npx strapi deploy --force'
         );
       }
-      throw e;
+      console.warn('  Register/link failed:', e.message);
+      failed += registerBatch.length;
     }
   }
 

@@ -78,7 +78,35 @@ async function fetchCloudTenants(cloudFetch) {
   return map;
 }
 
-async function fetchCloudSlugMap(cloudFetch, plural, tenantId, keyField = 'slug') {
+function cloudUpsertKeyFromRow(uid, row, tenantId) {
+  if (uid === 'api::liturgy-day.liturgy-day') {
+    const date = row.date ?? row.attributes?.date;
+    return date ? `date:${date}_${tenantId || ''}` : null;
+  }
+  if (uid === 'api::advertisement-slot.advertisement-slot') {
+    const position = row.position ?? row.attributes?.position ?? 'unknown';
+    const priority = row.priority ?? row.attributes?.priority;
+    const startDate = row.startDate ?? row.attributes?.startDate ?? '';
+    const endDate = row.endDate ?? row.attributes?.endDate ?? '';
+    const pri = priority != null ? priority : 'np';
+    return `ad:${position}:${pri}:${startDate}:${endDate}_${tenantId || ''}`;
+  }
+  if (uid === 'api::flash-news-item.flash-news-item') {
+    const title = row.title ?? row.attributes?.title;
+    const content = row.content ?? row.attributes?.content;
+    const t = String(title || content || '')
+      .trim()
+      .slice(0, 80);
+    return t ? `flash:${t}_${tenantId || ''}` : null;
+  }
+  const slug = row.slug ?? row.attributes?.slug;
+  if (uid === 'api::article.article' && slug) {
+    return `slug:${slug}`;
+  }
+  return slug ? `${slug}_${tenantId || ''}` : null;
+}
+
+async function fetchCloudSlugMap(cloudFetch, plural, tenantId, uid = null) {
   const map = new Map();
   let page = 1;
   const pageSize = 100;
@@ -91,14 +119,14 @@ async function fetchCloudSlugMap(cloudFetch, plural, tenantId, keyField = 'slug'
     const list = Array.isArray(data?.data) ? data.data : (data?.results ?? []);
     if (!list.length) break;
     for (const row of list) {
-      const key = row[keyField] ?? row.attributes?.[keyField];
       const docTenant =
         row.tenant?.tenantId ??
         row.tenant?.tenant_id ??
         row.tenant?.attributes?.tenantId;
       const documentId = row.documentId ?? row.document_id ?? row.id;
-      if (key != null && documentId) {
-        map.set(`${key}_${docTenant || tenantId || ''}`, documentId);
+      const upsertKey = cloudUpsertKeyFromRow(uid, row, docTenant || tenantId || '');
+      if (upsertKey && documentId) {
+        map.set(upsertKey, documentId);
       }
     }
     if (list.length < pageSize) break;
@@ -185,10 +213,7 @@ function makeGlobalResolver(globalSlugMaps, cloudTenantDocId) {
 }
 
 function docUpsertKeyFromPayload(uid, data, tenantId) {
-  if (uid === 'api::liturgy-day.liturgy-day') {
-    return data.date ? `date:${data.date}_${tenantId}` : null;
-  }
-  return data.slug ? `${data.slug}_${tenantId}` : null;
+  return cloudUpsertKeyFromRow(uid, data, tenantId);
 }
 
 async function pushCollectionType(strapi, uid, ctx) {
@@ -210,12 +235,38 @@ async function pushCollectionType(strapi, uid, ctx) {
   }
 
   const cloudTenantDocId = cloudTenant.documentId ?? cloudTenant.id;
-  const keyField = uid === 'api::liturgy-day.liturgy-day' ? 'date' : 'slug';
-  const cloudKeys = args.dryRun
+  let cloudKeys = args.dryRun
     ? new Map()
-    : await fetchCloudSlugMap(cloudFetch, plural, tenant.tenantId, keyField);
+    : await fetchCloudSlugMap(cloudFetch, plural, tenant.tenantId, uid);
+
+  // If tenant links were wiped, tenant-filtered map is empty but slugs still exist.
+  // Fall back to a global slug map so --force updates instead of duplicate-creates.
+  if (!args.dryRun && cloudKeys.size === 0 && uid === 'api::article.article') {
+    console.log('  Tenant-filtered Cloud map empty; falling back to global slug map...');
+    cloudKeys = await fetchCloudSlugMap(cloudFetch, plural, null, uid);
+  }
 
   console.log(`\n[${uid}] pushing ${docs.length} document(s)...`);
+
+  // Advertisement slots have no slug; when force-updating news layout, replace
+  // tenant ads to avoid duplicate position collisions (e.g. two sidebars).
+  if (
+    !args.dryRun &&
+    args.force &&
+    uid === 'api::advertisement-slot.advertisement-slot' &&
+    cloudKeys.size > 0
+  ) {
+    console.log(`  Clearing ${cloudKeys.size} existing Cloud ad slot(s) for tenant before recreate...`);
+    for (const cloudDocId of cloudKeys.values()) {
+      try {
+        await cloudFetch(`/api/${plural}/${cloudDocId}`, { method: 'DELETE' });
+      } catch (e) {
+        console.warn('  Delete ad failed:', cloudDocId, e.message);
+      }
+      if (delayMs) await sleep(delayMs);
+    }
+    cloudKeys.clear();
+  }
 
   const pushCtx = {
     idMap,
