@@ -32,6 +32,10 @@ const { pushCollectionImagesS3, CLOUD_URL, API_TOKEN } = require('./lib/push-col
 const SKIP_API = process.argv.includes('--skip-api');
 const SKIP_S3 = process.argv.includes('--skip-s3');
 const LINK_EXISTING = process.argv.includes('--link-existing');
+const ONLY_SLUG = (() => {
+  const m = process.argv.find((a) => a.startsWith('--slug='));
+  return m ? m.split('=').slice(1).join('=').trim() : null;
+})();
 
 async function main() {
   const collectionKey = getCollectionKey();
@@ -49,6 +53,7 @@ async function main() {
   console.log('Push', config.label, 'images to Cloud (S3 path)');
   console.log('  Cloud:', CLOUD_URL);
   console.log('  Tenant:', tenantId);
+  if (ONLY_SLUG) console.log('  Slug filter:', ONLY_SLUG);
   console.log(
     '  Mode:',
     LINK_EXISTING ? 'link-existing' : SKIP_S3 ? 'api-only' : SKIP_API ? 's3-register-only' : 'api then s3-register'
@@ -58,6 +63,7 @@ async function main() {
     skipS3: SKIP_S3,
     linkExisting: LINK_EXISTING,
     tryApiFirst: !SKIP_API && !LINK_EXISTING,
+    onlySlugs: ONLY_SLUG || null,
   });
 
   console.log('\nDone.', config.label);

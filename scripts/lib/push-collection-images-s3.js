@@ -238,7 +238,15 @@ async function getCloudEntryMap(restPlural, tenantIdFilter) {
 }
 
 async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
-  const { skipS3 = false, linkExisting = false, tryApiFirst = true } = options;
+  const { skipS3 = false, linkExisting = false, tryApiFirst = true, onlySlugs = null } = options;
+  const slugAllow =
+    onlySlugs == null
+      ? null
+      : new Set(
+          (Array.isArray(onlySlugs) ? onlySlugs : String(onlySlugs).split(','))
+            .map((s) => String(s || '').trim())
+            .filter(Boolean)
+        );
   const mediaField = config.mediaField || 'image';
   const UID = config.uid;
   const restPlural = config.restPlural;
@@ -301,6 +309,9 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
     const matchKey = entryMatchKey(doc);
     const cloudDocId = matchKey ? cloudByKey.get(matchKey) : null;
     const label = doc.slug || matchKey || doc.documentId;
+    if (slugAllow && !slugAllow.has(String(doc.slug || ''))) {
+      continue;
+    }
     if (!cloudDocId) {
       console.warn('Skip (no cloud entry):', label);
       failed++;

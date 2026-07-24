@@ -5,9 +5,9 @@
  * Creates entries in Directory – Holy Synod only; does not modify other collection types.
  *
  * Sources:
- *   - code_clone_ref/mosc_in/holysynod HTML pages
- *   - Next.js holy-synod hub page.tsx for excerpt and card image
- *   - public/images/holy-synod/* (preferred images)
+ *   - Next.js mosc-redesign holy-synod/<slug>/page.tsx (preferred body + contact)
+ *   - code_clone_ref/mosc_in/holysynod HTML pages (fallback)
+ *   - Hub page.tsx for excerpt / order / card title
  *
  * Env:
  *   MOSC_TEMP_DIR     (default: C:\project_workspace\mosc-temp)
@@ -15,12 +15,10 @@
  *   DRY_RUN=1         Preview only
  *   --replace         Update existing rows for same slug+tenant
  *   --images-only     Replace image media only (no text/content changes)
+ *   --keep-images     On create/replace, never upload/replace images (default with --replace)
  *
- * Image priority (matches mosc-redesign holy-synod pages):
- *   1. Hub card image from holy-synod/page.tsx (synodMembers)
- *   2. Detail page featured image from holy-synod/<slug>/page.tsx
- *   node scripts/import-holy-synod-from-mosc-temp.js
- *   node scripts/import-holy-synod-from-mosc-temp.js --tenant-id=tenant_demo_002
+ *   npm run import:holy-synod -- --replace --keep-images
+ *   npm run import:holy-synod -- --tenant-id=mosc_malankara_orthodox_2 --replace --keep-images
  */
 
 try {
@@ -35,11 +33,128 @@ const cheerio = require('cheerio');
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true';
 const REPLACE = process.argv.includes('--replace');
 const IMAGES_ONLY = process.argv.includes('--images-only');
+const KEEP_IMAGES =
+  process.argv.includes('--keep-images') || (REPLACE && !IMAGES_ONLY && !process.argv.includes('--force-images'));
 const TENANT_ID = (() => {
   const m = process.argv.find((a) => a.startsWith('--tenant-id='));
   if (m) return m.split('=')[1].trim();
   return process.env.TENANT_ID || 'tenant_demo_002';
 })();
+
+function effectiveSlug(baseSlug, tenantId) {
+  if (tenantId === 'mosc_malankara_orthodox_2') {
+    if (baseSlug.endsWith('-mo2')) return baseSlug;
+    return `${baseSlug}-mo2`;
+  }
+  return baseSlug.replace(/-mo2$/, '');
+}
+
+function decodeJsxText(s) {
+  return String(s || '')
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Parse mosc-redesign holy-synod/<slug>/page.tsx for biography + contact.
+ */
+function parseDetailTsx(slug) {
+  const pagePath = path.join(HOLYSYNOD_PAGES, slug, 'page.tsx');
+  if (!fs.existsSync(pagePath)) return null;
+  const raw = fs.readFileSync(pagePath, 'utf8');
+
+  const titleMatch =
+    raw.match(/title:\s*'((?:\\'|[^'])*)'/) ||
+    raw.match(/title:\s*"((?:\\"|[^"])*)"/) ||
+    raw.match(/SyroPageBanner[\s\S]*?title="([^"]+)"/) ||
+    raw.match(/SyroPageBanner[\s\S]*?title=\{\s*'((?:\\'|[^'])*)'\s*\}/);
+  const name = titleMatch ? decodeJsxText(titleMatch[1]) : null;
+
+  const contactSplit = raw.search(/>\s*Contact\s*</i);
+  const bioRaw = contactSplit >= 0 ? raw.slice(0, contactSplit) : raw;
+  const contactRaw = contactSplit >= 0 ? raw.slice(contactSplit) : '';
+
+  function extractParagraphs(chunk) {
+    const matches = [...chunk.matchAll(/<p[^>]*>([\s\S]*?)<\/p>/g)];
+    const out = [];
+    for (const m of matches) {
+      let inner = m[1]
+        .replace(/<a[^>]*href="mailto:([^"]+)"[^>]*>[\s\S]*?<\/a>/gi, '$1')
+        .replace(/<a[^>]*href="(https?:\/\/[^"]+)"[^>]*>[\s\S]*?<\/a>/gi, '$1')
+        .replace(/\{'\s*'\}/g, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&amp;/g, '&');
+      inner = decodeJsxText(inner);
+      if (!inner || inner.length < 2) continue;
+      if (/^(contact|facebook|instagram)\s*:?$/i.test(inner)) continue;
+      out.push(inner);
+    }
+    return out;
+  }
+
+  const bioParas = extractParagraphs(bioRaw).filter((p) => {
+    // Drop page chrome / duplicate titles that match the banner name exactly
+    if (name && p === name) return false;
+    return true;
+  });
+  const contactParas = extractParagraphs(contactRaw);
+
+  let email = null;
+  let phones = null;
+  const addressParts = [];
+
+  for (const p of contactParas) {
+    const mail = p.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+    if (/^email\s*:/i.test(p) || mail) {
+      if (mail) email = mail[0];
+      continue;
+    }
+    if (/^(facebook|instagram)\s*:/i.test(p) || /facebook\.com|instagram\.com/i.test(p)) continue;
+    if (/^(mob|ph|tel|cell|phone)\s*:/i.test(p) || /\b(?:mob|ph|tel|cell)\s*:/i.test(p)) {
+      const labeled = [...p.matchAll(/(?:mob|ph|tel|cell|phone)\s*:\s*([+\d][\d\s,\-\/]*)/gi)];
+      const nums = labeled.map((x) => x[1].trim()).filter(Boolean);
+      if (nums.length) phones = phones ? `${phones}, ${nums.join(', ')}` : nums.join(', ');
+      else phones = phones ? `${phones}, ${p}` : p;
+      continue;
+    }
+    addressParts.push(p);
+  }
+
+  // Fallback: contact mixed into bio when no Contact heading
+  if (!contactParas.length) {
+    const keptBio = [];
+    for (const p of bioParas) {
+      const mail = p.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+      if (/^email\s*:/i.test(p) || mail) {
+        if (mail) email = mail[0];
+        continue;
+      }
+      if (/^(mob|ph|tel|cell)\s*:/i.test(p)) {
+        const labeled = [...p.matchAll(/(?:mob|ph|tel|cell|phone)\s*:\s*([+\d][\d\s,\-\/]*)/gi)];
+        const nums = labeled.map((x) => x[1].trim()).filter(Boolean);
+        if (nums.length) phones = phones ? `${phones}, ${nums.join(', ')}` : nums.join(', ');
+        continue;
+      }
+      keptBio.push(p);
+    }
+    bioParas.length = 0;
+    bioParas.push(...keptBio);
+  }
+
+  const bodyHtml = bioParas.map((p) => `<p>${p}</p>`).join('\n');
+  return {
+    name,
+    address: addressParts.length ? addressParts.join('\n') : null,
+    email,
+    phones,
+    bodyHtml: bodyHtml || null,
+    source: 'tsx',
+  };
+}
 
 const MOSC_ROOT = path.resolve(
   process.env.MOSC_TEMP_DIR || process.env.STRAPI_DATA_IMPORT_MOSC_TEMP_DIR || 'C:\\project_workspace\\mosc-temp'
@@ -288,6 +403,20 @@ function discoverHtmlPages() {
   return pages;
 }
 
+function discoverMemberSlugs(hubMeta) {
+  const slugs = new Set([...hubMeta.keys()]);
+  if (fs.existsSync(HOLYSYNOD_PAGES)) {
+    for (const ent of fs.readdirSync(HOLYSYNOD_PAGES, { withFileTypes: true })) {
+      if (!ent.isDirectory()) continue;
+      if (fs.existsSync(path.join(HOLYSYNOD_PAGES, ent.name, 'page.tsx'))) {
+        slugs.add(ent.name);
+      }
+    }
+  }
+  for (const { slug } of discoverHtmlPages()) slugs.add(slug);
+  return [...slugs];
+}
+
 async function getOrCreateTenant(strapi, tenantId) {
   const existing = await strapi.db.query('api::tenant.tenant').findOne({
     where: { tenantId },
@@ -315,6 +444,7 @@ async function main() {
   if (DRY_RUN) console.log('  DRY_RUN=1');
   if (REPLACE) console.log('  --replace: update existing slugs');
   if (IMAGES_ONLY) console.log('  --images-only: replace images only (no content changes)');
+  if (KEEP_IMAGES) console.log('  --keep-images: leave existing images untouched');
   console.log('');
 
   if (!fs.existsSync(MOSC_ROOT)) {
@@ -323,9 +453,10 @@ async function main() {
   }
 
   const hubMeta = loadHubMeta();
-  const htmlPages = discoverHtmlPages();
+  const htmlBySlug = new Map(discoverHtmlPages().map((p) => [p.slug, p.htmlPath]));
+  const memberSlugs = discoverMemberSlugs(hubMeta);
   console.log('Hub members (page.tsx):', hubMeta.size);
-  console.log('Detail HTML pages:', htmlPages.length);
+  console.log('Member slugs to process:', memberSlugs.length);
   console.log('');
 
   // Use a NODE_ENV without config/env/*/plugins.js S3 override so local disk upload works.
@@ -343,7 +474,10 @@ async function main() {
   const connectTenant = tenant.id;
 
   const existing = await app.documents(UID).findMany({
-    filters: { tenant: tenant.id },
+    filters: {
+      $or: [{ tenant: tenant.id }, { tenant: { documentId: tenant.documentId } }],
+    },
+    populate: { image: true },
     limit: 500,
   });
   const existingList = existing?.results ?? existing?.data ?? (Array.isArray(existing) ? existing : []);
@@ -356,38 +490,57 @@ async function main() {
   let updated = 0;
   let skipped = 0;
 
-  for (const { slug, htmlPath } of htmlPages) {
-    const html = fs.readFileSync(htmlPath, 'utf8');
-    const parsed = parseDetailHtml(html, htmlPath);
-    if (!parsed) {
-      console.warn('Skip (parse failed):', slug);
+  for (const baseSlug of memberSlugs) {
+    const slug = effectiveSlug(baseSlug, TENANT_ID);
+    const tsx = parseDetailTsx(baseSlug);
+    const htmlPath = htmlBySlug.get(baseSlug);
+    let htmlParsed = null;
+    if (htmlPath && fs.existsSync(htmlPath)) {
+      htmlParsed = parseDetailHtml(fs.readFileSync(htmlPath, 'utf8'), htmlPath);
+    }
+
+    if (!tsx && !htmlParsed) {
+      console.warn('Skip (parse failed):', baseSlug);
       skipped++;
       continue;
     }
 
-    const hub = hubMeta.get(slug) || {};
-    const name = hub.title || parsed.name;
-    const excerpt = hub.excerpt || parsed.bodyHtml.replace(/<[^>]+>/g, ' ').slice(0, 280);
+    const hub = hubMeta.get(baseSlug) || {};
+    const name = hub.title || tsx?.name || htmlParsed?.name;
+    if (!name) {
+      console.warn('Skip (no name):', baseSlug);
+      skipped++;
+      continue;
+    }
+
+    const body =
+      (tsx?.bodyHtml && tsx.bodyHtml.length >= 80 ? tsx.bodyHtml : null) ||
+      htmlParsed?.bodyHtml ||
+      tsx?.bodyHtml ||
+      null;
+    const excerpt =
+      hub.excerpt ||
+      (body ? body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 280) : null);
+    const address = tsx?.address || htmlParsed?.address || null;
+    const email = tsx?.email || htmlParsed?.email || null;
+    const phones = tsx?.phones || htmlParsed?.phones || null;
     const memberType =
-      slug.includes('his-holiness') || /catholicos/i.test(name) ? 'catholicos' : 'metropolitan';
+      baseSlug.includes('his-holiness') || /catholicos/i.test(name) ? 'catholicos' : 'metropolitan';
     const order = hub.order != null ? hub.order : 0;
 
-    const imageCandidates = [
-      hub.cardImage,
-      loadPageDetailImage(slug),
-    ];
+    const imageCandidates = [hub.cardImage, loadPageDetailImage(baseSlug)];
     let imageFile = null;
     let imageRefUsed = null;
     for (const ref of imageCandidates) {
       if (!ref) continue;
-      imageFile = resolveImageFile(ref, parsed.htmlDir);
+      imageFile = resolveImageFile(ref, htmlParsed?.htmlDir || HOLYSYNOD_PAGES);
       if (imageFile) {
         imageRefUsed = ref;
         break;
       }
     }
 
-    const prev = bySlug.get(slug);
+    const prev = bySlug.get(slug) || bySlug.get(baseSlug);
     if (IMAGES_ONLY) {
       if (!prev) {
         console.warn('Skip (no row for images-only):', slug);
@@ -395,7 +548,7 @@ async function main() {
         continue;
       }
       if (DRY_RUN) {
-        console.log('Would replace image:', slug, '|', imageFile ? path.basename(imageFile) : 'none', '| ref:', imageRefUsed || '-');
+        console.log('Would replace image:', slug, '|', imageFile ? path.basename(imageFile) : 'none');
         updated++;
         continue;
       }
@@ -427,10 +580,10 @@ async function main() {
       slug,
       memberType,
       excerpt,
-      body: parsed.bodyHtml || null,
-      address: parsed.address,
-      email: parsed.email,
-      phones: parsed.phones,
+      body,
+      address,
+      email,
+      phones,
       order,
       tenant: connectTenant,
     };
@@ -442,8 +595,20 @@ async function main() {
     }
 
     if (DRY_RUN) {
-      console.log('Would import:', slug, '|', name.slice(0, 50), '| image:', imageFile ? path.basename(imageFile) : 'none');
-      created++;
+      console.log(
+        'Would import:',
+        slug,
+        '| body:',
+        body ? body.length : 0,
+        '| addr:',
+        address ? 'yes' : 'no',
+        '| email:',
+        email || '-',
+        '| keepImg:',
+        Boolean(KEEP_IMAGES && prev?.image)
+      );
+      if (prev) updated++;
+      else created++;
       continue;
     }
 
@@ -455,7 +620,13 @@ async function main() {
           data,
         });
         updated++;
-        console.log('Updated:', slug);
+        console.log(
+          'Updated:',
+          slug,
+          `| body=${body ? body.length : 0}`,
+          email ? `| ${email}` : '',
+          tsx ? '(tsx)' : '(html)'
+        );
       } else {
         doc = await app.documents(UID).create({ data });
         created++;
@@ -469,7 +640,8 @@ async function main() {
       }
 
       const docId = doc?.documentId ?? prev?.documentId;
-      if (imageFile && docId) {
+      const alreadyHasImage = Boolean(prev?.image);
+      if (imageFile && docId && !(KEEP_IMAGES && alreadyHasImage)) {
         const uploaded = await uploadLocalImage(app, imageFile);
         if (uploaded?.documentId) {
           try {

@@ -101,7 +101,7 @@ npm run finish:all-collection-images-on-cloud -- --tenant-id=mosc_malankara_orth
 | Cloud endpoint (`uploadMedia`, `linkCollectionImages`, `register-s3-media`) | [src/index.js](mdc:src/index.js) | — |
 | Upload provider config | [config/env/production/plugins.js](mdc:config/env/production/plugins.js) | Prefer `UPLOAD_PROVIDER=aws-s3` on Cloud |
 
-**`--collection` keys:** `catholicate`, `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `current-catholicos`, `institutions`, `dioceses`, `working-committees`, `training`, `spiritual-organisations`, `kalpana-editions`, `kalpana-documents`.
+**`--collection` keys:** `catholicate`, `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `current-catholicos`, `institutions`, `dioceses`, `working-committees`, `managing-committees`, `training`, `spiritual-organisations`, `kalpana-editions`, `kalpana-documents`.
 
 Content-first (if entries missing): `npm run push:<section>-to-cloud -- --tenant-id=mosc_malankara_orthodox_2` (e.g. `push:institutions-to-cloud`), then images via **strategy A (S3)**.
 
