@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News (Articles / Ads / Flash) – Production Cloud Push PRD</title>
+  <style>
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; }
+    a { color: var(--accent); }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: monospace; font-weight: bold; display: inline-block; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; margin: 0.4rem 0; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); }
+    .command-block.verify { border-color: #4caf50; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); }
+    .command-block.warn-block { border-color: #ff9800; background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; color: #0d3b66; }
+    .command-content { padding: 12px 15px; font-family: monospace; font-size: 0.9em; color: #0d3b66; word-break: break-all; }
+    .copy-button { padding: 6px 12px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    .warn { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; color: #333; }
+    .success { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; color: #333; }
+    .info { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; color: #0c5460; }
+  </style>
+</head>
+<body>
+  <div class="doc">
+    <p><a href="index.html">← Cloud push index</a> · <a href="../../News_Import/news_import_workflow.html">Local news import workflow</a></p>
+    <h1>News – Production / Cloud data push PRD</h1>
+    <p>Push <strong>articles</strong>, <strong>advertisement slots</strong>, and <strong>flash news</strong> from local Strapi to Strapi Cloud for the live production tenant, with durable <strong>S3</strong> media (not ephemeral Cloud <code>/uploads/</code>).</p>
+
+    <div class="section-intro">
+      <p><strong>Production tenant:</strong> <code class="code-highlight">mosc_malankara_orthodox_2</code></p>
+      <p><strong>Demo tenant:</strong> <code class="code-highlight">tenant_demo_002</code></p>
+      <p><strong>Content push:</strong> <code class="script-name">push:tenant-to-cloud</code> → <code class="script-name">scripts/push-tenant-to-cloud.js</code></p>
+      <p><strong>S3 images:</strong> <code class="script-name">push:collection-images-s3-to-cloud</code> (<code>--collection=articles</code> / <code>advertisement-slots</code>)</p>
+      <p><strong>One-shot repair:</strong> <code class="script-name">repair:cloud-news-sync</code> → <code class="script-name">scripts/repair-cloud-news-sync.js</code></p>
+      <p><strong>Local scrape (ads + flash):</strong> <code class="script-name">seed:ads-flash-catholicatenews</code></p>
+      <p><strong>Image rule:</strong> <code>.cursor/rules/strapi-cloud-image-upload-migration.mdc</code></p>
+    </div>
+
+    <div class="success"><strong>Verified Jul 2026:</strong> Production Cloud has ~25 articles with S3 covers, 4 advertisement slots (top / between_sections / sidebar) with S3 media, and 5 flash items for <code>mosc_malankara_orthodox_2</code>.</div>
+
+    <h2>1. Types pushed</h2>
+    <table>
+      <thead><tr><th>Type</th><th>UID</th><th>REST</th><th>Media field</th></tr></thead>
+      <tbody>
+        <tr><td>Articles</td><td><code>api::article.article</code></td><td><code>articles</code></td><td><code>cover</code></td></tr>
+        <tr><td>Flash news</td><td><code>api::flash-news-item.flash-news-item</code></td><td><code>flash-news-items</code></td><td>—</td></tr>
+        <tr><td>Ads</td><td><code>api::advertisement-slot.advertisement-slot</code></td><td><code>advertisement-slots</code></td><td><code>media</code></td></tr>
+      </tbody>
+    </table>
+
+    <h2>2. Prerequisites</h2>
+    <ol>
+      <li>Local news seeded (articles + ads + flash). See <a href="../../News_Import/news_import_workflow.html">News import workflow</a>.</li>
+      <li><code>.env</code>: <code>STRAPI_CLOUD_URL</code>, <code>STRAPI_CLOUD_API_TOKEN</code>, AWS S3 vars (<code>AWS_ACCESS_KEY_ID</code>, <code>AWS_SECRET_ACCESS_KEY</code>, <code>AWS_REGION</code>, <code>AWS_S3_BUCKET_NAME</code>, <code>S3_UPLOAD_PREFIX</code>).</li>
+      <li>Stop local Strapi before embedded-Strapi scripts (<code>push:tenant-to-cloud</code>, S3 push).</li>
+      <li>PowerShell TLS (if needed): <code>$env:NODE_TLS_REJECT_UNAUTHORIZED='0'</code></li>
+    </ol>
+
+    <h2>3. Clean wipe + re-upload (articles only)</h2>
+    <div class="warn">
+      <p>When Cloud has conflicting/stale articles for the production tenant, wipe first then re-push from local. Categories (main-news, most-read, press-release, featured-news) live on the article relation — wiping articles clears those sections for the tenant.</p>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Wipe all Cloud articles for production tenant</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-wipe')">📋 Copy</button></div>
+      <div class="command-content" id="c-wipe">node scripts/wipe-cloud-articles-for-tenant.js --tenant-id=mosc_malankara_orthodox_2</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Re-push articles only from local</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-art-only')">📋 Copy</button></div>
+      <div class="command-content" id="c-art-only">npm run push:tenant-to-cloud -- --tenant-id=mosc_malankara_orthodox_2 --types=articles --force --delay-ms=80</div>
+    </div>
+
+    <h2>4. Recommended full sync (production)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>1 — Content push (articles + flash + ads)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c1')">📋 Copy</button></div>
+      <div class="command-content" id="c1">npm run push:tenant-to-cloud -- --tenant-id=mosc_malankara_orthodox_2 --types=articles,flash-news-items,advertisement-slots --force --delay-ms=80</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>2 — Restore historical article publishedAt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c2')">📋 Copy</button></div>
+      <div class="command-content" id="c2">npm run sync:article-published-dates-cloud -- --tenant-id=mosc_malankara_orthodox_2</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>3 — S3 covers (articles)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c3')">📋 Copy</button></div>
+      <div class="command-content" id="c3">npm run push:collection-images-s3-to-cloud -- --collection=articles --tenant-id=mosc_malankara_orthodox_2 --skip-api</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>4 — S3 media (advertisement slots)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c4')">📋 Copy</button></div>
+      <div class="command-content" id="c4">npm run push:collection-images-s3-to-cloud -- --collection=advertisement-slots --tenant-id=mosc_malankara_orthodox_2 --skip-api</div>
+    </div>
+    <div class="command-block warn-block">
+      <div class="command-header"><strong>5 — Re-link tenants after cover PUT (required)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c5')">📋 Copy</button></div>
+      <div class="command-content" id="c5">npm run repair:cloud-news-sync -- --tenant-id=mosc_malankara_orthodox_2</div>
+    </div>
+    <p>Or run only the repair orchestrator after a failed partial sync — it deletes empty article shells, re-pushes content, S3-links, and re-links tenants (including a second tenant pass after S3).</p>
+
+    <h2>5. Local scrape → DB (before Cloud push)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Ads + flash from live catholicatenews.in</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-ads')">📋 Copy</button></div>
+      <div class="command-content" id="c-ads">npm run seed:ads-flash-catholicatenews -- --tenants=tenant_demo_002,mosc_malankara_orthodox_2</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Articles (live scrape, last 12 months)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-art')">📋 Copy</button></div>
+      <div class="command-content" id="c-art">npm run seed:news_catholicatenews -- --live --months=12 --tenants=tenant_demo_002,mosc_malankara_orthodox_2</div>
+    </div>
+
+    <h2>6. Gotchas</h2>
+    <div class="warn">
+      <p><strong>Cover PUT can wipe title/slug/tenant/category.</strong> The S3 linker re-sends preserve fields and maps <strong>local category slug → Cloud category documentId</strong>. <strong>Tenant can still drop</strong> — re-link via <code>fix-published</code> / <code>repair:cloud-news-sync</code> after S3.</p>
+      <p><strong>Never send local category documentIds</strong> raw (invalid on Cloud → HTTP 400); always map by slug.</p>
+      <p><strong>Publish resets publishedAt</strong> — use <code>sync:article-published-dates-cloud</code> after content push.</p>
+      <p><strong>Production images must be S3 URLs</strong> (<code>…amazonaws.com/…</code>), not <code>/uploads/…</code>. See <a href="cloud-image-upload-migration-fix.html">cloud image migration fix</a>.</p>
+      <p><strong>Duplicate flash</strong> can appear if push runs twice without replace — delete older duplicates on Cloud or re-seed local then force-push carefully.</p>
+    </div>
+
+    <h2>7. REST verification</h2>
+    <div class="info">
+      <p>Articles: <code class="code-highlight">GET /api/articles?filters[tenant][tenantId][$eq]=mosc_malankara_orthodox_2&amp;populate=cover&amp;sort=publishedAt:desc</code></p>
+      <p>Flash: <code class="code-highlight">GET /api/flash-news-items?filters[tenant][tenantId][$eq]=mosc_malankara_orthodox_2&amp;sort=order:asc</code></p>
+      <p>Ads: <code class="code-highlight">GET /api/advertisement-slots?filters[tenant][tenantId][$eq]=mosc_malankara_orthodox_2&amp;populate=media</code></p>
+      <p>Expect S3 on <code>cover.url</code> / <code>media.url</code>, and <code>tenant.tenantId</code> = <code>mosc_malankara_orthodox_2</code>.</p>
+    </div>
+
+    <h2>8. npm script map</h2>
+    <table>
+      <thead><tr><th>npm script</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>seed:ads-flash-catholicatenews</code></td><td>Scrape live ads + flash → local DB (both tenants)</td></tr>
+        <tr><td><code>seed:news_catholicatenews</code></td><td>Import / live-scrape articles → local DB</td></tr>
+        <tr><td><code>wipe:cloud-articles-tenant</code></td><td>Delete all Cloud articles for one tenant (clean start)</td></tr>
+        <tr><td><code>push:tenant-to-cloud</code></td><td>Upsert selected types to Cloud for one tenant</td></tr>
+        <tr><td><code>sync:article-published-dates-cloud</code></td><td>Restore historical <code>publishedAt</code> via migration API</td></tr>
+        <tr><td><code>push:collection-images-s3-to-cloud</code></td><td>Register durable S3 media + link on Cloud</td></tr>
+        <tr><td><code>repair:cloud-news-sync</code></td><td>Shell cleanup + re-push + S3 + tenant re-link</td></tr>
+      </tbody>
+    </table>
+
+    <h2>9. AI prompt</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
+      <div class="command-content" id="p" style="white-space:pre-wrap;">Sync local news (articles, advertisement-slots, flash-news-items) to Strapi Cloud for tenant mosc_malankara_orthodox_2. Use durable S3 images per .cursor/rules/strapi-cloud-image-upload-migration.mdc (--skip-api). After cover link, re-link tenants (repair:cloud-news-sync). Restore publishedAt with sync:article-published-dates-cloud. Verify tenant filter returns articles with amazonaws cover URLs and ads for top/between_sections/sidebar.</div>
+    </div>
+  </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

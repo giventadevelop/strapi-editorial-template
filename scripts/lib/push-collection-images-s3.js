@@ -220,19 +220,33 @@ async function registerS3OnCloud(filePayloads) {
 
 async function getCloudEntryMap(restPlural, tenantIdFilter) {
   const map = new Map();
-  let page = 1;
-  while (true) {
-    const url = `/api/${restPlural}?pagination[page]=${page}&pagination[pageSize]=100&populate[tenant]=*&filters[tenant][tenantId][$eq]=${encodeURIComponent(tenantIdFilter)}`;
-    const data = await cloudFetch(url);
-    const list = Array.isArray(data?.data) ? data.data : data?.results ?? [];
-    if (list.length === 0) break;
-    for (const row of list) {
-      const docId = row.documentId ?? row.document_id ?? row.id;
-      const key = entryMatchKey(row);
-      if (key && docId) map.set(key, docId);
+  async function fill(url) {
+    let page = 1;
+    let added = 0;
+    while (true) {
+      const pageUrl = `${url}&pagination[page]=${page}&pagination[pageSize]=100`;
+      const data = await cloudFetch(pageUrl);
+      const list = Array.isArray(data?.data) ? data.data : data?.results ?? [];
+      if (list.length === 0) break;
+      for (const row of list) {
+        const docId = row.documentId ?? row.document_id ?? row.id;
+        const key = entryMatchKey(row);
+        if (key && docId && !map.has(key)) {
+          map.set(key, docId);
+          added++;
+        }
+      }
+      if (list.length < 100) break;
+      page++;
     }
-    if (list.length < 100) break;
-    page++;
+    return added;
+  }
+  const tenantUrl = `/api/${restPlural}?populate[tenant]=*&filters[tenant][tenantId][$eq]=${encodeURIComponent(tenantIdFilter)}`;
+  await fill(tenantUrl);
+  // Articles often lose tenant on Cloud create; fall back to global slug map.
+  if (map.size === 0 && restPlural === 'articles') {
+    console.log('  Cloud tenant map empty; falling back to global article slug map...');
+    await fill(`/api/${restPlural}?populate[tenant]=*&fields[0]=slug&fields[1]=title`);
   }
   return map;
 }
@@ -271,7 +285,10 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
   const result = await app.documents(UID).findMany({
     filters,
     limit: 2000,
-    populate: { [mediaField]: true },
+    populate: {
+      [mediaField]: true,
+      ...(UID === 'api::article.article' ? { category: true } : {}),
+    },
     ...(UID === 'api::article.article' ? { status: 'draft' } : {}),
   });
   const list = result?.results ?? result?.data ?? (Array.isArray(result) ? result : []);
@@ -294,6 +311,21 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
     });
   }
 
+  /** Article Document Service PUTs that only set cover wipe title/slug/category — always re-send content fields. */
+  function articlePreserveFields(doc, cloudCategoryBySlug) {
+    if (UID !== 'api::article.article') return {};
+    const out = {};
+    for (const key of ['title', 'slug', 'description', 'views', 'isFeatured']) {
+      if (doc[key] != null && doc[key] !== '') out[key] = doc[key];
+    }
+    // Map local category slug → Cloud category documentId (never send local IDs).
+    const catSlug = doc.category?.slug;
+    if (catSlug && cloudCategoryBySlug?.has(String(catSlug))) {
+      out.category = cloudCategoryBySlug.get(String(catSlug));
+    }
+    return out;
+  }
+
   // Resolve Cloud tenant documentId so PUTs do not wipe the tenant relation.
   let cloudTenantDocId = null;
   try {
@@ -303,7 +335,27 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
     const trow = (tenants?.data || [])[0];
     cloudTenantDocId = trow?.documentId ?? trow?.document_id ?? null;
   } catch (_) {}
-  const linkExtra = cloudTenantDocId ? { tenant: cloudTenantDocId } : {};
+
+  // Cloud category slug → documentId (for article cover PUTs).
+  const cloudCategoryBySlug = new Map();
+  if (UID === 'api::article.article') {
+    try {
+      let cpage = 1;
+      for (;;) {
+        const cats = await cloudFetch(
+          `/api/categories?pagination[page]=${cpage}&pagination[pageSize]=100&fields[0]=slug`
+        );
+        for (const row of cats?.data || []) {
+          if (row.slug && row.documentId) cloudCategoryBySlug.set(String(row.slug), row.documentId);
+        }
+        if (!cats?.meta || cpage >= cats.meta.pagination.pageCount) break;
+        cpage++;
+      }
+      console.log(`  Cloud categories mapped: ${cloudCategoryBySlug.size}`);
+    } catch (e) {
+      console.warn('  Cloud category map failed:', e.message);
+    }
+  }
 
   for (const doc of list) {
     const matchKey = entryMatchKey(doc);
@@ -331,6 +383,11 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
       failed++;
       continue;
     }
+
+    const linkExtra = {
+      ...(cloudTenantDocId ? { tenant: cloudTenantDocId } : {}),
+      ...articlePreserveFields(doc, cloudCategoryBySlug),
+    };
 
     let fileId = null;
 
@@ -367,6 +424,7 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
             relativePath,
             slug: label,
             cloudDocId,
+            linkExtra,
           });
           console.log('  Staged for S3 register:', label, relativePath);
         } else if (remoteS3) {
@@ -375,6 +433,7 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
             ...ensured,
             slug: label,
             cloudDocId,
+            linkExtra,
           });
           console.log('  Staged existing S3 URL for register:', label, ensured.relativePath);
         }
@@ -398,7 +457,7 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
 
   if (registerBatch.length > 0) {
     try {
-      const payloads = registerBatch.map(({ slug, cloudDocId, ...file }) => file);
+      const payloads = registerBatch.map(({ slug, cloudDocId, linkExtra, ...file }) => file);
       const reg = await registerS3OnCloud(payloads);
       if (reg?.errors?.length) {
         for (const err of reg.errors) console.warn('  Register error:', err.name, err.error);
@@ -414,8 +473,7 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
           continue;
         }
         try {
-          // Always include tenant in PUT so cover/media link does not wipe tenant relation.
-          await linkMediaOnCloud(item.cloudDocId, match.id, linkExtra);
+          await linkMediaOnCloud(item.cloudDocId, match.id, item.linkExtra || {});
           console.log('  Linked (S3 register):', item.slug, match.reused ? '(reused)' : '');
           linked++;
         } catch (e) {

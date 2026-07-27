@@ -5,130 +5,158 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>News Import – Catholicate News workflow</title>
   <style>
-    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 900px; margin: 0 auto; padding: 2rem; color: #333; }
-    h1 { color: #1a1a1a; border-bottom: 2px solid #db1111; padding-bottom: 0.5rem; }
-    h2 { color: #2d2d2d; margin-top: 2rem; }
-    ul, ol { margin: 0.5rem 0; }
-    li { margin: 0.25rem 0; }
-    code, pre { background: #f0f0f0; padding: 0.2em 0.4em; border-radius: 4px; font-size: 0.9em; }
-    pre { padding: 1rem; overflow-x: auto; white-space: pre-wrap; }
-    a { color: #db1111; }
-    .note { background: #fff8e6; border-left: 4px solid #e6b800; padding: 0.75rem 1rem; margin: 1rem 0; }
-    table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
-    th, td { border: 1px solid #ccc; padding: 0.5rem; text-align: left; }
-    th { background: #f5f5f5; }
+    :root { --bg: #0f1419; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --border: #30363d; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; margin: 0; padding: 2rem; }
+    .doc { max-width: 72rem; margin: 0 auto; }
+    h1 { font-size: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-top: 0; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    p, li { color: var(--muted); }
+    a { color: var(--accent); }
+    code { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    pre { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 1rem; overflow-x: auto; border-radius: 6px; white-space: pre-wrap; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    th, td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: linear-gradient(135deg, #0066cc 0%, #0052a3 100%); color: white; font-weight: 600; }
+    .section-intro { background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%); border-left: 4px solid #0066cc; border-radius: 8px; padding: 20px; margin: 20px 0; }
+    .section-intro p { color: #333; margin: 0.4rem 0; }
+    .script-name { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 4px 10px; border-radius: 5px; font-family: 'Courier New', monospace; font-weight: bold; display: inline-block; }
+    .code-highlight { background: #e8f4f8; color: #0d3b66; border: 1px solid #b8d4e3; padding: 2px 6px; border-radius: 4px; }
+    .command-block { border-radius: 8px; border: 2px solid #2196f3; margin: 1rem 0; background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); overflow: hidden; }
+    .command-block.verify { border-color: #4caf50; background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); }
+    .command-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; color: #0d3b66; }
+    .command-content { padding: 12px 15px; font-family: 'Courier New', monospace; font-size: 0.9em; color: #0d3b66; word-break: break-all; }
+    .copy-button { padding: 6px 12px; border: none; background: #0066cc; color: white; border-radius: 4px; cursor: pointer; font-size: 0.85em; }
+    .note { background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.75rem 1rem; margin: 1rem 0; color: #333; }
+    .info { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 0.75rem 1rem; margin: 1rem 0; color: #0c5460; }
+    .success { background: #d4edda; border-left: 4px solid #28a745; padding: 0.75rem 1rem; margin: 1rem 0; color: #333; }
   </style>
 </head>
 <body>
-  <h1>News Import – Catholicate News workflow</h1>
-  <p>This document describes how to run the automated import of news articles from the local clone of <a href="https://catholicatenews.in/">catholicatenews.in</a> into Strapi.</p>
+  <div class="doc">
+    <p><a href="../front_end_based_collection_types_import/production_cloud_data_push/news-production-cloud-push-prd.html">Production Cloud push PRD →</a></p>
+    <h1>News Import – Catholicate News workflow</h1>
+    <p>Import news articles, advertisement slots, and flash news from <a href="https://catholicatenews.in/">catholicatenews.in</a> into local Strapi, then sync to Cloud.</p>
 
-  <h2>Prerequisites</h2>
-  <ol>
-    <li><strong>Local clone</strong> of catholicatenews.in (pass as CLI arg, or <code>STRAPI_NEWS_CLONE_DIR</code> env, or default: <code>E:\project_workspace\catholicatenews-in-temp</code>).</li>
-    <li><strong>Strapi</strong> project with Article and Category content types and multi-tenant setup.</li>
-    <li><strong>cheerio</strong>, <strong>dotenv</strong>, <strong>mime-types</strong>: run <code>npm install</code> in the project root.</li>
-  </ol>
+    <div class="section-intro">
+      <p><strong>Articles:</strong> <code class="script-name">seed:news_catholicatenews</code></p>
+      <p><strong>Ads + flash:</strong> <code class="script-name">seed:ads-flash-catholicatenews</code></p>
+      <p><strong>Cloud + S3:</strong> see <a href="../front_end_based_collection_types_import/production_cloud_data_push/news-production-cloud-push-prd.html">news-production-cloud-push-prd.html</a></p>
+    </div>
 
-  <h2>What the scripts do</h2>
-  <table>
-    <thead>
-      <tr><th>Script</th><th>Purpose</th></tr>
-    </thead>
-    <tbody>
-      <tr><td><strong>Export</strong></td><td>Exports articles and categories for tenant <code>tenant_demo_002</code> to JSON for backup/testing.</td></tr>
-      <tr><td><strong>Delete</strong></td><td>Deletes all Article entries. Categories are not deleted (they may be shared).</td></tr>
-      <tr><td><strong>Seed</strong></td><td>Parses category pages (main-news, featured-news, press-release, most-read) from the clone, imports up to 30 articles per category, assigns tenant and categories.</td></tr>
-    </tbody>
-  </table>
+    <h2>Prerequisites</h2>
+    <ol>
+      <li>Local clone of catholicatenews.in <em>or</em> use <code class="code-highlight">--live</code> scrape.</li>
+      <li>Strapi with Article, Category, Advertisement Slot, Flash News Item + multi-tenant.</li>
+      <li><code>cheerio</code>, <code>dotenv</code>, <code>mime-types</code> installed.</li>
+    </ol>
 
-  <h2>Config from .env</h2>
-  <p>Set these in your project root <code>.env</code> file:</p>
-  <table>
-    <thead>
-      <tr><th>Variable</th><th>Default</th><th>Description</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>CLI arg or <code>STRAPI_NEWS_CLONE_DIR</code></td><td><code>E:\project_workspace\catholicatenews-in-temp</code></td><td>Path to the catholicatenews.in clone.</td></tr>
-      <tr><td><code>TENANT_ID</code></td><td><code>tenant_demo_002</code></td><td>Editorial tenant for imported articles.</td></tr>
-      <tr><td><code>STRAPI_NEWS_FETCH_MISSING</code></td><td>—</td><td>Set to <code>1</code> to fetch missing category pages from <code>https://catholicatenews.in/</code>.</td></tr>
-      <tr><td><code>EXPORT_OUTPUT_PATH</code></td><td><code>exports/news_tenant_demo_002_YYYYMMDD.json</code></td><td>Output path for export script (export only).</td></tr>
-    </tbody>
-  </table>
+    <h2>What the scripts do</h2>
+    <table>
+      <thead><tr><th>Script / npm</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>export:news_tenant_demo</code></td><td>Backup articles/categories for a tenant.</td></tr>
+        <tr><td><code>delete:articles</code></td><td>Delete all articles (categories kept).</td></tr>
+        <tr><td><code>seed:news_catholicatenews</code></td><td>Import articles from clone or live site.</td></tr>
+        <tr><td><code>seed:ads-flash-catholicatenews</code></td><td>Scrape homepage ads + flash; upsert per tenant.</td></tr>
+        <tr><td><code>fix:article_category_tenant</code></td><td>Repair empty category/tenant in Content Manager.</td></tr>
+        <tr><td><code>repair:cloud-news-sync</code></td><td>Cloud: shells + re-push + S3 + tenant re-link.</td></tr>
+      </tbody>
+    </table>
 
-  <h2>How to run</h2>
-  <p class="note"><strong>Important:</strong> Stop Strapi before running delete and seed. Restart Strapi after the seed so the admin UI picks up the new articles.</p>
-  <h3>1. Export (backup before delete)</h3>
-  <pre><code>npm run export:news_tenant_demo</code></pre>
-  <p>Writes articles and categories for <code>tenant_demo_002</code> to <code>exports/news_tenant_demo_002_YYYYMMDD.json</code>.</p>
+    <h2>How to run (local)</h2>
+    <div class="note"><strong>Stop Strapi</strong> before delete/seed. Restart afterward so the admin UI picks up data.</div>
 
-  <h3>2. Delete all articles</h3>
-  <pre><code>npm run delete:articles</code></pre>
-  <p>To only see counts without deleting:</p>
-  <pre><code>DRY_RUN=1 npm run delete:articles</code></pre>
-  <p>Run with Strapi stopped or from another terminal.</p>
+    <div class="command-block">
+      <div class="command-header"><strong>1 — Export backup</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-export')">📋 Copy</button></div>
+      <div class="command-content" id="c-export">npm run export:news_tenant_demo</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>2 — Delete articles (optional)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-del')">📋 Copy</button></div>
+      <div class="command-content" id="c-del">npm run delete:articles</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>3 — Seed articles (live, 12 months, both tenants)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-seed')">📋 Copy</button></div>
+      <div class="command-content" id="c-seed">npm run seed:news_catholicatenews -- --live --months=12 --tenants=tenant_demo_002,mosc_malankara_orthodox_2</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>4 — Seed ads + flash from live homepage</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-ads')">📋 Copy</button></div>
+      <div class="command-content" id="c-ads">npm run seed:ads-flash-catholicatenews -- --tenants=tenant_demo_002,mosc_malankara_orthodox_2</div>
+    </div>
+    <div class="command-block verify">
+      <div class="command-header"><strong>Ads/flash dry-run</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-dry')">📋 Copy</button></div>
+      <div class="command-content" id="c-dry">npm run seed:ads-flash-catholicatenews -- --dry-run</div>
+    </div>
 
-  <h3>3. Seed from legacy clone</h3>
-  <pre><code># Pass clone path as CLI arg (recommended)
-npm run seed:news_catholicatenews -- "E:\project_workspace\catholicatenews-in-temp"
+    <h2>Ads + flash scrape mapping</h2>
+    <table>
+      <thead><tr><th>Position</th><th>Source on catholicatenews.in</th></tr></thead>
+      <tbody>
+        <tr><td><code>top</code></td><td>Header <code>.top-add</code> banner (e.g. Malankara_ad-new.png)</td></tr>
+        <tr><td><code>between_sections</code></td><td>First mid-page square promo</td></tr>
+        <tr><td><code>sidebar</code></td><td>Remaining square promos</td></tr>
+        <tr><td>Flash items</td><td><code>.flash-news</code> carousel links (order + dates)</td></tr>
+      </tbody>
+    </table>
+    <div class="info">Lifecycles strip <code>tenant</code> on script creates — the ads/flash seed links tenants via DB join tables after create.</div>
 
-# Or use env
-STRAPI_NEWS_CLONE_DIR=E:\project_workspace\catholicatenews-in-temp npm run seed:news_catholicatenews</code></pre>
-  <p>Optional: <code>TENANT_ID=tenant_demo_002</code> (default) to override tenant.</p>
+    <h2>Articles from clone (alternate)</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Seed from local HTML clone</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-clone')">📋 Copy</button></div>
+      <div class="command-content" id="c-clone">npm run seed:news_catholicatenews -- "E:\project_workspace\catholicatenews-in-temp"</div>
+    </div>
 
-  <h2>Category pages and traversal</h2>
-  <p>The seed script reads from:</p>
-  <ul>
-    <li><code>category/main-news/page/1/index.html</code>, <code>page/2/index.html</code>, …</li>
-    <li><code>category/featured-news/page/1/index.html</code>, …</li>
-    <li><code>category/press-release/page/1/index.html</code>, …</li>
-    <li><code>category/most-read/page/1/index.html</code>, …</li>
-  </ul>
-  <p>It collects up to <strong>30 articles per category</strong> (hard limit). Duplicate articles across categories are assigned to the first category encountered. If a page is missing and <code>STRAPI_NEWS_FETCH_MISSING=1</code> is set, the script fetches it from <code>https://catholicatenews.in/</code>.</p>
+    <h2>Category pages</h2>
+    <p>Seed reads main-news, featured-news, press-release, most-read (up to 30 articles per category). With <code>STRAPI_NEWS_FETCH_MISSING=1</code>, missing pages are fetched live.</p>
 
-  <h2>Image resolution (local vs online)</h2>
-  <p>Images are resolved in this order:</p>
-  <ol>
-    <li><strong>Local:</strong> Path from <code>img</code> src (e.g. <code>uploads/2026/01/...)</code>) relative to the HTML file’s directory.</li>
-    <li><strong>Fallback:</strong> If the file is missing locally, the script tries <code>https://catholicatenews.in/{path}</code>.</li>
-  </ol>
+    <h2>Push to production Cloud</h2>
+    <div class="success">Use durable <strong>S3</strong> images (<code>--skip-api</code>). Full steps and gotchas: <a href="../front_end_based_collection_types_import/production_cloud_data_push/news-production-cloud-push-prd.html">News production Cloud push PRD</a>.</div>
+    <div class="command-block">
+      <div class="command-header"><strong>Content + dates + S3 + tenant repair (orchestrator after push)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-cloud')">📋 Copy</button></div>
+      <div class="command-content" id="c-cloud">npm run push:tenant-to-cloud -- --tenant-id=mosc_malankara_orthodox_2 --types=articles,flash-news-items,advertisement-slots --force --delay-ms=80</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>Restore publishedAt</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-dates')">📋 Copy</button></div>
+      <div class="command-content" id="c-dates">npm run sync:article-published-dates-cloud -- --tenant-id=mosc_malankara_orthodox_2</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>S3 article covers</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-s3a')">📋 Copy</button></div>
+      <div class="command-content" id="c-s3a">npm run push:collection-images-s3-to-cloud -- --collection=articles --tenant-id=mosc_malankara_orthodox_2 --skip-api</div>
+    </div>
+    <div class="command-block">
+      <div class="command-header"><strong>S3 ad media</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-s3b')">📋 Copy</button></div>
+      <div class="command-content" id="c-s3b">npm run push:collection-images-s3-to-cloud -- --collection=advertisement-slots --tenant-id=mosc_malankara_orthodox_2 --skip-api</div>
+    </div>
+    <div class="command-block verify">
+      <div class="command-header"><strong>Repair (re-link tenants after cover PUT)</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-repair')">📋 Copy</button></div>
+      <div class="command-content" id="c-repair">npm run repair:cloud-news-sync -- --tenant-id=mosc_malankara_orthodox_2</div>
+    </div>
+    <div class="note"><strong>Gotcha:</strong> Linking covers via Document Service PUT can drop the article tenant relation. Always re-run tenant fix / <code>repair:cloud-news-sync</code> after S3.</div>
 
-  <h2>Tenant assignment and Editor Tenant</h2>
-  <p>Imported articles are assigned to <code>tenant_demo_002</code>. If an editor is mapped to that tenant via <strong>Editor Tenant Assignment</strong>, the import runs in that user’s request context so lifecycles can set the tenant. Otherwise, the tenant is backfilled at the end of the import.</p>
-  <p>Ensure a tenant with <code>tenantId</code> <code>tenant_demo_002</code> exists and that an editor is assigned to it for the best experience.</p>
+    <h2>After import</h2>
+    <ol>
+      <li>Content Manager → Article / Advertisement Slot / Flash News Item.</li>
+      <li>Filter by tenant (<code>tenant_demo_002</code> or <code>mosc_malankara_orthodox_2</code>).</li>
+      <li>On Cloud, confirm <code>cover.url</code> / <code>media.url</code> are <code>amazonaws.com</code> URLs.</li>
+    </ol>
 
-  <h2>Required categories</h2>
-  <p>The script creates these categories if missing:</p>
-  <table>
-    <thead>
-      <tr><th>Name</th><th>Slug</th></tr>
-    </thead>
-    <tbody>
-      <tr><td>Main News</td><td>main-news</td></tr>
-      <tr><td>Press Release</td><td>press-release</td></tr>
-      <tr><td>Featured News</td><td>featured-news</td></tr>
-      <tr><td>Most Read</td><td>most-read</td></tr>
-    </tbody>
-  </table>
+    <h2>Bulk publish</h2>
+    <div class="command-block">
+      <div class="command-header"><strong>Publish draft articles</strong><button type="button" class="copy-button" onclick="copyCommand(this,'c-pub')">📋 Copy</button></div>
+      <div class="command-content" id="c-pub">npm run bulk_publish:articles</div>
+    </div>
 
-  <h2>After import</h2>
-  <ol>
-    <li>Open Strapi Admin and check <strong>Content Manager → Article</strong>.</li>
-    <li>Filter by tenant (or log in as an editor assigned to <code>tenant_demo_002</code>).</li>
-    <li>Verify categories and cover images. Missing images may be due to local paths not resolving; you can attach them manually.</li>
-  </ol>
-
-  <h2>Bulk publish imported articles</h2>
-  <p>If imported articles appear as drafts, run:</p>
-  <pre><code>npm run bulk_publish:articles</code></pre>
-  <p>To limit to a specific tenant:</p>
-  <pre><code>TENANT_ID=tenant_demo_002 node scripts/bulk_publish_articles.js</code></pre>
-  <p>To only see how many would be published:</p>
-  <pre><code>DRY_RUN=1 npm run bulk_publish:articles</code></pre>
-
-  <h2>Re-running</h2>
-  <div class="note">
-    The import script does not check for existing articles. Re-running will create duplicates. To re-import cleanly: run <code>npm run delete:articles</code>, then <code>npm run seed:news_catholicatenews</code> again.
+    <h2>Re-running</h2>
+    <div class="note">Article seed can create duplicates if re-run without delete. Ads/flash seed replaces existing slots/items for the given tenants. For a clean article re-import: <code>delete:articles</code> then re-seed.</div>
   </div>
+  <script>
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent.trim()).then(function () {
+        btn.textContent = '✓ Copied';
+        setTimeout(function () { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+  </script>
 </body>
 </html>

@@ -71,6 +71,118 @@ module.exports = {
         return;
       }
 
+      if (body.ensureAdminEditorRole?.email) {
+        const email = String(body.ensureAdminEditorRole.email).trim().toLowerCase();
+        try {
+          const editorRole = await strapi.db.query('admin::role').findOne({
+            where: { code: 'strapi-editor' },
+          });
+          if (!editorRole) {
+            ctx.status = 400;
+            ctx.body = { ok: false, error: { message: 'Editor role (strapi-editor) not found.' } };
+            return;
+          }
+          const adminUser = await strapi.db.query('admin::user').findOne({
+            where: { email },
+            populate: { roles: true },
+          });
+          if (!adminUser) {
+            ctx.status = 404;
+            ctx.body = { ok: false, error: { message: `Admin user not found: ${email}` } };
+            return;
+          }
+          const hasEditor = (adminUser.roles || []).some((r) => r.code === 'strapi-editor' || r.id === editorRole.id);
+          if (hasEditor) {
+            ctx.body = {
+              ok: true,
+              email,
+              alreadyHadEditor: true,
+              roles: (adminUser.roles || []).map((r) => ({ id: r.id, code: r.code, name: r.name })),
+            };
+            return;
+          }
+          const knex = strapi.db.connection;
+          const existingLink = await knex('admin_users_roles_lnk')
+            .where({ user_id: adminUser.id, role_id: editorRole.id })
+            .first();
+          if (!existingLink) {
+            const [{ count }] = await knex('admin_users_roles_lnk')
+              .where({ user_id: adminUser.id })
+              .count({ count: '*' });
+            await knex('admin_users_roles_lnk').insert({
+              user_id: adminUser.id,
+              role_id: editorRole.id,
+              role_ord: Number(count) + 1,
+            });
+          }
+          const refreshed = await strapi.db.query('admin::user').findOne({
+            where: { id: adminUser.id },
+            populate: { roles: true },
+          });
+          ctx.body = {
+            ok: true,
+            email,
+            alreadyHadEditor: false,
+            roles: (refreshed?.roles || []).map((r) => ({ id: r.id, code: r.code, name: r.name })),
+          };
+        } catch (err) {
+          ctx.status = 400;
+          ctx.body = { ok: false, error: { message: err.message } };
+        }
+        return;
+      }
+
+      if (body.assignEditorTenant?.email && body.assignEditorTenant?.tenantId) {
+        const email = String(body.assignEditorTenant.email).trim().toLowerCase();
+        const tenantId = String(body.assignEditorTenant.tenantId).trim();
+        const replace = !!body.assignEditorTenant.replace;
+        try {
+          const knex = strapi.db.connection;
+          const tenantRow = await knex('tenants').where({ tenant_id: tenantId }).select('id').first();
+          if (!tenantRow) {
+            ctx.status = 400;
+            ctx.body = { ok: false, error: { message: `Tenant not found: ${tenantId}` } };
+            return;
+          }
+          if (replace) {
+            const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
+              where: {},
+              populate: { tenant: true },
+            });
+            for (const row of mappings) {
+              if ((row.adminUserEmail || '').toLowerCase() !== email) continue;
+              await strapi.db.query('api::editor-tenant.editor-tenant').delete({ where: { id: row.id } });
+            }
+          }
+          const assignmentKey = `${email}__${tenantId}`;
+          const already = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
+            where: {},
+            populate: { tenant: true },
+          });
+          const exists = already.find(
+            (m) =>
+              (m.adminUserEmail || '').toLowerCase() === email &&
+              (m.tenant?.tenantId || m.tenant?.tenant_id) === tenantId
+          );
+          if (exists) {
+            ctx.body = { ok: true, email, tenantId, alreadyAssigned: true, assignmentKey: exists.assignmentKey };
+            return;
+          }
+          await strapi.db.query('api::editor-tenant.editor-tenant').create({
+            data: {
+              adminUserEmail: email,
+              assignmentKey,
+              tenant: tenantRow.id,
+            },
+          });
+          ctx.body = { ok: true, email, tenantId, alreadyAssigned: false, assignmentKey };
+        } catch (err) {
+          ctx.status = 400;
+          ctx.body = { ok: false, error: { message: err.message } };
+        }
+        return;
+      }
+
       if (Array.isArray(body.upgradeS3Media) && body.upgradeS3Media.length > 0) {
         const { registerOrUpgradeS3Files } = require('./utils/s3-media-register');
         try {

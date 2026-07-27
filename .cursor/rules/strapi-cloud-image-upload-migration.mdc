@@ -43,9 +43,17 @@ Always pass `--tenant-id=` explicitly. In [scripts/lib/liturgy-cli.js](mdc:scrip
 
 - **`push:tenant-to-cloud` publish resets `publishedAt` to “now”.** After pushing articles, restore historical dates from local:
   ```bash
-  node scripts/sync-article-published-dates-to-cloud.js --tenant-id=mosc_malankara_orthodox_2
+  npm run sync:article-published-dates-cloud -- --tenant-id=mosc_malankara_orthodox_2
   ```
   Uses `POST /api/migration/fix-published` (knex) so Document Service publish does not overwrite dates again.
+- **Cover PUT can drop tenant/category (and previously wiped title/slug).** After S3 article covers, re-link tenants. Prefer the orchestrator:
+  ```bash
+  npm run repair:cloud-news-sync -- --tenant-id=mosc_malankara_orthodox_2
+  ```
+  S3 linker preserves `title`/`slug`/… and maps category by **Cloud slug**; still re-run tenant fix after cover link.
+- **Clean article re-upload (conflicts):** `npm run wipe:cloud-articles-tenant -- --tenant-id=mosc_malankara_orthodox_2` then push articles only + dates + S3.
+- **Local ads/flash scrape:** `npm run seed:ads-flash-catholicatenews -- --tenants=tenant_demo_002,mosc_malankara_orthodox_2`
+- **Full news Cloud runbook:** [news-production-cloud-push-prd.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/news-production-cloud-push-prd.html)
 - **S3 register with `prod/` prefix while local media lives under `dev/`** creates Cloud URLs that **403** (object missing under prod). `push-collection-images-s3` now copies remote `dev/` bytes into the prod key before register. Emergency repair:
   ```bash
   node scripts/repair-cloud-ad-s3-from-dev.js

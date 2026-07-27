@@ -1,16 +1,22 @@
 'use strict';
 
 /**
- * News import from local clone of catholicatenews.in
+ * News import from local clone and/or live catholicatenews.in
  * Parses articles from category pages (main-news, featured-news, press-release, most-read).
- * Max 30 articles per category. Tenant: tenant_demo_002 (editorial).
  *
- * Source directory: first CLI arg, or STRAPI_NEWS_CLONE_DIR env, or default below.
+ * Source directory: first non-flag CLI arg, or STRAPI_NEWS_CLONE_DIR, or default below.
  * Config from .env: TENANT_ID
- * Optional: STRAPI_NEWS_FETCH_MISSING=1 to fetch missing category pages from https://catholicatenews.in/
  *
- * Run: npm run seed:news_catholicatenews -- "E:\path\to\catholicatenews-in-temp"
- *   or: STRAPI_NEWS_CLONE_DIR=/path/to/clone npm run seed:news_catholicatenews
+ * Flags / env:
+ *   --live | STRAPI_NEWS_LIVE=1              Always fetch category pages from https://catholicatenews.in/
+ *   --months=5 | STRAPI_NEWS_MONTHS=5        Keep only articles with publishedAt within N months
+ *   --tenant-id=... | TENANT_ID              Single tenant (default tenant_demo_002)
+ *   --tenants=a,b                            Seed the same scrape into multiple tenants
+ *   STRAPI_NEWS_FETCH_MISSING=1              Fetch missing pages only (legacy; superseded by --live)
+ *
+ * Run:
+ *   npm run seed:news_catholicatenews -- --live --months=5 --tenants=tenant_demo_002,mosc_malankara_orthodox_2
+ *   npm run seed:news_catholicatenews -- "C:\project_workspace\catholicatenews-in-temp"
  */
 
 try {
@@ -24,15 +30,54 @@ const https = require('https');
 const mime = require('mime-types');
 const cheerio = require('cheerio');
 
-const requestContext = require(path.join(__dirname, '..', 'src', 'utils', 'request-context'));
+function getArg(name, fallback = null) {
+  for (let i = 2; i < process.argv.length; i++) {
+    const a = process.argv[i];
+    if (a === `--${name}` && process.argv[i + 1] && !String(process.argv[i + 1]).startsWith('--')) {
+      return process.argv[i + 1].trim();
+    }
+    const m = a.match(new RegExp(`^--${name}=(.+)$`));
+    if (m) return m[1].trim();
+  }
+  return fallback;
+}
 
-const FETCH_MISSING = process.env.STRAPI_NEWS_FETCH_MISSING === '1' || process.env.STRAPI_NEWS_FETCH_MISSING === 'true';
+const ONLY_MOST_READ =
+  process.argv.includes('--only-most-read') ||
+  process.env.STRAPI_NEWS_ONLY_MOST_READ === '1' ||
+  process.env.STRAPI_NEWS_ONLY_MOST_READ === 'true';
+const LIVE_MODE =
+  ONLY_MOST_READ ||
+  process.argv.includes('--live') ||
+  process.env.STRAPI_NEWS_LIVE === '1' ||
+  process.env.STRAPI_NEWS_LIVE === 'true';
+const FETCH_MISSING =
+  LIVE_MODE ||
+  process.env.STRAPI_NEWS_FETCH_MISSING === '1' ||
+  process.env.STRAPI_NEWS_FETCH_MISSING === 'true';
+const MONTHS_RAW = getArg('months', process.env.STRAPI_NEWS_MONTHS || '');
+const MONTHS =
+  MONTHS_RAW !== '' && MONTHS_RAW != null && !Number.isNaN(Number(MONTHS_RAW))
+    ? Math.max(0, Number(MONTHS_RAW))
+    : 0;
 const LIVE_BASE = 'https://catholicatenews.in';
 const DEFAULT_CLONE_DIR = process.env.STRAPI_NEWS_CLONE_DIR
   ? path.resolve(process.env.STRAPI_NEWS_CLONE_DIR)
-  : path.join('E:', 'project_workspace', 'catholicatenews-in-temp');
+  : path.join('C:', 'project_workspace', 'catholicatenews-in-temp');
 const DEFAULT_TENANT_ID = process.env.TENANT_ID || 'tenant_demo_002';
-const PER_CATEGORY_LIMIT = 30;
+/** Hard cap when not using a months window (legacy behavior). */
+const PER_CATEGORY_LIMIT = MONTHS > 0 ? 500 : 30;
+
+function cutoffIsoForMonths(months, fromDate = null) {
+  if (!months || months <= 0) return null;
+  const d = fromDate ? new Date(fromDate) : new Date();
+  if (Number.isNaN(d.getTime())) return null;
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString();
+}
+
+/** Set in collectAllArticles after probing live/category newest dates. */
+let PUBLISHED_CUTOFF_ISO = cutoffIsoForMonths(MONTHS);
 
 const CATEGORIES = [
   { slug: 'main-news', name: 'Main News', isFeatured: false },
@@ -175,11 +220,26 @@ function parseCategoryPage(cloneDir, categorySlug, pageNum) {
   return parseArticlesFromHtml(html, categorySlug, baseDir);
 }
 
-function fetchUrl(url) {
+function fetchUrl(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, { headers: { 'User-Agent': 'StrapiNewsImport/1.0' } }, (res) => {
-      if (res.statusCode !== 200) {
-        reject(new Error(`HTTP ${res.statusCode}`));
+      const code = res.statusCode || 0;
+      if ([301, 302, 303, 307, 308].includes(code) && res.headers.location) {
+        res.resume();
+        if (redirectCount >= 5) {
+          reject(new Error(`Too many redirects for ${url}`));
+          return;
+        }
+        let next = res.headers.location;
+        try {
+          next = new URL(next, url).toString();
+        } catch (_) {}
+        fetchUrl(next, redirectCount + 1).then(resolve, reject);
+        return;
+      }
+      if (code !== 200) {
+        res.resume();
+        reject(new Error(`HTTP ${code}`));
         return;
       }
       const chunks = [];
@@ -187,25 +247,42 @@ function fetchUrl(url) {
       res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     });
     req.on('error', reject);
-    req.setTimeout(15000, () => {
+    req.setTimeout(20000, () => {
       req.destroy();
       reject(new Error('timeout'));
     });
   });
 }
 
+function isWithinPublishedWindow(publishedAtIso) {
+  if (!PUBLISHED_CUTOFF_ISO) return true;
+  if (!publishedAtIso) return false; // when filtering by months, drop undated cards
+  return publishedAtIso >= PUBLISHED_CUTOFF_ISO;
+}
+
 async function getArticlesForCategory(cloneDir, categorySlug) {
   const all = [];
   const seenSlugs = new Set();
   let page = 1;
+  let consecutiveOldPages = 0;
   for (;;) {
     let html;
     const htmlPath = path.join(cloneDir, 'category', categorySlug, 'page', String(page), 'index.html');
-    if (fs.existsSync(htmlPath)) {
+    if (LIVE_MODE) {
+      try {
+        const url = `${LIVE_BASE}/category/${categorySlug}/page/${page}/`;
+        console.log('    Fetch live:', url);
+        html = await fetchUrl(url);
+      } catch (e) {
+        console.log('    Stop page', page, '(' + e.message + ')');
+        break;
+      }
+    } else if (fs.existsSync(htmlPath)) {
       html = fs.readFileSync(htmlPath, 'utf8');
     } else if (FETCH_MISSING) {
       try {
         const url = `${LIVE_BASE}/category/${categorySlug}/page/${page}/`;
+        console.log('    Fetch missing:', url);
         html = await fetchUrl(url);
       } catch (e) {
         break;
@@ -215,32 +292,181 @@ async function getArticlesForCategory(cloneDir, categorySlug) {
     }
     const baseDir = path.join(cloneDir, 'category', categorySlug, 'page', String(page));
     const { items } = parseArticlesFromHtml(html, categorySlug, baseDir);
+    if (items.length === 0) break;
+
+    let keptOnPage = 0;
+    let oldOnPage = 0;
     for (const it of items) {
       if (seenSlugs.has(it.slug)) continue;
+      if (!isWithinPublishedWindow(it.publishedAt)) {
+        oldOnPage++;
+        continue;
+      }
       seenSlugs.add(it.slug);
       all.push(it);
+      keptOnPage++;
       if (all.length >= PER_CATEGORY_LIMIT) return all.slice(0, PER_CATEGORY_LIMIT);
     }
-    if (items.length === 0) break;
+
+    if (PUBLISHED_CUTOFF_ISO) {
+      // Stop once a page is entirely older than the window (site is date-ordered newest-first).
+      if (keptOnPage === 0 && oldOnPage > 0) {
+        consecutiveOldPages++;
+        if (consecutiveOldPages >= 1) break;
+      } else {
+        consecutiveOldPages = 0;
+      }
+    }
+
     page++;
+    if (page > 80) break; // safety
+    await new Promise((r) => setTimeout(r, LIVE_MODE ? 250 : 0));
   }
   return all;
 }
 
+/**
+ * Homepage "Most Read" section (not /category/most-read archive).
+ * Legacy site shows recent popular cards here; WP category archive is older/unrelated.
+ */
+async function parseHomepageMostReadSection() {
+  const html = await fetchUrl(`${LIVE_BASE}/`);
+  const $home = cheerio.load(html);
+  let section = null;
+  $home('.article-section').each((_, el) => {
+    const heading = $home(el).find('.title, h2').first().text().trim();
+    if (/most\s*read/i.test(heading)) {
+      section = $home(el);
+      return false;
+    }
+  });
+  if (!section || !section.length) {
+    console.warn('  Homepage Most Read section not found');
+    return [];
+  }
+
+  const items = [];
+  const seen = new Set();
+  let fallbackIdx = 0;
+  section.find('.article-block.primary-article, .article-block').each((_, el) => {
+    const block = $home(el);
+    const titleEl = block.find('.content h3 a, h3 a').first();
+    const title = text(titleEl);
+    if (!title) return;
+    const href = titleEl.attr('href') || '';
+    const urlKey = href || title;
+    if (seen.has(urlKey)) return;
+    seen.add(urlKey);
+
+    const img = block.find('.img img, img.wp-post-image').first();
+    const src = img.attr('src') || (img.attr('srcset') || '').split(/\s+/)[0] || '';
+    const timeEl = block.find('time[datetime], time').first();
+    let publishedAt = null;
+    const datetime = (timeEl.attr('datetime') || '').trim();
+    if (datetime) {
+      const d = new Date(datetime);
+      if (!Number.isNaN(d.getTime())) publishedAt = d.toISOString();
+    } else if (text(timeEl)) {
+      const d = new Date(text(timeEl));
+      if (!Number.isNaN(d.getTime())) publishedAt = d.toISOString();
+    }
+    const descEl = block.find('.content p').first();
+    let slug = slugFromUrl(href) || slugify(title);
+    if (!slug) {
+      slug = 'most-read-' + (++fallbackIdx) + '-' + Math.random().toString(36).slice(2, 10);
+    }
+    if (!slug.endsWith('-mr')) slug = `${slug}-mr`;
+    items.push({
+      title: title.trim(),
+      description: text(descEl).slice(0, 2048),
+      imagePath: src || undefined,
+      articleUrl: href || undefined,
+      slug,
+      publishedAt,
+      categorySlug: 'most-read',
+      isFeatured: false,
+      htmlBaseDir: '',
+    });
+  });
+  return items;
+}
+
 async function collectAllArticles(cloneDir) {
+  if (LIVE_MODE || ONLY_MOST_READ) console.log('Live mode: fetching from', LIVE_BASE);
+
+  if (ONLY_MOST_READ) {
+    console.log('  Category most-read (homepage section)...');
+    const items = await parseHomepageMostReadSection();
+    console.log('   most-read:', items.length, 'articles');
+    return items;
+  }
+
+  // Probe page 1 of each category to learn the newest published date, then
+  // apply the months window relative to that (so a stale site still imports
+  // its latest N months instead of an empty "now - N months" window).
+  if (MONTHS > 0) {
+    let newestMs = 0;
+    for (const cat of CATEGORIES) {
+      try {
+        let html;
+        if (LIVE_MODE) {
+          html = await fetchUrl(`${LIVE_BASE}/category/${cat.slug}/page/1/`);
+        } else {
+          const htmlPath = path.join(cloneDir, 'category', cat.slug, 'page', '1', 'index.html');
+          if (!fs.existsSync(htmlPath)) continue;
+          html = fs.readFileSync(htmlPath, 'utf8');
+        }
+        const { items } = parseArticlesFromHtml(html, cat.slug, '');
+        for (const it of items) {
+          if (!it.publishedAt) continue;
+          const ms = Date.parse(it.publishedAt);
+          if (!Number.isNaN(ms) && ms > newestMs) newestMs = ms;
+        }
+      } catch (e) {
+        console.warn('  Probe failed for', cat.slug, e.message);
+      }
+    }
+    try {
+      const homeItems = await parseHomepageMostReadSection();
+      for (const it of homeItems) {
+        if (!it.publishedAt) continue;
+        const ms = Date.parse(it.publishedAt);
+        if (!Number.isNaN(ms) && ms > newestMs) newestMs = ms;
+      }
+    } catch (_) {}
+    const fromNow = cutoffIsoForMonths(MONTHS, new Date());
+    const fromNewest = newestMs > 0 ? cutoffIsoForMonths(MONTHS, new Date(newestMs)) : null;
+    // Earlier cutoff => more inclusive. Prefer covering site-newest window AND calendar window.
+    const candidates = [fromNow, fromNewest].filter(Boolean).sort();
+    PUBLISHED_CUTOFF_ISO = candidates[0] || null;
+    console.log(
+      'Published window: since',
+      PUBLISHED_CUTOFF_ISO,
+      `(last ${MONTHS} months; site newest=${newestMs ? new Date(newestMs).toISOString() : 'n/a'})`
+    );
+  }
+
   const byCategory = {};
   for (const cat of CATEGORIES) {
+    console.log('  Category', cat.slug, '...');
+    if (cat.slug === 'most-read' && (LIVE_MODE || FETCH_MISSING)) {
+      // Prefer homepage Most Read cards (matches legacy UI) over WP archive.
+      const homeItems = await parseHomepageMostReadSection();
+      byCategory[cat.slug] = homeItems.filter((it) => isWithinPublishedWindow(it.publishedAt));
+      console.log('   most-read (homepage):', byCategory[cat.slug].length, 'articles');
+      continue;
+    }
     const items = await getArticlesForCategory(cloneDir, cat.slug);
     byCategory[cat.slug] = items;
     console.log('  ', cat.slug + ':', items.length, 'articles');
   }
-  // Deduplicate globally: an article can appear in multiple categories; assign to first category encountered
+  // Deduplicate within non-most-read; most-read keeps its own rows (slug ends with -mr).
   const seen = new Map();
   const flattened = [];
   for (const cat of CATEGORIES) {
-    for (const it of byCategory[cat.slug]) {
-      if (seen.has(it.slug)) continue;
-      seen.set(it.slug, true);
+    for (const it of byCategory[cat.slug] || []) {
+      if (cat.slug !== 'most-read' && seen.has(it.slug)) continue;
+      if (cat.slug !== 'most-read') seen.set(it.slug, true);
       flattened.push({ ...it, categorySlug: cat.slug, isFeatured: cat.isFeatured });
     }
   }
@@ -261,32 +487,47 @@ async function getUploadFileDocumentId(strapi, uploaded) {
   }
 }
 
-function downloadImageToTemp(imageUrl) {
+function downloadImageToTemp(imageUrl, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(imageUrl);
     const baseName = path.basename(parsed.pathname) || 'image';
     const tempPath = path.join(os.tmpdir(), `strapi-news-import-${Date.now()}-${baseName.replace(/[^a-zA-Z0-9.-]/g, '_')}`);
-    const file = fs.createWriteStream(tempPath);
     const req = https.get(imageUrl, { headers: { 'User-Agent': 'StrapiNewsImport/1.0' } }, (res) => {
-      if (res.statusCode !== 200) {
-        file.close();
-        fs.unlink(tempPath, () => {});
-        reject(new Error(`HTTP ${res.statusCode}`));
+      const code = res.statusCode || 0;
+      if ([301, 302, 303, 307, 308].includes(code) && res.headers.location) {
+        res.resume();
+        if (redirectCount >= 5) {
+          reject(new Error(`Too many redirects for ${imageUrl}`));
+          return;
+        }
+        let next = res.headers.location;
+        try {
+          next = new URL(next, imageUrl).toString();
+        } catch (_) {}
+        downloadImageToTemp(next, redirectCount + 1).then(resolve, reject);
         return;
       }
+      if (code !== 200) {
+        res.resume();
+        reject(new Error(`HTTP ${code}`));
+        return;
+      }
+      const file = fs.createWriteStream(tempPath);
       res.pipe(file);
       file.on('finish', () => {
         file.close(() => resolve(tempPath));
       });
+      file.on('error', (err) => {
+        try {
+          fs.unlinkSync(tempPath);
+        } catch (_) {}
+        reject(err);
+      });
     });
     req.on('error', (err) => {
-      file.close();
-      try {
-        fs.unlinkSync(tempPath);
-      } catch (_) {}
       reject(err);
     });
-    req.setTimeout(15000, () => {
+    req.setTimeout(20000, () => {
       req.destroy();
       reject(new Error('timeout'));
     });
@@ -398,11 +639,17 @@ async function resolveAndUploadImage(strapi, cloneDir, htmlBaseDir, imagePath) {
     }
     let result = await uploadImageFromClone(strapi, cloneDir, htmlBaseDir, trimmed);
     if (result) return result;
+    // Live / missing local file: try site-root relative paths (uploads/YYYY/MM/...)
+    const cleaned = trimmed.replace(/^\.\//, '');
+    result = await uploadImageFromUrl(strapi, `${LIVE_BASE}/${cleaned}`);
+    if (result) return result;
     const base = typeof htmlBaseDir === 'string' && htmlBaseDir ? htmlBaseDir : cloneDir;
     const fullPath = path.resolve(String(base), trimmed);
     const relFromClone = path.relative(cloneDir, fullPath).replace(/\\/g, '/');
-    const remoteUrl = LIVE_BASE + '/' + relFromClone;
-    return await uploadImageFromUrl(strapi, remoteUrl);
+    if (relFromClone && !relFromClone.startsWith('..')) {
+      return await uploadImageFromUrl(strapi, LIVE_BASE + '/' + relFromClone);
+    }
+    return null;
   } catch (e) {
     console.warn('  Resolve image failed:', trimmed.slice(0, 50), e.message);
     return null;
@@ -550,16 +797,11 @@ async function syncDraftRowsFromPublished(strapi) {
 async function setPublishedAtViaDb(strapi, entityDocumentId, publishedAtIso) {
   if (!entityDocumentId || !publishedAtIso || typeof publishedAtIso !== 'string') return false;
   try {
-    const entityRow = await strapi.db.query('api::article.article').findOne({
-      where: { documentId: entityDocumentId },
-      select: ['id'],
-    });
-    if (!entityRow?.id) return false;
-    await strapi.db.connection('articles').where({ id: entityRow.id }).update({
+    const updated = await strapi.db.connection('articles').where({ document_id: entityDocumentId }).update({
       published_at: publishedAtIso,
       updated_at: publishedAtIso,
     });
-    return true;
+    return Number(updated) > 0;
   } catch (_) {
     return false;
   }
@@ -683,21 +925,52 @@ async function backfillTenantOnArticles(strapi, tenantConnectId) {
   if (updated) console.log('  Backfilled tenant for', updated, 'articles');
 }
 
-async function runImport(strapi, cloneDir, tenantDoc) {
+async function runImport(strapi, cloneDir, tenantDoc, precollectedArticles = null, options = {}) {
   const tenantConnectId = tenantDoc.documentId ?? tenantDoc.document_id ?? tenantDoc.id;
   if (tenantConnectId == null) throw new Error('Tenant has no id/documentId');
   const connectTenant = { connect: [tenantConnectId] };
+  const slugSuffix = options.slugSuffix || '';
+  const coverCache = options.coverCache || new Map();
 
-  console.log('Collecting articles from category pages...');
-  const articles = await collectAllArticles(cloneDir);
+  const articles =
+    Array.isArray(precollectedArticles) && precollectedArticles.length > 0
+      ? precollectedArticles
+      : await (async () => {
+          console.log('Collecting articles from category pages...');
+          return collectAllArticles(cloneDir);
+        })();
   if (articles.length === 0) {
-    console.log('No articles found. Ensure clone exists at', cloneDir);
+    console.log('No articles found. Ensure clone exists at', cloneDir, 'or use --live');
     return;
   }
   console.log('Total unique articles:', articles.length);
+  if (slugSuffix) console.log('Slug suffix:', slugSuffix);
+
+  const ARTICLE_UID = 'api::article.article';
+
+  if (ONLY_MOST_READ) {
+    const existing = await strapi.documents(ARTICLE_UID).findMany({
+      filters: {
+        category: { slug: { $eq: 'most-read' } },
+        tenant: { id: { $eq: tenantDoc.id } },
+      },
+      fields: ['slug'],
+      limit: 500,
+    });
+    const list = Array.isArray(existing) ? existing : existing?.results || [];
+    console.log('Removing', list.length, 'existing most-read article(s) for tenant before re-import...');
+    for (const row of list) {
+      const docId = row.documentId ?? row.document_id;
+      if (!docId) continue;
+      try {
+        await strapi.documents(ARTICLE_UID).delete({ documentId: docId });
+      } catch (e) {
+        console.warn('  Delete most-read skip', docId, e.message);
+      }
+    }
+  }
 
   const categoryMap = await ensureCategories(strapi);
-  const ARTICLE_UID = 'api::article.article';
   const usedSlugs = new Set();
 
   async function createWithCoverFallback(data, coverConnect) {
@@ -729,6 +1002,9 @@ async function runImport(strapi, cloneDir, tenantDoc) {
   for (const art of articles) {
     try {
       let slug = art.slug;
+      if (slugSuffix && !String(slug).endsWith(slugSuffix)) {
+        slug = `${slug}${slugSuffix}`;
+      }
       if (usedSlugs.has(slug)) {
         let suffix = 1;
         while (usedSlugs.has(slug + '-' + suffix)) suffix++;
@@ -744,7 +1020,12 @@ async function runImport(strapi, cloneDir, tenantDoc) {
 
       let coverConnect = null;
       if (art.imagePath) {
-        const uploaded = await resolveAndUploadImage(strapi, cloneDir, art.htmlBaseDir, art.imagePath);
+        const cacheKey = String(art.imagePath);
+        let uploaded = coverCache.get(cacheKey);
+        if (uploaded === undefined) {
+          uploaded = await resolveAndUploadImage(strapi, cloneDir, art.htmlBaseDir, art.imagePath);
+          coverCache.set(cacheKey, uploaded || null);
+        }
         if (uploaded) coverConnect = { connect: [{ documentId: uploaded.documentId }] };
       }
 
@@ -817,17 +1098,30 @@ async function runImport(strapi, cloneDir, tenantDoc) {
 }
 
 async function main() {
-  const cloneDir = path.resolve(
-    process.argv[2] || process.env.STRAPI_NEWS_CLONE_DIR || DEFAULT_CLONE_DIR
-  );
-  const tenantId = process.env.TENANT_ID || DEFAULT_TENANT_ID;
+  const positional = process.argv.slice(2).find((a) => a && !String(a).startsWith('--'));
+  const cloneDir = path.resolve(positional || process.env.STRAPI_NEWS_CLONE_DIR || DEFAULT_CLONE_DIR);
+  const tenantsArg = getArg('tenants', '');
+  const singleTenant = getArg('tenant-id', process.env.TENANT_ID || DEFAULT_TENANT_ID);
+  const tenantIds = tenantsArg
+    ? tenantsArg.split(',').map((s) => s.trim()).filter(Boolean)
+    : [singleTenant];
 
-  if (!fs.existsSync(cloneDir)) {
+  if (!LIVE_MODE && !fs.existsSync(cloneDir)) {
     console.error('Clone directory not found:', cloneDir);
-    console.error('Usage: npm run seed:news_catholicatenews -- "E:\\path\\to\\catholicatenews-in-temp"');
-    console.error('   or: STRAPI_NEWS_CLONE_DIR=/path/to/clone npm run seed:news_catholicatenews');
+    console.error('Usage: npm run seed:news_catholicatenews -- --live --months=5');
+    console.error('   or: npm run seed:news_catholicatenews -- "C:\\project_workspace\\catholicatenews-in-temp"');
     process.exit(1);
   }
+  if (LIVE_MODE && !fs.existsSync(cloneDir)) {
+    fs.mkdirSync(cloneDir, { recursive: true });
+    console.log('Live mode: clone dir missing; created placeholder', cloneDir);
+  }
+
+  console.log('Mode:', LIVE_MODE || ONLY_MOST_READ ? 'live' : 'clone');
+  if (ONLY_MOST_READ) console.log('Only Most Read (homepage section)');
+  console.log('Clone dir:', cloneDir);
+  console.log('Tenants:', tenantIds.join(', '));
+  if (MONTHS > 0 && !ONLY_MOST_READ) console.log('Months window:', MONTHS);
 
   const { createStrapi, compileStrapi } = require('@strapi/strapi');
   const appContext = await compileStrapi();
@@ -835,16 +1129,33 @@ async function main() {
   app.log.level = 'error';
 
   try {
-    const tenant = await getOrCreateTenant(app, tenantId);
-    console.log('Tenant:', tenantId, tenant?.id ?? tenant?.documentId);
-    const adminUser = await findOneAdminUserForTenant(app, tenantId);
-    if (adminUser) {
-      console.log('Running import as editor:', adminUser.email);
-    } else {
-      console.log('No editor assigned to tenant; tenant will be set via backfill.');
+    console.log('Collecting articles once for all tenants...');
+    const articles = await collectAllArticles(cloneDir);
+    if (articles.length === 0) {
+      console.error('No articles collected.');
+      process.exitCode = 1;
+      return;
     }
-    // Run without requestContext to avoid tenant middleware filtering; tenant is set explicitly in data + backfill
-    await runImport(app, cloneDir, tenant);
+    const dated = articles.filter((a) => a.publishedAt).length;
+    console.log(`Collected ${articles.length} unique articles (${dated} with publishedAt)`);
+
+    const coverCache = new Map();
+    for (const tenantId of tenantIds) {
+      console.log('\n=== Import for tenant', tenantId, '===');
+      const tenant = await getOrCreateTenant(app, tenantId);
+      console.log('Tenant:', tenantId, tenant?.id ?? tenant?.documentId);
+      const adminUser = await findOneAdminUserForTenant(app, tenantId);
+      if (adminUser) {
+        console.log('Editor mapping found:', adminUser.email);
+      } else {
+        console.log('No editor assigned to tenant; tenant will be set via backfill.');
+      }
+      const slugSuffix =
+        tenantId === 'mosc_malankara_orthodox_2'
+          ? getArg('slug-suffix', '-mo2')
+          : getArg('slug-suffix', '');
+      await runImport(app, cloneDir, tenant, articles, { slugSuffix, coverCache });
+    }
   } catch (err) {
     console.error(err);
     process.exitCode = 1;

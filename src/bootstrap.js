@@ -288,27 +288,28 @@ async function registerTenantRBACConditions() {
       category: 'Multi-tenant',
       async handler(user) {
         if (!user) return { id: { $eq: null } };
-        let email = user.email;
-        if (!email && user.id) {
-          const adminUser = await strapi.db.query('admin::user').findOne({
-            where: { id: user.id },
-            select: ['email'],
-          });
-          email = adminUser?.email;
+        const {
+          getTenantsForEmail,
+          resolveTenantFromRequestContext,
+        } = require('./utils/tenant-assignment');
+
+        // Prefer Active tenant switcher (X-Active-Tenant-Id) when the editor has multiple assignments.
+        let tenantDoc = await resolveTenantFromRequestContext(strapi);
+        if (!tenantDoc) {
+          let email = user.email;
+          if (!email && user.id) {
+            const adminUser = await strapi.db.query('admin::user').findOne({
+              where: { id: user.id },
+              select: ['email'],
+            });
+            email = adminUser?.email;
+          }
+          if (!email) return { id: { $eq: null } };
+          const assigned = await getTenantsForEmail(strapi, email);
+          tenantDoc = assigned[0] || null;
         }
-        if (!email) return { id: { $eq: null } };
-        const emailLower = String(email).toLowerCase();
-        const mappings = await strapi.db.query('api::editor-tenant.editor-tenant').findMany({
-          where: {},
-          populate: { tenant: true },
-        });
-        const mapping = mappings.find(
-          (m) => (m.adminUserEmail || '').toLowerCase() === emailLower
-        );
-        if (!mapping?.tenant) {
-          return { id: { $eq: null } };
-        }
-        const tenantDoc = mapping.tenant;
+        if (!tenantDoc) return { id: { $eq: null } };
+
         const tenantDocumentId = tenantDoc.documentId ?? tenantDoc.document_id;
         const tenantId = tenantDoc.id != null ? Number(tenantDoc.id) : null;
         if (tenantId == null && !tenantDocumentId) return { id: { $eq: null } };
