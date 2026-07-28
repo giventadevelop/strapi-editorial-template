@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flash News Article Link Fix — Analysis &amp; Production Import</title>
+  <style>
+    :root {
+      --code-bg: #e8f4f8;
+      --code-fg: #0d3b66;
+      --code-border: #b8d4e3;
+    }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      line-height: 1.6;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+      color: #1a2332;
+      background: #f7fbff;
+    }
+    h1 { color: #0d3b66; border-bottom: 3px solid #2196f3; padding-bottom: 0.5rem; }
+    h2 { color: #0d3b66; margin-top: 2rem; }
+    h3 { color: #1565c0; margin-top: 1.25rem; }
+    .section-container {
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin: 1.25rem 0;
+      border: 1px solid transparent;
+    }
+    .section-container.analysis {
+      background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+      border-color: #2196f3;
+    }
+    .section-container.fix {
+      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+      border-color: #4caf50;
+    }
+    .section-container.warning {
+      background: linear-gradient(135deg, #fff8e1 0%, #ffe082 100%);
+      border-color: #ffc107;
+    }
+    .section-container.prompt {
+      background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+      border-color: #9c27b0;
+    }
+    .section-header {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin: 0 0 0.75rem;
+      color: #0d3b66;
+    }
+    .section-intro {
+      background: linear-gradient(90deg, #e3f2fd, #f7fbff);
+      border-left: 4px solid #2196f3;
+      padding: 0.85rem 1rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1rem 0;
+    }
+    .info {
+      background: #d1ecf1;
+      border: 1px solid #0c5460;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin: 1rem 0;
+      color: #0c5460;
+    }
+    .warning-box {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin: 1rem 0;
+      color: #856404;
+    }
+    .success {
+      background: #d4edda;
+      border: 1px solid #28a745;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin: 1rem 0;
+      color: #155724;
+    }
+    code, .code-highlight {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      border: 1px solid var(--code-border);
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      font-size: 0.92em;
+    }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      border: 1px solid var(--code-border);
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 0.9em;
+    }
+    .script-name {
+      background: linear-gradient(135deg, #7b1fa2, #9c27b0);
+      color: #fff;
+      padding: 0.15em 0.55em;
+      border-radius: 6px;
+      font-weight: 600;
+      border: none;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    th {
+      background: linear-gradient(135deg, #1976d2 0%, #42a5f5 100%);
+      color: #fff;
+      padding: 0.65rem 0.75rem;
+      text-align: left;
+    }
+    td {
+      border: 1px solid #c5e0f5;
+      padding: 0.55rem 0.75rem;
+    }
+    tr:hover td { background: #f0f8ff; }
+    .command-block {
+      border-radius: 12px;
+      border: 2px solid #2196f3;
+      background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+      margin: 1.25rem 0;
+      overflow: hidden;
+    }
+    .command-block.verify {
+      border-color: #4caf50;
+      background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    }
+    .command-block.expedite {
+      border-color: #9c27b0;
+      background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+    }
+    .command-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.65rem 1rem;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .command-type { font-weight: 700; color: #0d3b66; }
+    .command-header-buttons { display: flex; gap: 0.5rem; }
+    .copy-button, .copy-button-template {
+      border: none;
+      border-radius: 6px;
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+      background: #0d3b66;
+      color: #fff;
+    }
+    .copy-button-template { background: #5e35b1; }
+    .copy-button:hover, .copy-button-template:hover { opacity: 0.9; }
+    .command-parameters {
+      padding: 0 1rem 0.75rem;
+    }
+    .parameter-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+    .parameter-input label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #0d3b66;
+      margin-bottom: 0.25rem;
+    }
+    .parameter-input input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid #90caf9;
+      border-radius: 6px;
+    }
+    .command-content {
+      padding: 0 1rem 1rem;
+    }
+    .command-content pre {
+      margin: 0.35rem 0 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .prompt-block {
+      border-radius: 12px;
+      border: 2px solid #9c27b0;
+      background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+      margin: 1.25rem 0;
+      overflow: hidden;
+    }
+    .prompt-body {
+      padding: 0 1rem 1rem;
+      white-space: pre-wrap;
+      background: var(--code-bg);
+      color: var(--code-fg);
+      border: 1px solid var(--code-border);
+      border-radius: 8px;
+      margin: 0 1rem 1rem;
+      padding: 1rem;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    .meta { color: #546e7a; font-size: 0.9rem; margin-top: 2rem; }
+    ul { margin: 0.4rem 0; }
+    li { margin: 0.3rem 0; }
+  </style>
+</head>
+<body>
+  <h1>Flash News Article Link Fix</h1>
+  <p class="section-intro">
+    Analysis of why Flash News / Browse opened <strong>catholicatenews.in</strong>, what was fixed in local Strapi,
+    and how to apply the <strong>same flash-news-only</strong> data fix to production.
+    Frontend same-domain routing lives in the Next app; this Strapi project owns the data repair scripts and report.
+  </p>
+
+  <div class="section-container analysis">
+    <h2 class="section-header">1. Root cause analysis</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Finding</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Schema</td>
+          <td><code class="code-highlight">flash-news-item</code> has <code class="code-highlight">article</code> (relation) and <code class="code-highlight">externalUrl</code> (fallback when no article).</td>
+        </tr>
+        <tr>
+          <td>Imported data</td>
+          <td>Flash rows had <code class="code-highlight">externalUrl</code> → catholicatenews.in and <code class="code-highlight">article: null</code>, even when matching articles already existed in Strapi (same titles).</td>
+        </tr>
+        <tr>
+          <td>Frontend bug (Next)</td>
+          <td>Link builder preferred <code class="code-highlight">externalUrl</code> over article slug (docs say the opposite). Fixed in mosc-temp <code class="code-highlight">getNewsHomePageData.ts</code>.</td>
+        </tr>
+        <tr>
+          <td>Lifecycle pitfall</td>
+          <td><code class="code-highlight">flash-news-item</code> lifecycle strips/auto-assigns <code class="code-highlight">tenant</code> for admin editors only. API-token PUT of <code class="code-highlight">article</code> can leave published rows without tenant.</td>
+        </tr>
+        <tr>
+          <td>Populate pitfall</td>
+          <td>Article relation must point at the <strong>published</strong> article row. Linking a draft article id makes API <code class="code-highlight">populate=article</code> return null.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-container fix">
+    <h2 class="section-header">2. What was fixed locally (flash news only)</h2>
+    <ul>
+      <li>Linked 5 <code class="code-highlight">mosc_malankara_orthodox_2</code> flash items to published articles by title (item 5 Malayalam Russia → English Russia article).</li>
+      <li>Repaired tenant on published flash rows via <code class="code-highlight">POST /api/migration/fix-published</code>.</li>
+      <li>Ensured article link table points at published article ids so populate works.</li>
+      <li><strong>Did not</strong> change articles body, categories, ads, or other content types as the intended ops scope.</li>
+    </ul>
+    <p>Reference snapshot:</p>
+    <p><code class="script-name">documentation/data/flash-news-article-links-local-snapshot.json</code></p>
+  </div>
+
+  <div class="section-container warning">
+    <h2 class="section-header">3. Scope rules for production</h2>
+    <div class="warning-box">
+      <strong>Flash news only.</strong> Do not create/delete articles, re-seed news, change categories, media, or tenants.
+      Only update <code class="code-highlight">flash-news-items</code>: set <code class="code-highlight">article</code> relation + repair <code class="code-highlight">tenant</code> on published rows.
+      Keep <code class="code-highlight">externalUrl</code> as historical reference; frontend prefers article when present.
+    </div>
+  </div>
+
+  <h2>4. Production script</h2>
+  <p>Canonical script in this Strapi repo:</p>
+  <p><code class="script-name">scripts/link-flash-news-to-articles.mjs</code></p>
+
+  <div class="command-block setup"
+       data-command-type="setup"
+       data-command-base="node scripts/link-flash-news-to-articles.mjs"
+       data-template-command="node scripts/link-flash-news-to-articles.mjs --tenant-id=mosc_malankara_orthodox_2 --dry-run">
+    <div class="command-header">
+      <span class="command-type">Dry-run (production)</span>
+      <div class="command-header-buttons">
+        <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'flash-dry')" title="Copy template command">Template</button>
+        <button type="button" class="copy-button" onclick="copyCommand(this, 'flash-dry')" title="Copy customized command">Copy</button>
+      </div>
+    </div>
+    <div class="command-parameters">
+      <h5>Customize Parameters</h5>
+      <div class="parameter-group">
+        <div class="parameter-input">
+          <label for="flash-dry-tenant-id">tenant-id</label>
+          <input type="text" id="flash-dry-tenant-id" value="mosc_malankara_orthodox_2" oninput="updateCommand('flash-dry', 'tenant-id', this.value)">
+        </div>
+      </div>
+    </div>
+    <div class="command-content">
+      <div><strong>Windows single-line</strong></div>
+      <pre id="flash-dry-single-code">node scripts/link-flash-news-to-articles.mjs --tenant-id=mosc_malankara_orthodox_2 --dry-run</pre>
+    </div>
+  </div>
+
+  <div class="command-block expedite"
+       data-command-type="expedite"
+       data-command-base="node scripts/link-flash-news-to-articles.mjs"
+       data-template-command="node scripts/link-flash-news-to-articles.mjs --tenant-id=mosc_malankara_orthodox_2">
+    <div class="command-header">
+      <span class="command-type">Apply (production)</span>
+      <div class="command-header-buttons">
+        <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'flash-apply')" title="Copy template command">Template</button>
+        <button type="button" class="copy-button" onclick="copyCommand(this, 'flash-apply')" title="Copy customized command">Copy</button>
+      </div>
+    </div>
+    <div class="command-parameters">
+      <h5>Customize Parameters</h5>
+      <div class="parameter-group">
+        <div class="parameter-input">
+          <label for="flash-apply-tenant-id">tenant-id</label>
+          <input type="text" id="flash-apply-tenant-id" value="mosc_malankara_orthodox_2" oninput="updateCommand('flash-apply', 'tenant-id', this.value)">
+        </div>
+      </div>
+    </div>
+    <div class="command-content">
+      <div><strong>Windows single-line</strong></div>
+      <pre id="flash-apply-single-code">node scripts/link-flash-news-to-articles.mjs --tenant-id=mosc_malankara_orthodox_2</pre>
+    </div>
+  </div>
+
+  <div class="command-block verify"
+       data-command-type="verify"
+       data-command-base="node scripts/link-flash-news-to-articles.mjs"
+       data-template-command="node scripts/link-flash-news-to-articles.mjs --local --tenant-id=mosc_malankara_orthodox_2 --dry-run">
+    <div class="command-header">
+      <span class="command-type">Local dry-run</span>
+      <div class="command-header-buttons">
+        <button type="button" class="copy-button-template" onclick="copyTemplateCommand(this, 'flash-local')" title="Copy template command">Template</button>
+        <button type="button" class="copy-button" onclick="copyCommand(this, 'flash-local')" title="Copy customized command">Copy</button>
+      </div>
+    </div>
+    <div class="command-parameters">
+      <h5>Customize Parameters</h5>
+      <div class="parameter-group">
+        <div class="parameter-input">
+          <label for="flash-local-tenant-id">tenant-id</label>
+          <input type="text" id="flash-local-tenant-id" value="mosc_malankara_orthodox_2" oninput="updateCommand('flash-local', 'tenant-id', this.value)">
+        </div>
+      </div>
+    </div>
+    <div class="command-content">
+      <div><strong>Windows single-line</strong></div>
+      <pre id="flash-local-single-code">node scripts/link-flash-news-to-articles.mjs --local --tenant-id=mosc_malankara_orthodox_2 --dry-run</pre>
+    </div>
+  </div>
+
+  <div class="info">
+    <strong>Env required for production:</strong>
+    <code class="code-highlight">STRAPI_CLOUD_URL</code>,
+    <code class="code-highlight">STRAPI_CLOUD_API_TOKEN</code>
+    (from this project <code class="code-highlight">.env</code>).
+    Local: add <code class="code-highlight">--local</code> (uses <code class="code-highlight">STRAPI_LOCAL_*</code>).
+  </div>
+
+  <div class="section-container prompt">
+    <h2 class="section-header">5. Production import prompt (copy/paste for AI or operator)</h2>
+    <p>Use this prompt only for the flash-news article-link fix on Strapi Cloud. Nothing else.</p>
+
+    <div class="prompt-block">
+      <div class="command-header">
+        <span class="command-type">AI / operator prompt</span>
+        <div class="command-header-buttons">
+          <button type="button" class="copy-button" onclick="copyPromptText(this, 'prod-flash-prompt')" aria-label="Copy prompt to clipboard" title="Copy prompt">Copy prompt</button>
+        </div>
+      </div>
+      <div class="prompt-body" id="prod-flash-prompt">Apply the flash-news-only production data fix in the Strapi project at C:\project_workspace\strapi-editorial-template.
+
+Scope (strict):
+- ONLY flash-news-items for tenant mosc_malankara_orthodox_2
+- Link each flash item to an existing published article by title (prefer exact title; then 25-char prefix)
+- For the Malayalam Russia flash title with no matching Malayalam article, link to the English Russia visitation article (same story) using documentation/data/flash-news-article-links-local-snapshot.json as the reference
+- Keep externalUrl values; do not delete them
+- After linking articles, repair tenant on published flash rows via POST /api/migration/fix-published with uid api::flash-news-item.flash-news-item and tenantDocumentId — do NOT send publishedAt (avoids double-publishing drafts)
+- Do NOT create/update/delete articles, categories, media, ads, tenants, or any other content type
+- Do NOT run unrelated migration scripts
+
+Steps:
+1. cd C:\project_workspace\strapi-editorial-template
+2. Ensure .env has STRAPI_CLOUD_URL and STRAPI_CLOUD_API_TOKEN
+3. Dry-run: node scripts/link-flash-news-to-articles.mjs --tenant-id=mosc_malankara_orthodox_2 --dry-run
+4. Review the plan JSON (statuses: already-linked | link | no-match)
+5. Apply: node scripts/link-flash-news-to-articles.mjs --tenant-id=mosc_malankara_orthodox_2
+6. Verify: GET flash-news-items for the tenant with populate=article — each item should have article.slug; Next news Flash/Browse should open same-domain /mosc-redesign/news/{slug} (frontend already prefers article over externalUrl)
+
+Report: counts linked / already-linked / no-match, and any failures.</div>
+    </div>
+  </div>
+
+  <div class="success">
+    <strong>Expected result:</strong> Flash News ticker and Browse open
+    <code class="code-highlight">/mosc-redesign/news/{slug}</code> on the same domain (local or prod Next app),
+    not catholicatenews.in, for items that have matching Strapi articles.
+  </div>
+
+  <div class="warn" style="background:#fff3cd;border-left:4px solid #ffc107;padding:0.75rem 1rem;margin:1rem 0;color:#333;">
+    <strong>Cloud gotcha (Jul 2026):</strong> Publish-only articles (no draft row) reject relation PUT by
+    <code class="code-highlight">documentId</code> with
+    <code class="code-highlight">Document with id … locale "null" not found</code>.
+    The linker uses the article numeric <code class="code-highlight">id</code> for
+    <code class="code-highlight">PUT …/flash-news-items/{id}?status=published</code>, then repairs tenant via
+    <code class="code-highlight">fix-published</code> (no <code class="code-highlight">publishedAt</code>).
+  </div>
+
+  <h2>6. Files in this Strapi project</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Path</th>
+        <th>Role</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code class="script-name">scripts/link-flash-news-to-articles.mjs</code></td>
+        <td>Production/local linker + tenant repair (flash only)</td>
+      </tr>
+      <tr>
+        <td><code class="script-name">documentation/data/flash-news-article-links-local-snapshot.json</code></td>
+        <td>Reference of local corrected mappings (title → articleSlug)</td>
+      </tr>
+      <tr>
+        <td><code class="script-name">documentation/flash_news_article_link_fix.html</code></td>
+        <td>This analysis + production prompt</td>
+      </tr>
+      <tr>
+        <td><code class="script-name">scripts/_export-flash-snapshot.mjs</code></td>
+        <td>Optional: re-export local snapshot when Strapi local is running</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="meta">Related Next.js change (not in this repo): mosc-temp <code class="code-highlight">src/app/mosc-redesign/(syro)/news/getNewsHomePageData.ts</code> — prefer article slug over externalUrl + title enrichment fallback.</p>
+
+  <script>
+    function feedback(btn, ok) {
+      const prev = btn.textContent;
+      btn.textContent = ok ? 'Copied!' : 'Failed';
+      setTimeout(() => { btn.textContent = prev; }, 1500);
+    }
+    function copyText(btn, text) {
+      navigator.clipboard.writeText(text).then(() => feedback(btn, true)).catch(() => feedback(btn, false));
+    }
+    function copyCommand(btn, id) {
+      const el = document.getElementById(id + '-single-code');
+      if (el) copyText(btn, el.textContent.trim());
+    }
+    function copyTemplateCommand(btn, id) {
+      const block = btn.closest('.command-block');
+      const tpl = block?.getAttribute('data-template-command') || '';
+      copyText(btn, tpl);
+    }
+    function copyPromptText(btn, id) {
+      const el = document.getElementById(id);
+      if (el) copyText(btn, el.textContent.trim());
+    }
+    function updateCommand(id, param, value) {
+      const block = document.querySelector(`[data-command-base] .command-content pre#${id}-single-code`)?.closest('.command-block')
+        || document.getElementById(id + '-single-code')?.closest('.command-block');
+      if (!block) return;
+      const base = block.getAttribute('data-command-base') || '';
+      const dry = id.includes('dry') || id.includes('local') ? ' --dry-run' : '';
+      const local = id.includes('local') ? ' --local' : '';
+      const tenant = (document.getElementById(id + '-tenant-id')?.value || 'mosc_malankara_orthodox_2').trim();
+      const line = `${base}${local} --tenant-id=${tenant}${dry}`.replace(/\s+/g, ' ').trim();
+      const pre = document.getElementById(id + '-single-code');
+      if (pre) pre.textContent = line;
+      block.setAttribute('data-template-command', line);
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      ['flash-dry', 'flash-apply', 'flash-local'].forEach((id) => {
+        const input = document.getElementById(id + '-tenant-id');
+        if (input) updateCommand(id, 'tenant-id', input.value);
+      });
+    });
+  </script>
+</body>
+</html>

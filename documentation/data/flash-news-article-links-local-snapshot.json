@@ -1,0 +1,58 @@
+{
+  "tenantId": "mosc_malankara_orthodox_2",
+  "exportedAt": "2026-07-28T18:00:00.000Z",
+  "source": "local Strapi after flash-news article-link fix (verified via API populate)",
+  "purpose": "Reference for production flash-news article linking only — do not bulk-import documentIds; match by title on target env",
+  "count": 5,
+  "items": [
+    {
+      "title": "അനുതാപ ഹൃദയത്തോടെ വിശുദ്ധിയിലേക്ക് വളരുക: പരിശുദ്ധ കാതോലിക്കാ ബാവാ",
+      "content": "അനുതാപ ഹൃദയത്തോടെ വിശുദ്ധിയിലേക്ക് വളരുക: പരിശുദ്ധ കാതോലിക്കാ ബാവാ",
+      "order": 1,
+      "externalUrl": "https://catholicatenews.in/%e0%b4%85%e0%b4%a8%e0%b5%81%e0%b4%a4%e0%b4%be%e0%b4%aa-%e0%b4%b9%e0%b5%83%e0%b4%a6%e0%b4%af%e0%b4%a4%e0%b5%8d%e0%b4%a4%e0%b5%8b%e0%b4%9f%e0%b5%86-%e0%b4%b5%e0%b4%bf%e0%b4%b6%e0%b5%81%e0%b4%a6%e0%b5%8d/",
+      "articleSlug": "article-1-xx3tv22h-mo2",
+      "articleTitleHint": "same title as flash item",
+      "matchStrategy": "exact-title"
+    },
+    {
+      "title": "പരിശുദ്ധ ബസേലിയോസ് മാർത്തോമ്മാ മാത്യൂസ് ദ്വിതീയൻ കാതോലിക്കാ ബാവായുടെ ഓർമ്മപ്പെരുന്നാൾ ജനുവരി 25ന് കൊടിയേറും.",
+      "content": "പരിശുദ്ധ ബസേലിയോസ് മാർത്തോമ്മാ മാത്യൂസ് ദ്വിതീയൻ കാതോലിക്കാ ബാവായുടെ ഓർമ്മപ്പെരുന്നാൾ ജനുവരി 25ന് കൊടിയേറും.",
+      "order": 2,
+      "externalUrl": "https://catholicatenews.in/%e0%b4%aa%e0%b4%b0%e0%b4%bf%e0%b4%b6%e0%b5%81%e0%b4%a6%e0%b5%8d%e0%b4%a7-%e0%b4%ac%e0%b4%b8%e0%b5%87%e0%b4%b2%e0%b4%bf%e0%b4%af%e0%b5%8b%e0%b4%b8%e0%b5%8d-%e0%b4%ae%e0%b4%be%e0%b5%bc%e0%b4%a4-5/",
+      "articleSlug": "5-mo2",
+      "matchStrategy": "exact-title-or-prefix"
+    },
+    {
+      "title": "തദ്ദേശ തിരഞ്ഞെടുപ്പിലെ വിജയികൾക്ക് ആദരമൊരുക്കി മലങ്കരസഭ",
+      "content": "തദ്ദേശ തിരഞ്ഞെടുപ്പിലെ വിജയികൾക്ക് ആദരമൊരുക്കി മലങ്കരസഭ",
+      "order": 3,
+      "externalUrl": "https://catholicatenews.in/%e0%b4%a4%e0%b4%a6%e0%b5%8d%e0%b4%a6%e0%b5%87%e0%b4%b6-%e0%b4%a4%e0%b4%bf%e0%b4%b0%e0%b4%9e%e0%b5%8d%e0%b4%9e%e0%b5%86%e0%b4%9f%e0%b5%81%e0%b4%aa%e0%b5%8d%e0%b4%aa%e0%b4%bf%e0%b4%b2%e0%b5%86-%e0%b4%b5/",
+      "articleSlug": "article-2-3tr9gl10-mo2",
+      "matchStrategy": "exact-title"
+    },
+    {
+      "title": "Delegation of the Malankara Orthodox Syrian Church Visits Russia",
+      "content": "Delegation of the Malankara Orthodox Syrian Church Visits Russia",
+      "order": 4,
+      "externalUrl": "https://catholicatenews.in/delegation-of-the-malankara-orthodox-syrian-church-visits-russia-as-part-of-the-ongoing-bilateral-dialogue-between-the-malankara-orthodox-syrian-church-and-the-russian-orthodox-church-a-delegation-fr/",
+      "articleSlug": "delegation-of-the-malankara-orthodox-syrian-church-visits-russia-as-part-of-the-ongoing-bilateral-dialogue-between-the-malankara-orthodox-syrian-church-and-the-russian-orthodox-church-a-delegation-fr-mo2",
+      "matchStrategy": "exact-title"
+    },
+    {
+      "title": "മലങ്കര ഓർത്തഡോക്സ് സുറിയാനി സഭയുടെ പ്രതിനിധി സംഘം റഷ്യയിൽ.",
+      "content": "മലങ്കര ഓർത്തഡോക്സ് സുറിയാനി സഭയുടെ പ്രതിനിധി സംഘം റഷ്യയിൽ.",
+      "order": 5,
+      "externalUrl": "https://catholicatenews.in/%e0%b4%ae%e0%b4%b2%e0%b4%99%e0%b5%8d%e0%b4%95%e0%b4%b0-%e0%b4%93%e0%b5%bc%e0%b4%a4%e0%b5%8d%e0%b4%a4%e0%b4%a1%e0%b5%8b%e0%b4%95%e0%b5%8d%e0%b4%b8%e0%b5%8d-%e0%b4%b8%e0%b5%81%e0%b4%b1%e0%b4%bf%e0%b4%af/",
+      "articleSlug": "delegation-of-the-malankara-orthodox-syrian-church-visits-russia-as-part-of-the-ongoing-bilateral-dialogue-between-the-malankara-orthodox-syrian-church-and-the-russian-orthodox-church-a-delegation-fr-mo2",
+      "matchStrategy": "manual-fallback-same-story-as-english-russia-article",
+      "notes": "No Malayalam article with this title; link to English Russia visitation article (same story)."
+    }
+  ],
+  "pitfalls": [
+    "REST PUT of article alone can drop tenant on published flash-news-item rows (lifecycle auto-tenant only for admin editor users).",
+    "After linking, call POST /api/migration/fix-published with uid api::flash-news-item.flash-news-item and tenantDocumentId — omit publishedAt to avoid double-publishing drafts.",
+    "Relation must point at the published article row (not draft) or populate returns article:null.",
+    "Cloud publish-only articles: PUT article by documentId fails (locale null not found); use numeric entry id (script does this).",
+    "Scope: flash-news-items article relation + tenant repair only. Do not modify other content types."
+  ]
+}
