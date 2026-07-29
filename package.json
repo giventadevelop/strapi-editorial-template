@@ -57,6 +57,8 @@
     "export:news_tenant_demo": "node ./scripts/export_news_tenant_demo.js",
     "export:strip-uploads": "node ./scripts/strip_upload_entities_from_export.js",
     "seed:news_catholicatenews": "node ./scripts/data_import_seed_news_catholicatenews.js",
+    "enrich:article-descriptions-catholicatenews": "node ./scripts/enrich-article-descriptions-from-catholicatenews.js",
+    "repair:article-tenants-by-slug": "node ./scripts/repair-article-tenants-by-slug.js",
     "seed:parish-images": "node ./scripts/seed-parish-images.js",
     "import:liturgy-days-pdf": "node ./scripts/import-liturgy-days-from-pdf.js",
     "export:liturgy-days-pdf": "node ./scripts/export-liturgy-days-from-pdf-to-excel.js",

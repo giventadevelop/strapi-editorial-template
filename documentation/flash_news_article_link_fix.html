@@ -416,6 +416,12 @@ Report: counts linked / already-linked / no-match, and any failures.</div>
     The linker uses the article numeric <code class="code-highlight">id</code> for
     <code class="code-highlight">PUT …/flash-news-items/{id}?status=published</code>, then repairs tenant via
     <code class="code-highlight">fix-published</code> (no <code class="code-highlight">publishedAt</code>).
+    <br/><br/>
+    <strong>Empty description on detail:</strong> Title matching can pick <em>Most Read</em> stubs
+    (<code class="code-highlight">*-mr-mo2</code>) that have cover/title but empty
+    <code class="code-highlight">description</code>. Prefer snapshot main-news slugs
+    (<code class="code-highlight">5-mo2</code>, <code class="code-highlight">article-*-mo2</code>) and
+    articles with non-empty description; the linker will <code class="code-highlight">relink</code> stubs.
   </div>
 
   <h2>6. Files in this Strapi project</h2>

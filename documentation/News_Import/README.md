@@ -10,6 +10,7 @@ This folder documents importing news from [catholicatenews.in](https://catholica
 | Delete | `delete:articles` | Remove articles (categories kept) |
 | Seed articles | `seed:news_catholicatenews` | Import from clone or `--live` scrape |
 | Seed ads + flash | `seed:ads-flash-catholicatenews` | Live homepage scrape → ad slots + flash |
+| Enrich full descriptions | `enrich:article-descriptions-catholicatenews` | Scrape article detail pages → fill `description` |
 | Fix category/tenant | `fix:article_category_tenant` | Repair empty category/tenant in CM |
 | Push to Cloud | `push:tenant-to-cloud` | Upsert articles / flash / ads |
 | Restore dates | `sync:article-published-dates-cloud` | Fix `publishedAt` after Cloud publish |
@@ -21,7 +22,7 @@ This folder documents importing news from [catholicatenews.in](https://catholica
 1. **Stop Strapi** (avoids SQLite locks; admin sees data after restart).
 2. `npm run export:news_tenant_demo` — backup.
 3. `npm run delete:articles` — optional wipe (`DRY_RUN=1` first).
-4. Seed articles, then ads/flash (see commands below).
+4. Seed articles, then **enrich full descriptions**, then ads/flash (see commands below).
 5. **Restart Strapi** — Content Manager → Editorial – Article / Ads / Flash.
 
 ## Local scrape commands
@@ -30,12 +31,14 @@ This folder documents importing news from [catholicatenews.in](https://catholica
 # Articles from live site (last 12 months), both tenants
 npm run seed:news_catholicatenews -- --live --months=12 --tenants=tenant_demo_002,mosc_malankara_orthodox_2
 
+# Fill full article bodies (seed only stores listing excerpts)
+npm run enrich:article-descriptions-catholicatenews -- --tenants=tenant_demo_002,mosc_malankara_orthodox_2
+
 # Ads + flash from live homepage (positions: top, between_sections, sidebar)
 npm run seed:ads-flash-catholicatenews -- --tenants=tenant_demo_002,mosc_malankara_orthodox_2
-
-# Dry-run ads/flash only
-npm run seed:ads-flash-catholicatenews -- --dry-run
 ```
+
+The initial news seed only stores the **card excerpt** from category listings. Run `enrich:article-descriptions-catholicatenews` afterward so Editorial – Article `description` has the full body from each [catholicatenews.in](https://catholicatenews.in/) detail page. Updates write via DB (avoids Document Service wiping tenant).
 
 Ad position mapping (frontend):
 

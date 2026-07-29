@@ -107,6 +107,40 @@ function field(obj, k) {
   return null;
 }
 
+function descNonEmpty(desc) {
+  if (desc == null) return false;
+  if (typeof desc === 'string') return desc.trim().length > 0;
+  if (Array.isArray(desc)) return desc.length > 0;
+  return String(desc).trim().length > 0;
+}
+
+/** Prefer full articles over Most Read stubs (empty description / -mr- slug). */
+function pickBetterArticle(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  const score = (row) => {
+    let s = 0;
+    if (row.hasDescription) s += 10;
+    if (row.slug && !/-mr(?:-|$)/i.test(row.slug) && !/^most-read-/i.test(row.slug)) s += 5;
+    return s;
+  };
+  return score(b) > score(a) ? b : a;
+}
+
+function loadSnapshotPreferredSlugs() {
+  try {
+    const snap = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf8'));
+    const map = new Map();
+    for (const item of snap.items || []) {
+      const key = norm(item.title || item.content);
+      if (key && item.articleSlug) map.set(key, item.articleSlug);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 function loadManualFallbacks() {
   try {
     const snap = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf8'));
@@ -151,7 +185,7 @@ async function main() {
   );
   const articleList = await listAll(
     '/api/articles',
-    `${tenantFilter}&filters[publishedAt][$notNull]=true&fields[0]=title&fields[1]=slug&fields[2]=documentId&fields[3]=id`,
+    `${tenantFilter}&filters[publishedAt][$notNull]=true&fields[0]=title&fields[1]=slug&fields[2]=documentId&fields[3]=id&fields[4]=description`,
   );
 
   const articlesByDoc = new Map();
@@ -166,12 +200,22 @@ async function main() {
     // Cloud publish-only articles often have no draft row; Document Service
     // relation by documentId then fails with locale "null" not found.
     // Numeric entry id works for manyToOne connect on published flash rows.
-    const row = { documentId, id, title, slug };
+    const row = {
+      documentId,
+      id,
+      title,
+      slug,
+      hasDescription: descNonEmpty(field(a, 'description')),
+    };
     articlesByDoc.set(documentId, row);
-    if (title) articlesByTitle.set(norm(title), row);
     articlesBySlug.set(slug, row);
+    if (title) {
+      const key = norm(title);
+      articlesByTitle.set(key, pickBetterArticle(articlesByTitle.get(key), row));
+    }
   }
 
+  const snapshotSlugByTitle = loadSnapshotPreferredSlugs();
   const manualFallbackSlugByTitle = loadManualFallbacks();
   console.log(`Flash items: ${flashList.length}; unique published articles: ${articlesByDoc.size}`);
 
@@ -182,7 +226,36 @@ async function main() {
     const externalUrl = field(item, 'externalUrl');
     const existingArticle = item.article || item.attributes?.article;
     const existingSlug = field(existingArticle, 'slug');
-    if (existingSlug) {
+    const existingDescOk = descNonEmpty(field(existingArticle, 'description'));
+    const key = norm(title);
+
+    // 1) Snapshot preferred slug (local-verified full articles)
+    let match = null;
+    const preferredSlug = snapshotSlugByTitle.get(key);
+    if (preferredSlug && articlesBySlug.has(preferredSlug)) {
+      match = articlesBySlug.get(preferredSlug);
+    }
+
+    // 2) Exact / prefix title, preferring articles with description
+    if (!match) {
+      match = articlesByTitle.get(key) || null;
+    }
+    if (!match) {
+      const prefixHits = [...articlesByTitle.entries()]
+        .filter(([t]) => t.startsWith(key.slice(0, 25)) || key.startsWith(t.slice(0, 25)))
+        .map(([, row]) => row);
+      match = prefixHits.reduce((best, row) => pickBetterArticle(best, row), null);
+    }
+
+    // 3) Manual Russia Malayalam fallback
+    if (!match) {
+      const fallbackSlug = manualFallbackSlugByTitle.get(key);
+      if (fallbackSlug && articlesBySlug.has(fallbackSlug)) {
+        match = articlesBySlug.get(fallbackSlug);
+      }
+    }
+
+    if (existingSlug && match && existingSlug === match.slug && existingDescOk) {
       plan.push({
         flashDocumentId: documentId,
         flashTitle: title.slice(0, 80),
@@ -193,39 +266,42 @@ async function main() {
       continue;
     }
 
-    const key = norm(title);
-    let match = articlesByTitle.get(key) || null;
-    if (!match) {
-      match =
-        [...articlesByTitle.entries()].find(
-          ([t]) => t.startsWith(key.slice(0, 25)) || key.startsWith(t.slice(0, 25)),
-        )?.[1] || null;
-    }
-    if (!match) {
-      const fallbackSlug = manualFallbackSlugByTitle.get(key);
-      if (fallbackSlug && articlesBySlug.has(fallbackSlug)) {
-        match = articlesBySlug.get(fallbackSlug);
-      }
+    // Relink when missing, wrong target, or linked to empty Most Read stub
+    if (match && (!existingSlug || existingSlug !== match.slug || !existingDescOk)) {
+      plan.push({
+        flashDocumentId: documentId,
+        flashId: field(item, 'id'),
+        flashTitle: title.slice(0, 80),
+        status: existingSlug ? 'relink' : 'link',
+        articleDocumentId: match.documentId,
+        articleId: match.id,
+        articleSlug: match.slug,
+        previousSlug: existingSlug || null,
+        externalUrl,
+      });
+      continue;
     }
 
     plan.push({
       flashDocumentId: documentId,
       flashId: field(item, 'id'),
       flashTitle: title.slice(0, 80),
-      status: match ? 'link' : 'no-match',
-      articleDocumentId: match?.documentId || null,
-      articleId: match?.id || null,
-      articleSlug: match?.slug || null,
+      status: 'no-match',
+      articleDocumentId: null,
+      articleId: null,
+      articleSlug: null,
       externalUrl,
     });
   }
 
   console.log(JSON.stringify(plan, null, 2));
 
-  const toLink = plan.filter((p) => p.status === 'link');
+  const toLink = plan.filter((p) => p.status === 'link' || p.status === 'relink');
   const already = plan.filter((p) => p.status === 'already-linked');
   const noMatch = plan.filter((p) => p.status === 'no-match');
-  console.log(`Summary: link=${toLink.length} already-linked=${already.length} no-match=${noMatch.length}`);
+  console.log(
+    `Summary: link=${plan.filter((p) => p.status === 'link').length} relink=${plan.filter((p) => p.status === 'relink').length} already-linked=${already.length} no-match=${noMatch.length}`,
+  );
 
   if (DRY_RUN) {
     console.log('[dry-run] No Strapi updates written.');
@@ -263,7 +339,14 @@ async function main() {
       continue;
     }
     linkedIds.push(row.flashDocumentId);
-    console.log('Linked article', row.flashDocumentId, '→', row.articleSlug, `(id=${articleRef})`);
+    console.log(
+      row.status === 'relink' ? 'Relinked article' : 'Linked article',
+      row.flashDocumentId,
+      row.previousSlug ? `(was ${row.previousSlug})` : '',
+      '→',
+      row.articleSlug,
+      `(id=${articleRef})`,
+    );
   }
 
   if (linkedIds.length) {
