@@ -1,0 +1,37 @@
+---
+description: Strapi Cloud bootstrap — content-manager syncConfigurations and defaultSortBy/Order to prevent transfer/post-deploy CM errors
+globs: src/bootstrap.js, src/extensions/content-manager/**
+alwaysApply: false
+---
+
+# Strapi Cloud bootstrap — content-manager config sync and default sort
+
+Critical bootstrap steps in [`src/bootstrap.js`](mdc:src/bootstrap.js) that fix errors after data transfer to Strapi Cloud. Do not remove these without understanding the consequences.
+
+Media 404s after deploy are **not** fixed by bootstrap — use durable S3: [strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc](mdc:.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc).
+
+## Required order
+
+1. `ensureContentManagerConfigurations()` — runs content-manager `syncConfigurations()`
+2. `ensureArticleListSortAndColumns()` — Article-specific publishedAt column/sort
+3. `ensureCollectionTypesHaveDefaultSort()` — default sort for all collection types
+
+## Fixes applied
+
+| Step | Error it fixes |
+|------|----------------|
+| `ensureContentManagerConfigurations` | `TypeError: Cannot read properties of undefined (reading 'settings')` in `getContentTypesMeta` (homepage count-documents, recent-documents). After transfer, some content types have explorer.read permission but no config in core-store. |
+| `ensureCollectionTypesHaveDefaultSort` | `sort=undefined:undefined` in list API → 400 errors. Configs missing `defaultSortBy` / `defaultSortOrder`. |
+
+## Verification
+
+After deploy or transfer, verify:
+
+- Admin homepage loads without 500s on `/content-manager/homepage/count-documents` and `recent-documents`
+- Collection list views (e.g. Bishop) load without 400 on `sort=undefined`
+
+## Related
+
+- Content-manager extension: [`src/extensions/content-manager/strapi-server.js`](mdc:src/extensions/content-manager/strapi-server.js) (Article publishedAt injection, tenant filter)
+- Cloud setup: [`documentation/strapi_cloud_setup.html`](mdc:documentation/strapi_cloud_setup.html)
+- News Cloud repair (tenant/slug, not CM bootstrap): [strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](mdc:.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc)

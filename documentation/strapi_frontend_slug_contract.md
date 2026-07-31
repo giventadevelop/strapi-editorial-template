@@ -6,7 +6,7 @@ Share this document with the **Next.js** (or any consumer) project. It defines w
 
 - [catholicatenews_strapi_content_mapping.md](./catholicatenews_strapi_content_mapping.md) — full news page API examples
 - [api_reference.md](./api_reference.md) — query parameters and troubleshooting
-- [../.cursor/rules/strapi_production_news_tenant_categories.mdc](../.cursor/rules/strapi_production_news_tenant_categories.mdc) — tenant + slug runbook for Strapi maintainers
+- [../.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](../.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc) — tenant + slug runbook for Strapi maintainers
 
 ---
 

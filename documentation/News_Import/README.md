@@ -50,7 +50,7 @@ Ad position mapping (frontend):
 
 **Tenant:** `mosc_malankara_orthodox_2` (live). Demo: `tenant_demo_002`.
 
-**Images:** use durable S3 (`--skip-api`), not ephemeral Cloud `/uploads/`. See `.cursor/rules/strapi-cloud-image-upload-migration.mdc`.
+**Images:** use durable S3 (`--skip-api`), not ephemeral Cloud `/uploads/`. See `.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc`.
 
 ```bash
 # PowerShell if TLS issues:

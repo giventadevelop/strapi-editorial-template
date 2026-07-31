@@ -1,0 +1,199 @@
+---
+description: Strapi 5 Content API frontend query patterns — tenant filter, publishedAt, array populate, pagination, media URL helpers
+globs: documentation/api_reference.md, documentation/strapi_frontend_slug_contract.md, documentation/catholicatenews_strapi_content_mapping.md, documentation/news_portal/**/*, documentation/production-news-tenant-field-issue.html
+alwaysApply: false
+---
+
+# Strapi 5 Content API — frontend query patterns (tenant, populate, published)
+
+Correct patterns for Strapi 5 Content API calls from Next.js (or any consumer). Incorrect syntax causes 400 Bad Request errors.
+
+**Slug casing policy** (use `$eq` with kebab-case; `$eqi` only as legacy): see [strapi-nextjs-frontend-slug-contract-kebab-case-category-filters.mdc](mdc:.cursor/rules/strapi-nextjs-frontend-slug-contract-kebab-case-category-filters.mdc) and [strapi_frontend_slug_contract.md](mdc:documentation/strapi_frontend_slug_contract.md).
+
+**Cloud tenant/category repair** (when lists return 0 despite local data): [strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](mdc:.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc).
+
+## Problem solved
+
+- **status=published** – Can cause validation errors in Strapi 5; use `filters[publishedAt][$notNull]=true` instead
+- **Comma-separated populate** – `populate=cover,category,author` triggers 400s; Strapi 5 expects array-style populate
+- **Empty tenant lists** – Never drop the tenant filter when the API returns 200 with 0 items
+
+## Tenant filtering (required — no fallback)
+
+All directory and news list/detail requests **must** use the tenant filter. Display only data scoped to the current tenant.
+
+### DO: Always filter by tenant
+
+- **Directory** (e.g. bishops, parishes): `filters[tenant][tenantId][$eq]=${tenantId}` — no fallback. If the API returns 200 with 0 items, show 0 items.
+- **News** (articles, flash-news-items, advertisement-slots): Same. Always include `filters[tenant][tenantId][$eq]=${tenantId}`. Do **not** retry without the tenant filter when the response is 200 with empty data.
+
+### DON'T: Fall back to no-tenant when response is 200 with 0 items
+
+```typescript
+// ❌ DON'T: Retry without tenant when tenant filter returns 0 items
+if (list.length === 0) {
+  const noTenant = await fetch('/articles?filters[publishedAt][$notNull]=true&...');
+  list = noTenant.data; // Wrong — shows other tenants' data
+}
+```
+
+When the API returns **200** with an empty list, show no items (and ensure entries in Strapi have the tenant relation set). The only exception is the **400 Bad Request** fallback below (different endpoints, different reason).
+
+## Published state filter
+
+### DO: Use `filters[publishedAt][$notNull]=true`
+
+```typescript
+// ✅ DO: Filter for published documents
+const query = `filters[publishedAt][$notNull]=true`;
+```
+
+### DON'T: Use `status=published`
+
+```typescript
+// ❌ DON'T: Can cause validation errors in Strapi 5
+const query = `status=published`;
+```
+
+## Populate parameter (array-style)
+
+### DO: Use array-style populate
+
+```typescript
+// ✅ DO: Array-style populate for Strapi 5
+const POPULATE = 'populate[0]=cover&populate[1]=category&populate[2]=author';
+
+// Full example
+const path = `/articles?filters[tenant][tenantId][$eq]=${tenantId}&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[pageSize]=10`;
+```
+
+### DON'T: Use comma-separated populate
+
+```typescript
+// ❌ DON'T: Triggers 400 Bad Request in Strapi 5
+const POPULATE = 'populate=cover,category,author';
+```
+
+### Exception: simple populate
+
+For single-field populate (e.g. `populate=media`), the simple format may work. If you encounter 400s, switch to `populate[0]=media`.
+
+## Example article query URLs
+
+### Featured News (category slug — preferred)
+
+```
+GET /api/articles?filters[category][slug][$eq]=featured-news&filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[pageSize]=6
+```
+
+### Featured News (`isFeatured` alternative)
+
+```
+GET /api/articles?filters[isFeatured][$eq]=true&filters[tenant][tenantId][$eq]=tenant_demo_002&filters[publishedAt][$notNull]=true&populate[0]=cover&populate[1]=category&populate[2]=author&sort=publishedAt:desc&pagination[pageSize]=6
+```
+
+### Main News / Press Release / Most Read
+
+Same pattern with `filters[category][slug][$eq]=main-news` (or `press-release`, `most-read`), plus tenant + publishedAt + array populate.
+
+**Category slugs:** prefer `$eq` with lowercase kebab-case after production slug backfill. Use `$eqi` only for legacy mixed-case data — see the slug contract rule.
+
+## Article detail page (slug or id)
+
+Detail routes accept slug, numeric id, or documentId:
+
+1. **documentId** (first when param looks like documentId): `filters[documentId][$eq]=<documentId>` — alphanumeric 15–35 chars. Try documentId first when param matches `/^[a-z0-9]{15,35}$/`.
+2. **Slug** (text): `filters[slug][$eq]=<slug>` — preferred for SEO (use `$eqi` only if legacy casing may remain).
+3. **Numeric id** (e.g. `7`): `filters[id][$eq]=7` — when slug is empty.
+
+Article links use: `article.slug || article.documentId || article.id`.
+
+### Article not found: troubleshooting
+
+When the API returns 200 but 0 items:
+
+- **Try documentId first** when the URL param looks like a Strapi 5 documentId.
+- **Tenant**: Article must have `tenant.tenantId` matching the app tenant. Do **not** retry without tenant.
+- **publishedAt**: Article must be Published. Filter excludes drafts.
+
+## Advertisement slots (sidebar + top)
+
+```
+filters[$or][0][position][$eq]=sidebar&filters[$or][1][position][$eq]=top
+```
+
+Split results client-side by `position`.
+
+## Native Strapi 5 response format
+
+Do **not** send `Strapi-Response-Format: v4`. Use native Strapi 5 flattened responses.
+
+## Media / relation URL extraction (Strapi 4 vs 5)
+
+Strapi 5 media URLs are no longer only at `relation.data.attributes.url`.
+
+### DO: Helper that supports both formats
+
+```typescript
+function getMediaUrl(media: unknown, baseUrl: string): string | null {
+  if (!media || !baseUrl) return null;
+  const m = media as Record<string, unknown>;
+  let url: string | undefined;
+  url = m?.url as string | undefined;
+  if (!url) url = (m?.data as Record<string, unknown>)?.url as string | undefined;
+  if (!url) {
+    const attrs = (m?.data as Record<string, unknown>)?.attributes as Record<string, unknown> | undefined;
+    url = attrs?.url as string | undefined;
+  }
+  if (!url) return null;
+  return url.startsWith('http') ? url : `${baseUrl}${url}`;
+}
+```
+
+### DON'T: Assume only Strapi 4 structure
+
+```typescript
+// ❌ DON'T: Only handles Strapi 4
+const url = media?.data?.attributes?.url;
+```
+
+Apply to: article `cover`, advertisement-slot `media`, promotional `thumbnail`.
+
+## List endpoints: pagination and 400-only fallback
+
+Use `pagination[page]=1` and `pagination[pageSize]=N` (not only `pagination[limit]=N`).
+
+### DO: `pagination[pageSize]`
+
+```typescript
+'pagination[page]=1&pagination[pageSize]=1'
+```
+
+### 400-only fallback (not for 200 with 0 items)
+
+Retry without tenant **only** when the request returns **400 Bad Request**. Never when 200 with empty data.
+
+- **Articles, bishops, flash-news-items, advertisement-slots**: Always use tenant filter.
+- **Exception**: Endpoints that return 400 with tenant + pagination (e.g. `catholicos-entries`) may try without tenant first for a narrow fallback (e.g. Catholicos image).
+
+```typescript
+const pathsToTry = [
+  `catholicos-entries?pagination[pageSize]=1&populate[0]=image`,
+  `catholicos-entries?filters[tenant][tenantId][$eq]=${encodeURIComponent(tenantId)}&pagination[pageSize]=1&populate[0]=image`,
+];
+let res: Response | null = null;
+for (const path of pathsToTry) {
+  res = await fetch(`${base}/${path}`, { headers: getStrapiHeaders(), cache: 'no-store' });
+  if (res.ok) break;
+}
+```
+
+## Editor cover dimensions (pointer only)
+
+Pixel/quality guidance for news covers: [image_upload_spec.md](mdc:documentation/news_portal/strapi/image_upload_spec.md). Durable Cloud media: [strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc](mdc:.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc).
+
+## Related rules
+
+- [strapi-nextjs-frontend-slug-contract-kebab-case-category-filters.mdc](mdc:.cursor/rules/strapi-nextjs-frontend-slug-contract-kebab-case-category-filters.mdc) — category slug `$eq` / kebab constants
+- [strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](mdc:.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc) — Cloud repair when tenant filter returns 0
+- API reference: [api_reference.md](mdc:documentation/api_reference.md) / [news_portal/strapi/api_reference.md](mdc:documentation/news_portal/strapi/api_reference.md)

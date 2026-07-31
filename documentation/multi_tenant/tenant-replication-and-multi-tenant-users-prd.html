@@ -638,7 +638,7 @@ Requirements:
 2. Process ~30 tenant-scoped collection types in dependency order (dioceses before parishes/priests; kalpana-editions before kalpana-documents; articles last).
 3. Maintain oldDocumentId→newDocumentId map; remap internal relations; set tenant to target.
 4. Handle article draft/publish rows and tenant join tables (see src/bootstrap.js registerTenantPublishMiddleware).
-5. Reuse S3 media files where possible; use files_related_mph for media links per .cursor/rules/strapi-media-relation-image-upload-fix.mdc.
+5. Reuse S3 media files where possible; use files_related_mph for media links per .cursor/rules/strapi5-document-service-media-relation-link-via-files-related-mph.mdc.
 6. Skip or document single types directory-home and kalpana-page (Strapi singleType limit).
 7. Add npm script clone:tenant and scripts/inventory-tenant-records.js for pre-clone counts.
 8. Do not implement multi-tenant editor schema until Phase 2 is approved.
@@ -674,7 +674,7 @@ Test: dry-run on tenant_demo_002 locally; verify counts with --tenant-id filter.
       <tr><td>Full push ordering</td><td><code>scripts/rest_api_push_to_cloud.js</code> (PUSH_FIRST)</td></tr>
       <tr><td>Admin user guide</td><td><code>documentation/user_guide/admin_user_guide.html</code></td></tr>
       <tr><td>Export/import guide</td><td><code>documentation/strapi5_export_import_transfer.html</code></td></tr>
-      <tr><td>Production tenant repair</td><td><code>.cursor/rules/strapi_production_news_tenant_categories.mdc</code></td></tr>
+      <tr><td>Production tenant repair</td><td><code>.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc</code></td></tr>
     </tbody>
   </table>
 

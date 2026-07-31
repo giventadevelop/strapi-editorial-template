@@ -1,10 +1,10 @@
 ---
-description: Strapi→Next.js slug contract — kebab-case category filters, article URLs, no frontend validation on read
-globs: documentation/**/*.md,documentation/**/*.html,scripts/debug-production-news.mjs,scripts/normalize-production-slugs.mjs,scripts/data_import_seed_news_catholicatenews.js
+description: Strapi→Next.js slug contract — kebab-case category filters with $eq, article URLs as returned, no frontend validation on read
+globs: documentation/**/*.md, documentation/**/*.html, scripts/debug-production-news.mjs, scripts/normalize-production-slugs.mjs, scripts/data_import_seed_news_catholicatenews.js
 alwaysApply: false
 ---
 
-# Strapi frontend slug contract
+# Strapi → Next.js frontend slug contract (kebab-case category filters)
 
 **Canonical doc (share with Next.js):** [strapi_frontend_slug_contract.md](mdc:documentation/strapi_frontend_slug_contract.md)
 
@@ -12,7 +12,7 @@ alwaysApply: false
 
 - **Category API filters:** Use exact lowercase kebab-case: `main-news`, `featured-news`, `press-release`, `most-read` (not `Main-News`).
 - **Article routes:** Use `article.slug` from Strapi API **as returned** — no client-side casing changes on read.
-- **Tenant + published:** Always `filters[tenant][tenantId][$eq]=...` and `filters[publishedAt][$notNull]=true` for news lists.
+- **Tenant + published:** Always `filters[tenant][tenantId][$eq]=...` and `filters[publishedAt][$notNull]=true` for news lists (query syntax details: [strapi5-content-api-frontend-query-patterns-tenant-populate-published.mdc](mdc:.cursor/rules/strapi5-content-api-frontend-query-patterns-tenant-populate-published.mdc)).
 - **No duplicate validation** on read paths — Strapi normalizes slugs on save via [`normalize-slug.js`](mdc:src/utils/normalize-slug.js).
 
 ## Frontend does NOT need
@@ -40,7 +40,8 @@ export const STRAPI_NEWS_CATEGORY_SLUGS = {
 
 ## Related rules
 
-- [strapi_production_news_tenant_categories.mdc](mdc:.cursor/rules/strapi_production_news_tenant_categories.mdc) — tenant on publish, Cloud repair, naming standards
+- [strapi5-content-api-frontend-query-patterns-tenant-populate-published.mdc](mdc:.cursor/rules/strapi5-content-api-frontend-query-patterns-tenant-populate-published.mdc) — tenant / populate / publishedAt query syntax
+- [strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](mdc:.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc) — tenant on publish, Cloud repair, naming standards
 - [catholicatenews_strapi_content_mapping.md](mdc:documentation/catholicatenews_strapi_content_mapping.md) — full API examples per page section
 
 ## When updating docs or scripts

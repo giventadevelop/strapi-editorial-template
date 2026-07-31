@@ -1,10 +1,10 @@
 ---
-description: Production Strapi Cloud images must use durable S3 (not ephemeral /uploads); tenant commands, script map, post-deploy policy
+description: Production Strapi Cloud images must use durable S3 (not ephemeral /uploads); tenants, script map, post-deploy policy
 globs: scripts/push-*-to-cloud.js, scripts/push-collection-images-migration.js, scripts/push-collection-images-s3-to-cloud.js, scripts/push-all-collection-images-s3-to-cloud.js, scripts/finish-collection-images-on-cloud.js, scripts/finish-all-collection-images-on-cloud.js, scripts/lib/cloud-image-migration-config.js, scripts/lib/push-collection-images-s3.js, scripts/lib/liturgy-cli.js, src/index.js, config/env/**/plugins.js, documentation/front_end_based_collection_types_import/production_cloud_data_push/**/*, documentation/STRAPI_MEDIA_STORAGE_S3_CLOUD_PRD.html
 alwaysApply: false
 ---
 
-# Strapi Cloud image upload (production)
+# Strapi Cloud production — durable S3 images (not ephemeral `/uploads/`)
 
 ## Production policy (mandatory)
 
@@ -39,26 +39,14 @@ npm run finish:collection-images-on-cloud -- --collection=institutions --tenant-
 
 Always pass `--tenant-id=` explicitly. In [scripts/lib/liturgy-cli.js](mdc:scripts/lib/liturgy-cli.js), **CLI flags override `.env` `TENANT_ID`** — confirm the log line `Tenant: mosc_malankara_orthodox_2` before trusting the run.
 
-## News push gotchas (articles + ads)
+## News articles / ads (pointer only)
 
-- **`push:tenant-to-cloud` publish resets `publishedAt` to “now”.** After pushing articles, restore historical dates from local:
-  ```bash
-  npm run sync:article-published-dates-cloud -- --tenant-id=mosc_malankara_orthodox_2
-  ```
-  Uses `POST /api/migration/fix-published` (knex) so Document Service publish does not overwrite dates again.
-- **Cover PUT can drop tenant/category (and previously wiped title/slug).** After S3 article covers, re-link tenants. Prefer the orchestrator:
-  ```bash
-  npm run repair:cloud-news-sync -- --tenant-id=mosc_malankara_orthodox_2
-  ```
-  S3 linker preserves `title`/`slug`/… and maps category by **Cloud slug**; still re-run tenant fix after cover link.
-- **Clean article re-upload (conflicts):** `npm run wipe:cloud-articles-tenant -- --tenant-id=mosc_malankara_orthodox_2` then push articles only + dates + S3.
-- **Local ads/flash scrape:** `npm run seed:ads-flash-catholicatenews -- --tenants=tenant_demo_002,mosc_malankara_orthodox_2`
-- **Full news Cloud runbook:** [news-production-cloud-push-prd.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/news-production-cloud-push-prd.html)
-- **S3 register with `prod/` prefix while local media lives under `dev/`** creates Cloud URLs that **403** (object missing under prod). `push-collection-images-s3` now copies remote `dev/` bytes into the prod key before register. Emergency repair:
-  ```bash
-  node scripts/repair-cloud-ad-s3-from-dev.js
-  ```
-- Bucket has **ACLs disabled** — do not pass `ACL: public-read` on PutObject; rely on bucket policy for the prefix.
+For Cloud news dates, cover/tenant repair after S3 link, wipe/re-upload, ads/flash seed, and `dev/`→`prod/` S3 key repair, use:
+
+- [strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](mdc:.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc)
+- [news-production-cloud-push-prd.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/news-production-cloud-push-prd.html)
+
+Still use **this** rule’s strategy A (S3) for article `cover` / advertisement `media` collections.
 
 ## Two upload strategies
 
@@ -68,7 +56,7 @@ Use for any production / live-tenant image fix. Survives Strapi Cloud redeploys.
 
 ```bash
 # Stop local Strapi first (script embeds Strapi to read local DB).
-# Requires .env: STRAPI_CLOUD_URL, STRAPI_CLOUD_API_TOKEN, AWS_* (see below)
+# Requires .env: STRAPI_CLOUD_URL, STRAPI_CLOUD_API_TOKEN, AWS_*
 npm run push:collection-images-s3-to-cloud -- --collection=institutions --tenant-id=mosc_malankara_orthodox_2 --skip-api
 # optional flags: --skip-s3 | --link-existing | omit --skip-api to try Cloud /api/upload first
 npm run push:all-collection-images-s3-to-cloud -- --tenant-id=mosc_malankara_orthodox_2
@@ -76,10 +64,10 @@ npm run push:all-collection-images-s3-to-cloud -- --tenant-id=mosc_malankara_ort
 
 - Needs local `.env` AWS creds (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET_NAME`) writing to shared prod prefix (`S3_UPLOAD_PREFIX`, default `strapi-editorial-media/prod`).
 - Prefer Node matching local `better-sqlite3` (often Node 22 on this machine) if default shell Node breaks native modules.
-- ACL: omit when bucket is “Bucket owner enforced” — [strapi-s3-upload-acl-fix.mdc](mdc:.cursor/rules/strapi-s3-upload-acl-fix.mdc).
+- ACL: omit when bucket is “Bucket owner enforced” — [strapi-aws-s3-upload-omit-acl-when-bucket-owner-enforced.mdc](mdc:.cursor/rules/strapi-aws-s3-upload-omit-acl-when-bucket-owner-enforced.mdc).
 - Details: [STRAPI_MEDIA_STORAGE_S3_CLOUD_PRD.html](mdc:documentation/STRAPI_MEDIA_STORAGE_S3_CLOUD_PRD.html).
 
-**Success criteria:** every `image.url` (or `cover` / `cardImage` / `pdf`) is an **S3 absolute URL** and `HEAD` returns **200**.
+**Success criteria:** every `image.url` (or `cover` / `cardImage` / `pdf` / `media`) is an **S3 absolute URL** and `HEAD` returns **200**.
 
 ### B — Ephemeral quick fix (migration base64 → Cloud local disk) — **emergency only**
 
@@ -109,7 +97,7 @@ npm run finish:all-collection-images-on-cloud -- --tenant-id=mosc_malankara_orth
 | Cloud endpoint (`uploadMedia`, `linkCollectionImages`, `register-s3-media`) | [src/index.js](mdc:src/index.js) | — |
 | Upload provider config | [config/env/production/plugins.js](mdc:config/env/production/plugins.js) | Prefer `UPLOAD_PROVIDER=aws-s3` on Cloud |
 
-**`--collection` keys:** `catholicate`, `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `current-catholicos`, `institutions`, `dioceses`, `working-committees`, `managing-committees`, `training`, `spiritual-organisations`, `kalpana-editions`, `kalpana-documents`.
+**`--collection` keys** (from [cloud-image-migration-config.js](mdc:scripts/lib/cloud-image-migration-config.js)): `catholicate`, `ecumenical`, `saints`, `publications`, `theological-seminaries`, `holy-synod`, `current-catholicos`, `institutions`, `dioceses`, `working-committees`, `managing-committees`, `articles`, `advertisement-slots`, `training`, `spiritual-organisations`, `kalpana-editions`, `kalpana-documents`.
 
 Content-first (if entries missing): `npm run push:<section>-to-cloud -- --tenant-id=mosc_malankara_orthodox_2` (e.g. `push:institutions-to-cloud`), then images via **strategy A (S3)**.
 
@@ -137,3 +125,9 @@ Content-first (if entries missing): `npm run push:<section>-to-cloud -- --tenant
 1. Register in [cloud-image-migration-config.js](mdc:scripts/lib/cloud-image-migration-config.js) (`uid`, `table`, `tenantLinkTable`, `entryIdCol`, `restPlural`, `mediaField`).
 2. Document § Cloud image upload fix in the type’s `*-production-cloud-push-prd.html` — production path = **S3**, ephemeral = emergency only.
 3. Deploy Cloud if migration/`register-s3-media` endpoints changed, then run **S3** push for the production tenant (and demo if needed).
+
+## Related rules
+
+- [strapi-aws-s3-upload-omit-acl-when-bucket-owner-enforced.mdc](mdc:.cursor/rules/strapi-aws-s3-upload-omit-acl-when-bucket-owner-enforced.mdc) — ACL omit for provider + PutObject
+- [strapi5-document-service-media-relation-link-via-files-related-mph.mdc](mdc:.cursor/rules/strapi5-document-service-media-relation-link-via-files-related-mph.mdc) — local Document Service media morph linking
+- [strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](mdc:.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc) — news Cloud repair after image push

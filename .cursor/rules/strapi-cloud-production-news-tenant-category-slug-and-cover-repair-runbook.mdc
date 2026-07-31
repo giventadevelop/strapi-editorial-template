@@ -1,21 +1,23 @@
 ---
-description: Production MOSC news — tenant on publish, category slugs, naming standards, and Cloud repair runbook
-globs: src/bootstrap.js,src/utils/tenant-assignment.js,src/api/article/**/*,src/api/category/**/*,src/index.js,scripts/debug-production-news.mjs,scripts/repair-production-article-tenant*.mjs,scripts/normalize-production-category-slugs.mjs
+description: Production MOSC news — tenant on publish, category slugs, naming standards, Cloud image/cover repair, and push gotchas
+globs: src/bootstrap.js,src/utils/tenant-assignment.js,src/api/article/**/*,src/api/category/**/*,src/index.js,scripts/debug-production-news.mjs,scripts/repair-production-article-tenant*.mjs,scripts/normalize-production-category-slugs.mjs,scripts/repair-cloud-news-sync*,scripts/sync-article-published-dates*,scripts/wipe-cloud-articles*,scripts/seed-ads-flash*,scripts/repair-cloud-ad-s3*
 alwaysApply: false
 ---
 
-# Strapi Production News — Tenant, Categories, and Naming
+# Strapi Cloud production news — tenant, categories, slugs, and cover repair
 
 ## Problem (symptoms)
 
 - Production news page shows **“No articles”** while local works.
 - **Tenant filter** returns 0 when published rows lack `articles_tenant_lnk` (draft may have tenant; published does not).
 - **Category sections empty** when production slugs are `Main-News` but frontend filters `main-news`.
+- Covers/ads show placeholders after Cloud push or when S3 keys point at the wrong prefix.
 
 ## Root causes
 
 1. **Strapi 5 Draft & Publish**: draft and published are separate DB rows; **relation link tables are not always copied on publish**.
 2. **Category slug casing**: UID fields stored with wrong casing break `filters[category][slug][$eq]=main-news`.
+3. **Media stripped / wrong S3 prefix** on tenant push: covers need durable S3 register, then tenant re-link (see gotchas below).
 
 ## Enforcement (code — requires Strapi Cloud deploy)
 
@@ -28,6 +30,28 @@ alwaysApply: false
 | Editor RBAC | [`src/bootstrap.js`](mdc:src/bootstrap.js) `registerTenantDocumentMiddleware()` | Tenant-scoped find/update for editor role |
 
 **Tenant-scoped UIDs** (publish middleware): article, advertisement-slot, flash-news-item, directory-home, and all directory collection types listed in `registerTenantPublishMiddleware`.
+
+## News push gotchas (articles + ads)
+
+- **`push:tenant-to-cloud` publish resets `publishedAt` to “now”.** After pushing articles, restore historical dates from local:
+  ```bash
+  npm run sync:article-published-dates-cloud -- --tenant-id=mosc_malankara_orthodox_2
+  ```
+  Uses `POST /api/migration/fix-published` (knex) so Document Service publish does not overwrite dates again.
+- **Cover PUT can drop tenant/category (and previously wiped title/slug).** After S3 article covers, re-link tenants. Prefer the orchestrator:
+  ```bash
+  npm run repair:cloud-news-sync -- --tenant-id=mosc_malankara_orthodox_2
+  ```
+  S3 linker preserves `title`/`slug`/… and maps category by **Cloud slug**; still re-run tenant fix after cover link.
+- **Clean article re-upload (conflicts):** `npm run wipe:cloud-articles-tenant -- --tenant-id=mosc_malankara_orthodox_2` then push articles only + dates + S3.
+- **Local ads/flash scrape:** `npm run seed:ads-flash-catholicatenews -- --tenants=tenant_demo_002,mosc_malankara_orthodox_2`
+- **Durable covers/ads media:** use S3 strategy A — [strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc](mdc:.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc) (`--collection=articles` / `advertisement-slots`, `--skip-api`).
+- **S3 register with `prod/` prefix while local media lives under `dev/`** creates Cloud URLs that **403** (object missing under prod). `push-collection-images-s3` now copies remote `dev/` bytes into the prod key before register. Emergency repair:
+  ```bash
+  node scripts/repair-cloud-ad-s3-from-dev.js
+  ```
+- Bucket has **ACLs disabled** — do not pass `ACL: public-read` on PutObject; see [strapi-aws-s3-upload-omit-acl-when-bucket-owner-enforced.mdc](mdc:.cursor/rules/strapi-aws-s3-upload-omit-acl-when-bucket-owner-enforced.mdc).
+- **Full news Cloud runbook:** [news-production-cloud-push-prd.html](mdc:documentation/front_end_based_collection_types_import/production_cloud_data_push/news-production-cloud-push-prd.html)
 
 ## One-time Cloud repair (no new deploy required for endpoint)
 
@@ -53,7 +77,7 @@ Auth: `Authorization: Bearer` = `STRAPI_CLOUD_API_TOKEN` or `STRAPI_MIGRATION_TO
 | [`scripts/normalize-production-category-slugs.mjs`](mdc:scripts/normalize-production-category-slugs.mjs) | Categories only (deprecated; use normalize-production-slugs) |
 | [`scripts/fix_article_category_tenant.js`](mdc:scripts/fix_article_category_tenant.js) | Local DB: propagate category/tenant links to all article rows |
 
-**Env**: `STRAPI_CLOUD_URL`, `STRAPI_CLOUD_API_TOKEN`, `TENANT_ID` (default `tenant_demo_002`).
+**Env**: `STRAPI_CLOUD_URL`, `STRAPI_CLOUD_API_TOKEN`, `TENANT_ID` (default `tenant_demo_002`). Always prefer explicit `--tenant-id=` for production (`mosc_malankara_orthodox_2`).
 
 **Windows TLS** (if `fetch failed`):
 
@@ -117,8 +141,11 @@ Do **not** wait for deploy to run slug normalization or `fix-published` backfill
 
 ## Related rules
 
-- [strapi_frontend_slug_contract.mdc](mdc:.cursor/rules/strapi_frontend_slug_contract.mdc) — **share with Next.js**: category slugs, article URLs, no frontend validation on read
-- [strapi-cloud-bootstrap-fixes.mdc](mdc:.cursor/rules/strapi-cloud-bootstrap-fixes.mdc) — CM config after transfer
+- [strapi-nextjs-frontend-slug-contract-kebab-case-category-filters.mdc](mdc:.cursor/rules/strapi-nextjs-frontend-slug-contract-kebab-case-category-filters.mdc) — **share with Next.js**: category slugs, article URLs, no frontend validation on read
+- [strapi5-content-api-frontend-query-patterns-tenant-populate-published.mdc](mdc:.cursor/rules/strapi5-content-api-frontend-query-patterns-tenant-populate-published.mdc) — Content API tenant / populate / publishedAt patterns
+- [strapi-cloud-bootstrap-content-manager-config-sync-and-default-sort-fixes.mdc](mdc:.cursor/rules/strapi-cloud-bootstrap-content-manager-config-sync-and-default-sort-fixes.mdc) — CM config after transfer
+- [strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc](mdc:.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc) — durable S3 for covers/ads
+- [strapi5-local-news-import-propagate-category-tenant-cover-draft-and-published.mdc](mdc:.cursor/rules/strapi5-local-news-import-propagate-category-tenant-cover-draft-and-published.mdc) — local seed D&P propagation
 - Push/import: [`scripts/rest_api_push_to_cloud.js`](mdc:scripts/rest_api_push_to_cloud.js) uses `normalizeSlug()` and case-insensitive category dedup
 
 ## Checklist after changes
@@ -127,3 +154,4 @@ Do **not** wait for deploy to run slug normalization or `fix-published` backfill
 - [ ] Category probes `main-news`, `press-release`, `featured-news` return rows
 - [ ] Strapi Cloud deployed with tenant-assignment + lifecycles
 - [ ] Editor mapped via `scripts/assign-editor-to-directory-tenant.js` if CM user cannot see tenant content
+- [ ] Article covers / ads use S3 absolute URLs with `HEAD` 200 (not `/uploads/`)

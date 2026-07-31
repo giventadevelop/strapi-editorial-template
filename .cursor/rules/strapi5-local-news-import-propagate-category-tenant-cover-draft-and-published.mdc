@@ -1,12 +1,14 @@
 ---
-description: Strapi 5 news import — propagate category, tenant, and cover images to ALL article rows (draft + published).
+description: Local Strapi 5 news seed/import — propagate category, tenant, and cover to ALL article rows (draft + published)
 globs: scripts/data_import_seed_news*.js, scripts/fix_article*.js, documentation/News_Import/**
 alwaysApply: false
 ---
 
-# Strapi 5 News Import: Category, Tenant & Images
+# Local news import — propagate category, tenant, and cover (draft + published)
 
-## Background: Strapi 5 Draft-and-Publish Model
+This rule is for **local** seed/import and local DB fix scripts. For **Cloud production** tenant/category/slug/cover repair after push, see [strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](mdc:.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc).
+
+## Background: Strapi 5 Draft-and-Publish model
 
 Strapi 5 creates **two rows per article** when using draft-and-publish:
 
@@ -15,7 +17,7 @@ Strapi 5 creates **two rows per article** when using draft-and-publish:
 
 The Content Manager loads the **draft row by default**. If category, tenant, or cover links exist only on the published row, they appear **empty** in the admin UI.
 
-## Tables Involved
+## Tables involved
 
 | Data       | Table                    | Key Columns                              |
 |-----------|---------------------------|------------------------------------------|
@@ -25,11 +27,11 @@ The Content Manager loads the **draft row by default**. If category, tenant, or 
 
 All relations use **article row id** (`articles.id`), not `document_id`. Each draft and published row has its own `id`.
 
-## Required Fixes
+## Required fixes
 
-### 1. Category and Tenant Propagation
+### 1. Category and tenant propagation
 
-After import (or when fixing existing data), **propagate** category and tenant from any row that has them to **all other rows** for the same `document_id`:
+After import (or when fixing existing local data), **propagate** category and tenant from any row that has them to **all other rows** for the same `document_id`:
 
 ```javascript
 // For each document_id that has category/tenant links:
@@ -44,7 +46,7 @@ Key points:
 - Group by `document_id`; collect `category_id` and `tenant_id` from any row.
 - Insert links for **every** article row that lacks them.
 
-### 2. Cover Image Propagation
+### 2. Cover image propagation
 
 Same pattern for cover images:
 
@@ -52,7 +54,9 @@ Same pattern for cover images:
 - Map `related_id` (article row id) → `document_id` via `articles`.
 - For each `document_id`, get `file_id` from any row; then ensure **all** article rows for that document have a cover link in the morph table.
 
-### 3. Image Upload Reliability (EBUSY / File Lock)
+Initial cover link after create uses `setMediaRelationViaDb` — see [strapi5-document-service-media-relation-link-via-files-related-mph.mdc](mdc:.cursor/rules/strapi5-document-service-media-relation-link-via-files-related-mph.mdc).
+
+### 3. Image upload reliability (EBUSY / file lock)
 
 When uploading images from a local clone (especially on Windows):
 
@@ -65,18 +69,18 @@ When uploading images from a local clone (especially on Windows):
 // Retry loop: if /EBUSY|EPERM|EACCES|resource busy|locked/i.test(e.message) && attempt < 3
 ```
 
-### 4. Cover Linking After Create
+### 4. Cover linking after create
 
-Always call `setMediaRelationViaDb` after creating an article with a cover. The Document Service may not reliably link media on create; writing to `files_related_mph` ensures the link exists.
+Always call `setMediaRelationViaDb` after creating an article with a cover (field `cover`). The Document Service may not reliably link media on create.
 
-## Import Flow Order
+## Import flow order
 
 1. Create articles with `category`, `tenant`, and optionally `cover` in the data.
 2. `syncDraftRowsFromPublished` — Copy `title`, `description`, `slug` to draft rows.
 3. `syncCoverToAllArticleRows` — Propagate cover to all article rows.
 4. `syncCategoryAndTenantToAllArticleRows` — Propagate category and tenant to all article rows.
 
-## Standalone Fix Scripts
+## Standalone fix scripts (local)
 
 - `npm run fix:article_covers` — Propagate cover only.
 - `npm run fix:article_category_tenant` — Propagate category and tenant only.
@@ -87,4 +91,9 @@ Run with Strapi stopped to avoid locks.
 
 - Import script: `scripts/data_import_seed_news_catholicatenews.js`
 - Fix scripts: `scripts/fix_article_covers.js`, `scripts/fix_article_category_tenant.js`
-- Related rule: `strapi-media-relation-image-upload-fix.mdc` for `setMediaRelationViaDb` pattern.
+
+## Related rules
+
+- [strapi5-document-service-media-relation-link-via-files-related-mph.mdc](mdc:.cursor/rules/strapi5-document-service-media-relation-link-via-files-related-mph.mdc) — `setMediaRelationViaDb` pattern
+- [strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc](mdc:.cursor/rules/strapi-cloud-production-news-tenant-category-slug-and-cover-repair-runbook.mdc) — Cloud production news repair
+- [strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc](mdc:.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc) — durable S3 for Cloud media

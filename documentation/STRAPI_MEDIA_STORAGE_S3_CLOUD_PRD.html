@@ -59,7 +59,7 @@
     <ol>
       <li><a href="#context">Context &amp; Problem Statement</a></li>
       <li><a href="#transfer-log-summary">Transfer to Strapi Cloud: Log Analysis &amp; 404 Summary</a></li>
-      <li><a href="#cursor-rule">Cursor Rule: strapi-media-relation-image-upload-fix</a></li>
+      <li><a href="#cursor-rule">Cursor Rules: media relation + durable S3 Cloud upload</a></li>
       <li><a href="#transfer-limitation">Transfer/Export Limitation with S3</a></li>
       <li><a href="#sqlite-myth">SQLite Slowness: Myth vs Reality</a></li>
       <li><a href="#best-options">Best Options for Media Storage</a></li>
@@ -136,14 +136,15 @@
   <h3>2.6 Bootstrap vs Media</h3>
   <p><strong>Bootstrap</strong> fixes the homepage and bishop list errors; once that version is deployed to Cloud, those issues should stop. <strong>Media 404s</strong> are independent of bootstrap. They are fixed by <strong>where files are stored</strong> (external storage + same URLs), not by bootstrap. So: deploy the fixed bootstrap for admin/list behavior; add S3 (or equivalent) for media so transfer no longer leaves you with missing files and 404s.</p>
 
-  <h2 id="cursor-rule">3. Cursor Rule: strapi-media-relation-image-upload-fix</h2>
-  <p>The rule <code>.cursor/rules/strapi-media-relation-image-upload-fix.mdc</code> does <strong>not</strong> address:</p>
+  <h2 id="cursor-rule">3. Cursor Rules: media relation + durable S3 Cloud upload</h2>
+  <p>The rule <code>.cursor/rules/strapi5-document-service-media-relation-link-via-files-related-mph.mdc</code> does <strong>not</strong> address:</p>
   <ul>
     <li>Strapi Cloud deployment or media storage providers</li>
     <li>S3 or Cloudinary configuration</li>
     <li>Transfer/export issues with media</li>
   </ul>
   <p>It focuses solely on the <strong>Document Service rejection</strong> when linking media to content: Strapi 5 rejects <code>connect</code> / <code>set</code> for <code>plugin::upload.file</code>. The fix uses the <code>files_related_mph</code> morph table to link media after create/update. Import scripts (e.g. <code>data_import_seed_directory_mosc_in.js</code>, <code>data_import_seed_news_catholicatenews.js</code>) implement this pattern.</p>
+  <p>For <strong>production Cloud durability</strong> (S3 vs ephemeral <code>/uploads/</code>), use <code>.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc</code>. For ACL omit when Bucket owner enforced, use <code>.cursor/rules/strapi-aws-s3-upload-omit-acl-when-bucket-owner-enforced.mdc</code>.</p>
 
   <h2 id="transfer-limitation">4. Transfer/Export Limitation with S3</h2>
   <table>

@@ -44,7 +44,7 @@
       <p><strong>S3 images:</strong> <code class="script-name">push:collection-images-s3-to-cloud</code> (<code>--collection=articles</code> / <code>advertisement-slots</code>)</p>
       <p><strong>One-shot repair:</strong> <code class="script-name">repair:cloud-news-sync</code> → <code class="script-name">scripts/repair-cloud-news-sync.js</code></p>
       <p><strong>Local scrape (ads + flash):</strong> <code class="script-name">seed:ads-flash-catholicatenews</code></p>
-      <p><strong>Image rule:</strong> <code>.cursor/rules/strapi-cloud-image-upload-migration.mdc</code></p>
+      <p><strong>Image rule:</strong> <code>.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc</code></p>
     </div>
 
     <div class="success"><strong>Verified Jul 2026:</strong> Production Cloud has ~25 articles with S3 covers, 4 advertisement slots (top / between_sections / sidebar) with S3 media, and 5 flash items for <code>mosc_malankara_orthodox_2</code>.</div>
@@ -147,7 +147,7 @@
     <h2>9. AI prompt</h2>
     <div class="command-block">
       <div class="command-header"><strong>Copy</strong><button type="button" class="copy-button" onclick="copyCommand(this,'p')">📋 Copy</button></div>
-      <div class="command-content" id="p" style="white-space:pre-wrap;">Sync local news (articles, advertisement-slots, flash-news-items) to Strapi Cloud for tenant mosc_malankara_orthodox_2. Use durable S3 images per .cursor/rules/strapi-cloud-image-upload-migration.mdc (--skip-api). After cover link, re-link tenants (repair:cloud-news-sync). Restore publishedAt with sync:article-published-dates-cloud. Verify tenant filter returns articles with amazonaws cover URLs and ads for top/between_sections/sidebar.</div>
+      <div class="command-content" id="p" style="white-space:pre-wrap;">Sync local news (articles, advertisement-slots, flash-news-items) to Strapi Cloud for tenant mosc_malankara_orthodox_2. Use durable S3 images per .cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc (--skip-api). After cover link, re-link tenants (repair:cloud-news-sync). Restore publishedAt with sync:article-published-dates-cloud. Verify tenant filter returns articles with amazonaws cover URLs and ads for top/between_sections/sidebar.</div>
     </div>
   </div>
   <script>

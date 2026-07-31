@@ -1,0 +1,41 @@
+---
+description: AWS S3 uploads — omit ACL when bucket Object Ownership is Bucket owner enforced (ACLs disabled)
+globs: config/env/**/plugins.js, config/plugins.js, scripts/lib/push-collection-images-s3.js, scripts/**/*s3*.js
+alwaysApply: false
+---
+
+# AWS S3 upload — omit ACL when Bucket owner enforced
+
+When the S3 bucket has **Object Ownership** set to "Bucket owner enforced", ACLs are disabled. Using `ACL: 'public-read'` in S3 params causes:
+
+```
+AccessControlListNotSupported: The bucket does not allow ACLs
+http: POST /upload 500
+```
+
+Public read for the media prefix comes from **bucket policy**, not object ACLs.
+
+## Fix — Strapi upload provider
+
+In `config/env/development/plugins.js` and `config/env/production/plugins.js`, set ACL to `undefined` when the bucket does not support ACLs:
+
+```js
+params: {
+  ACL: (env('AWS_ACL') && env('AWS_ACL') !== 'none') ? env('AWS_ACL') : undefined,
+  Bucket: env('AWS_S3_BUCKET_NAME', 'eventapp-media-bucket'),
+},
+```
+
+The `@strapi/provider-upload-aws-s3` provider adds `public-read` by default when the ACL key is **absent**. You must include `ACL: undefined` so the provider skips its default and does not send an ACL header to S3.
+
+## Fix — push / PutObject scripts
+
+Any script that calls `PutObject` (e.g. [scripts/lib/push-collection-images-s3.js](mdc:scripts/lib/push-collection-images-s3.js)) must also **omit** `ACL: 'public-read'` for this bucket. Do not reintroduce ACL headers when copying `dev/` → `prod/` keys or registering media.
+
+## Verification
+
+Upload an image in Media Library or editorial-advertisements. Upload should succeed without 500. Durable Cloud image push should complete without `AccessControlListNotSupported`.
+
+## Related rules
+
+- [strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc](mdc:.cursor/rules/strapi-cloud-production-durable-s3-image-upload-not-ephemeral-uploads.mdc) — production S3 image push policy
