@@ -77,6 +77,7 @@ const SLUG_CONTENT_TYPE_UIDS = [
   'api::current-catholicos.current-catholicos',
   'api::diocesan-bishop.diocesan-bishop',
   'api::holy-synod-member.holy-synod-member',
+  'api::managing-committee-member.managing-committee-member',
   'api::ecumenical-article.ecumenical-article',
   'api::saint-entry.saint-entry',
   'api::catholicate-entry.catholicate-entry',

@@ -1,0 +1,79 @@
+{
+  "kind": "collectionType",
+  "collectionName": "managing_committee_members",
+  "info": {
+    "singularName": "managing-committee-member",
+    "pluralName": "managing-committee-members",
+    "displayName": "Directory – Managing Committee Members",
+    "description": "Managing Committee member roster (photo, role, diocese/parish) for a given term year"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "description": "Member full name"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name",
+      "required": true
+    },
+    "photo": {
+      "type": "media",
+      "multiple": false,
+      "required": false,
+      "allowedTypes": ["images"],
+      "description": "Portrait photo"
+    },
+    "role": {
+      "type": "string",
+      "description": "Role / designation (e.g. Priest, Lay, office bearer)"
+    },
+    "diocese": {
+      "type": "string",
+      "description": "Diocese from roster"
+    },
+    "parish": {
+      "type": "string",
+      "description": "Parish from roster"
+    },
+    "serialNumber": {
+      "type": "integer",
+      "description": "Serial number as printed in source PDF"
+    },
+    "order": {
+      "type": "integer",
+      "default": 0,
+      "description": "Display order on roster page"
+    },
+    "isCurrent": {
+      "type": "boolean",
+      "default": true,
+      "description": "Marks the current roster term"
+    },
+    "termYear": {
+      "type": "integer",
+      "required": true,
+      "description": "Primary term year discriminator (e.g. 2026)"
+    },
+    "notes": {
+      "type": "text",
+      "description": "Optional leftover columns / remarks"
+    },
+    "tenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::tenant.tenant",
+      "description": "Auto-assigned from editor's tenant. Do not edit.",
+      "pluginOptions": {
+        "content-manager": {
+          "visible": false
+        }
+      }
+    }
+  }
+}

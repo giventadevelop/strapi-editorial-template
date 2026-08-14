@@ -1524,6 +1524,52 @@ export interface ApiLiturgyDayLiturgyDay extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiManagingCommitteeMemberManagingCommitteeMember
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'managing_committee_members';
+  info: {
+    description: 'Managing Committee member roster (photo, role, diocese/parish) for a given term year';
+    displayName: 'Directory \u2013 Managing Committee Members';
+    pluralName: 'managing-committee-members';
+    singularName: 'managing-committee-member';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    diocese: Schema.Attribute.String;
+    isCurrent: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::managing-committee-member.managing-committee-member'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    notes: Schema.Attribute.Text;
+    order: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    parish: Schema.Attribute.String;
+    photo: Schema.Attribute.Media<'images'>;
+    publishedAt: Schema.Attribute.DateTime;
+    role: Schema.Attribute.String;
+    serialNumber: Schema.Attribute.Integer;
+    slug: Schema.Attribute.UID<'name'> & Schema.Attribute.Required;
+    tenant: Schema.Attribute.Relation<'manyToOne', 'api::tenant.tenant'> &
+      Schema.Attribute.SetPluginOptions<{
+        'content-manager': {
+          visible: false;
+        };
+      }>;
+    termYear: Schema.Attribute.Integer & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiManagingCommitteeManagingCommittee
   extends Struct.CollectionTypeSchema {
   collectionName: 'managing_committees';
@@ -2673,6 +2719,7 @@ declare module '@strapi/strapi' {
       'api::kalpana-edition.kalpana-edition': ApiKalpanaEditionKalpanaEdition;
       'api::kalpana-page.kalpana-page': ApiKalpanaPageKalpanaPage;
       'api::liturgy-day.liturgy-day': ApiLiturgyDayLiturgyDay;
+      'api::managing-committee-member.managing-committee-member': ApiManagingCommitteeMemberManagingCommitteeMember;
       'api::managing-committee.managing-committee': ApiManagingCommitteeManagingCommittee;
       'api::parish.parish': ApiParishParish;
       'api::pilgrim-centre.pilgrim-centre': ApiPilgrimCentrePilgrimCentre;
