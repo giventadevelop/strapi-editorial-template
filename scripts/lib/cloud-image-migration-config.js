@@ -138,6 +138,16 @@ const COLLECTIONS = {
     mediaField: 'image',
     pushContentScript: 'push:tenant-to-cloud',
   },
+  'managing-committee-members': {
+    label: 'Managing Committee Members',
+    uid: 'api::managing-committee-member.managing-committee-member',
+    table: 'managing_committee_members',
+    tenantLinkTable: 'managing_committee_members_tenant_lnk',
+    entryIdCol: 'managing_committee_member_id',
+    restPlural: 'managing-committee-members',
+    mediaField: 'photo',
+    pushContentScript: 'push:managing-committee-members-to-cloud',
+  },
   articles: {
     label: 'News Articles',
     uid: 'api::article.article',

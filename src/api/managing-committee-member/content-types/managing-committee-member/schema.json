@@ -41,6 +41,14 @@
       "type": "string",
       "description": "Parish from roster"
     },
+    "address": {
+      "type": "text",
+      "description": "Postal / residence address"
+    },
+    "electedRegion": {
+      "type": "string",
+      "description": "Elected region / constituency (e.g. NORTH EAST AMERICA)"
+    },
     "serialNumber": {
       "type": "integer",
       "description": "Serial number as printed in source PDF"

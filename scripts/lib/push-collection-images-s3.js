@@ -291,7 +291,24 @@ async function pushCollectionImagesS3(config, tenantIdFilter, options = {}) {
     },
     ...(UID === 'api::article.article' ? { status: 'draft' } : {}),
   });
-  const list = result?.results ?? result?.data ?? (Array.isArray(result) ? result : []);
+  let list = result?.results ?? result?.data ?? (Array.isArray(result) ? result : []);
+
+  // MC members may historically lack tenant link; fall back to termYear + -mo2 slug
+  if (
+    list.length === 0 &&
+    UID === 'api::managing-committee-member.managing-committee-member' &&
+    tenantIdFilter === 'mosc_malankara_orthodox_2'
+  ) {
+    const fallback = await app.documents(UID).findMany({
+      filters: { termYear: 2026 },
+      limit: 2000,
+      populate: { [mediaField]: true, tenant: true },
+    });
+    const all = fallback?.results ?? fallback?.data ?? (Array.isArray(fallback) ? fallback : []);
+    list = all.filter((row) => String(row.slug || '').endsWith('-mo2'));
+    console.log(`  Fallback load: ${list.length} MC member(s) by termYear=2026 + -mo2 slug`);
+  }
+
   await app.destroy();
 
   if (list.length === 0) {

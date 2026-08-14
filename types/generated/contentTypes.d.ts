@@ -1537,10 +1537,12 @@ export interface ApiManagingCommitteeMemberManagingCommitteeMember
     draftAndPublish: false;
   };
   attributes: {
+    address: Schema.Attribute.Text;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     diocese: Schema.Attribute.String;
+    electedRegion: Schema.Attribute.String;
     isCurrent: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<true>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<

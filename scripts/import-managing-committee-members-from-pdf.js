@@ -28,6 +28,8 @@ const mime = require('mime-types');
 const DRY_RUN = process.env.DRY_RUN === '1' || process.env.DRY_RUN === 'true' || process.argv.includes('--dry-run');
 const REPLACE = process.argv.includes('--replace');
 const DEFAULT_PDF_URL = 'https://mosc.in/uploads/2026/04/Managing-Committee-Members.pdf';
+const DEFAULT_LOCAL_PDF =
+  'C:\\E_Drive\\code_backup\\mosc_downloads\\malankara-association-2026\\2026\\Managing-Committee-Members-1.pdf';
 const UID = 'api::managing-committee-member.managing-committee-member';
 
 const TENANT_ID = (() => {
@@ -45,7 +47,11 @@ const TERM_YEAR = (() => {
 const PDF_PATH_OR_URL = (() => {
   const m = process.argv.find((a) => a.startsWith('--pdf='));
   if (m) return m.split('=').slice(1).join('=').trim();
-  return process.env.MC_MEMBERS_PDF || DEFAULT_PDF_URL;
+  if (process.env.MC_MEMBERS_PDF) return process.env.MC_MEMBERS_PDF;
+  try {
+    if (require('fs').existsSync(DEFAULT_LOCAL_PDF)) return DEFAULT_LOCAL_PDF;
+  } catch (_) {}
+  return DEFAULT_PDF_URL;
 })();
 
 const PHOTO_DIR = (() => {
